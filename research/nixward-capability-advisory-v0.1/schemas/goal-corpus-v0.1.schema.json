@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:nixward:goal-corpus:0.1",
+  "title": "NixWard user-goal conformance corpus v0.1",
+  "description": "Synthetic planning inputs and expected clarification behavior; not production planning or authorization evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_id", "synthetic_only", "cases"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "profile_id": {"const": "NIXWARD-GOAL-CORPUS-V0.1"},
+    "synthetic_only": {"const": true},
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host_id", "nixos_release", "system", "flake_ref", "nixpkgs_revision", "flake_lock_digest", "configuration_identity"],
+      "properties": {
+        "host_id": {"type": ["string", "null"]},
+        "nixos_release": {"type": ["string", "null"]},
+        "system": {"type": ["string", "null"]},
+        "flake_ref": {"type": ["string", "null"]},
+        "nixpkgs_revision": {"type": ["string", "null"]},
+        "flake_lock_digest": {"type": ["string", "null"]},
+        "configuration_identity": {"type": ["string", "null"]},
+        "module_set_digest": {"type": ["string", "null"]},
+        "home_manager_identity": {"type": ["string", "null"]}
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["constraint_id", "kind", "statement"],
+      "properties": {
+        "constraint_id": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["hard", "soft", "forbidden"]},
+        "statement": {"type": "string", "minLength": 1}
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirement_id", "domain", "desired_outcome", "verification_obligations"],
+      "properties": {
+        "requirement_id": {"type": "string", "minLength": 1},
+        "domain": {
+          "enum": ["packages", "services", "desktop", "network", "storage", "boot_recovery", "identity", "secrets", "encryption", "virtualization", "containers", "development", "hardware", "multi_host", "backup", "security"]
+        },
+        "desired_outcome": {"type": "string", "minLength": 1},
+        "verification_obligations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "question", "risk_if_assumed"],
+      "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "question": {"type": "string", "minLength": 1},
+        "risk_if_assumed": {"enum": ["low", "moderate", "high", "irreversible"]}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "cluster_id", "user_request", "target", "hard_constraints", "soft_preferences", "requirements", "unresolved_decisions", "expected"],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^NWG-[0-9]{3}$"},
+        "cluster_id": {"type": "string", "minLength": 1},
+        "user_request": {"type": "string", "minLength": 1},
+        "target": {"$ref": "#/$defs/target"},
+        "hard_constraints": {"type": "array", "items": {"$ref": "#/$defs/constraint"}},
+        "soft_preferences": {"type": "array", "items": {"$ref": "#/$defs/constraint"}},
+        "requirements": {"type": "array", "items": {"$ref": "#/$defs/requirement"}, "minItems": 1},
+        "unresolved_decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "blocking_decisions", "must_not_assume"],
+          "properties": {
+            "classification": {"enum": ["plan_candidate", "needs_clarification", "abstain"]},
+            "blocking_decisions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+            "must_not_assume": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+          }
+        }
+      }
+    }
+  }
+}

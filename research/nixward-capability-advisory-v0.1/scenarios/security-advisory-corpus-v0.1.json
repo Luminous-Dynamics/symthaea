@@ -1,0 +1,1223 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "NIXWARD-CAPABILITY-ADVISORY-V0.1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "case_id": "NWA-001",
+      "cluster_id": "pkg-exact-match",
+      "scenario_class": "package_advisory",
+      "description": "An exact store derivation in the pinned host closure matches a current synthetic advisory range.",
+      "subject": {
+        "host_id": "workstation-01",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": {
+          "derivation_path": "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-openssl-3.0.13.drv",
+          "derivation_name": "openssl-3.0.13",
+          "pname": "openssl",
+          "version": "3.0.13",
+          "output_paths": [
+            "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-openssl-3.0.13"
+          ],
+          "process_linkage_observed": null
+        },
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0001",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-001-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-001-lock",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-001-derivation",
+          "kind": "nix_store_derivation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-001-derivation",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-001-closure",
+          "kind": "nix_store_closure",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-001-closure",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-001-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-001-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "affected",
+        "exposure": "not_applicable",
+        "disposition": "recommend",
+        "required_evidence": [
+          "exact_host",
+          "pinned_nixpkgs_revision",
+          "exact_derivation",
+          "current_advisory_record"
+        ],
+        "must_not_claim": [
+          "public_exposure",
+          "process_is_exploitable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-002",
+      "cluster_id": "pkg-name-only",
+      "scenario_class": "package_presence",
+      "description": "A report says the host has OpenSSL, but no version, derivation or closure membership is bound.",
+      "subject": {
+        "host_id": "workstation-02",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0002",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-002-inventory",
+          "kind": "nix_store_closure",
+          "subject_binding": "partial",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-002-inventory",
+          "summary": "Inventory only contains a package-name string"
+        }
+      ],
+      "expected": {
+        "applicability": "unknown",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "exact_derivation",
+          "pinned_nixpkgs_revision"
+        ],
+        "must_not_claim": [
+          "affected",
+          "not_affected",
+          "not_exposed"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-003",
+      "cluster_id": "pkg-fixed-range",
+      "scenario_class": "package_advisory",
+      "description": "The exact derivation is at the advisory's documented fixed version in the same pinned source context.",
+      "subject": {
+        "host_id": "workstation-03",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": {
+          "derivation_path": "/nix/store/cccccccccccccccccccccccccccccccc-openssl-3.0.14.drv",
+          "derivation_name": "openssl-3.0.14",
+          "pname": "openssl",
+          "version": "3.0.14",
+          "output_paths": [
+            "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-openssl-3.0.14"
+          ],
+          "process_linkage_observed": null
+        },
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0003",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-003-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-003-lock",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-003-derivation",
+          "kind": "nix_store_derivation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-003-derivation",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-003-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-003-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_affected",
+        "exposure": "not_applicable",
+        "disposition": "inform_only",
+        "required_evidence": [
+          "exact_derivation",
+          "authoritative_fixed_range",
+          "matching_source_revision"
+        ],
+        "must_not_claim": [
+          "all_openssl_versions_are_safe",
+          "host_is_secure"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-004",
+      "cluster_id": "advisory-withdrawal",
+      "scenario_class": "advisory_lifecycle",
+      "description": "The upstream record is withdrawn after publication; the old affected range cannot be treated as current without review.",
+      "subject": {
+        "host_id": "workstation-04",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": {
+          "derivation_path": "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-openssl-3.0.13.drv",
+          "derivation_name": "openssl-3.0.13",
+          "pname": "openssl",
+          "version": "3.0.13",
+          "output_paths": [
+            "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-openssl-3.0.13"
+          ],
+          "process_linkage_observed": null
+        },
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0004",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "withdrawn",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-004-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-004-lock",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-004-derivation",
+          "kind": "nix_store_derivation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-004-derivation",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-004-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-004-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "unknown",
+        "exposure": "not_applicable",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "current_advisory_review"
+        ],
+        "must_not_claim": [
+          "definitively_affected",
+          "definitively_not_affected"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-005",
+      "cluster_id": "closure-not-process",
+      "scenario_class": "package_advisory",
+      "description": "The affected derivation is in the host closure, but an exact process-linkage observation says the target service does not load it.",
+      "subject": {
+        "host_id": "workstation-05",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": {
+          "derivation_path": "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-openssl-3.0.13.drv",
+          "derivation_name": "openssl-3.0.13",
+          "pname": "openssl",
+          "version": "3.0.13",
+          "output_paths": [
+            "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-openssl-3.0.13"
+          ],
+          "process_linkage_observed": false
+        },
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0005",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-005-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-lock",
+          "summary": "Pinned host source identity"
+        },
+        {
+          "evidence_id": "e-005-closure",
+          "kind": "nix_store_closure",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-closure",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-005-derivation",
+          "kind": "nix_store_derivation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-derivation",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-005-linkage",
+          "kind": "process_linkage",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-linkage",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-005-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-005-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "affected",
+        "exposure": "unknown",
+        "disposition": "monitor",
+        "required_evidence": [
+          "exact_derivation",
+          "closure_membership",
+          "process_linkage_for_consequence"
+        ],
+        "must_not_claim": [
+          "package_not_present",
+          "vulnerable_code_is_executed",
+          "host_is_not_exposed"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-006",
+      "cluster_id": "mysql-local-config-only",
+      "scenario_class": "service_exposure",
+      "description": "The NixOS option evaluation declares a database bound to localhost, but no live listener or network-path observation exists.",
+      "subject": {
+        "host_id": "server-01",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "mysql",
+          "declared_value": "127.0.0.1:3306",
+          "runtime_identity": null
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-006-option",
+          "kind": "nixos_option_evaluation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-006-option",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "live_listener",
+          "effective_network_path"
+        ],
+        "must_not_claim": [
+          "not_exposed",
+          "publicly_reachable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-007",
+      "cluster_id": "wildcard-listener-no-route",
+      "scenario_class": "service_exposure",
+      "description": "A fresh runtime observation shows a wildcard-bound database listener, but no route or external reachability evidence exists.",
+      "subject": {
+        "host_id": "server-02",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "mysql",
+          "declared_value": null,
+          "runtime_identity": "0.0.0.0:3306"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-007-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-007-listener",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "listener_process_identity",
+          "route_observation",
+          "external_reachability_probe"
+        ],
+        "must_not_claim": [
+          "internet_exposed",
+          "publicly_reachable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-008",
+      "cluster_id": "public-probe-confirmed",
+      "scenario_class": "service_exposure",
+      "description": "A service listener is bound to a process and a fresh external probe from the declared test vantage point succeeds.",
+      "subject": {
+        "host_id": "server-03",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "nginx",
+          "declared_value": null,
+          "runtime_identity": "0.0.0.0:443"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-008-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-008-listener",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-008-route",
+          "kind": "route_observation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-008-route",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-008-probe",
+          "kind": "external_reachability_probe",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-008-probe",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "confirmed",
+        "disposition": "inform_only",
+        "required_evidence": [
+          "listener_process_identity",
+          "route_observation",
+          "external_reachability_probe"
+        ],
+        "must_not_claim": [
+          "all_paths_and_vantage_points_are_reachable",
+          "exposure_is_unintended",
+          "service_is_vulnerable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-009",
+      "cluster_id": "firewall-config-not-runtime",
+      "scenario_class": "firewall_effectiveness",
+      "description": "The declared firewall option is enabled, but the only effective-firewall capture is stale.",
+      "subject": {
+        "host_id": "server-04",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "nixos_option",
+          "identity": "networking.firewall.enable",
+          "declared_value": true,
+          "runtime_identity": null
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-009-option",
+          "kind": "nixos_option_evaluation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-009-option",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-009-firewall",
+          "kind": "effective_firewall",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "stale",
+          "value_digest": "fixture:e-009-firewall",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "fresh_effective_firewall",
+          "network_path_probe"
+        ],
+        "must_not_claim": [
+          "firewall_is_effective",
+          "service_is_not_reachable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-010",
+      "cluster_id": "unit-hardening-observed",
+      "scenario_class": "service_hardening",
+      "description": "A fresh systemd unit observation shows NoNewPrivileges disabled and an unrestricted filesystem view; this is a hardening finding, not a CVE applicability claim.",
+      "subject": {
+        "host_id": "server-05",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "systemd_unit",
+          "identity": "example.service",
+          "declared_value": null,
+          "runtime_identity": "example.service"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-010-unit",
+          "kind": "runtime_unit_properties",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-010-unit",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "not_applicable",
+        "disposition": "recommend",
+        "required_evidence": [
+          "runtime_unit_properties",
+          "service_functional_requirements"
+        ],
+        "must_not_claim": [
+          "this_is_a_cve",
+          "service_is_publicly_exposed",
+          "one_hardening_profile_fits_every_service"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-011",
+      "cluster_id": "ssh-effective-config-public",
+      "scenario_class": "ssh_authentication",
+      "description": "Declared PasswordAuthentication is false, but sshd's effective runtime configuration enables it and an external probe confirms the SSH endpoint is reachable.",
+      "subject": {
+        "host_id": "server-06",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "ssh_daemon",
+          "identity": "sshd",
+          "declared_value": "PasswordAuthentication no",
+          "runtime_identity": "PasswordAuthentication yes"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-011-option",
+          "kind": "nixos_option_evaluation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-011-option",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-011-sshd",
+          "kind": "sshd_effective_config",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-011-sshd",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-011-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-011-listener",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-011-probe",
+          "kind": "external_reachability_probe",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-011-probe",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "confirmed",
+        "disposition": "recommend",
+        "required_evidence": [
+          "effective_sshd_configuration",
+          "listener_process_identity",
+          "external_reachability_probe"
+        ],
+        "must_not_claim": [
+          "password_auth_is_disabled",
+          "password_authentication_alone_proves_compromise"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-012",
+      "cluster_id": "stale-listener",
+      "scenario_class": "evidence_currentness",
+      "description": "The only listener observation is outside the declared freshness window, so present exposure cannot be inferred.",
+      "subject": {
+        "host_id": "server-07",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "postgresql",
+          "declared_value": null,
+          "runtime_identity": "0.0.0.0:5432"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-012-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-20T10:00:00Z",
+          "source_revision": "fixture-runtime-v1",
+          "integrity": "verified_local",
+          "freshness": "stale",
+          "value_digest": "fixture:e-012-listener",
+          "summary": "Listener observation is deliberately stale"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "fresh_runtime_listener",
+          "fresh_network_path"
+        ],
+        "must_not_claim": [
+          "currently_exposed",
+          "currently_not_exposed"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-013",
+      "cluster_id": "config-runtime-conflict",
+      "scenario_class": "evidence_conflict",
+      "description": "Configuration declares a loopback bind while a fresh runtime listener reports wildcard binding; neither should be silently selected as universal truth.",
+      "subject": {
+        "host_id": "server-08",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "mysql",
+          "declared_value": "127.0.0.1:3306",
+          "runtime_identity": "0.0.0.0:3306"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-013-option",
+          "kind": "nixos_option_evaluation",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-013-option",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-013-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-013-listener",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "reconciled_config_runtime_chronology",
+          "listener_process_identity",
+          "network_path"
+        ],
+        "must_not_claim": [
+          "not_exposed",
+          "configuration_matches_runtime"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-014",
+      "cluster_id": "intentional-public-web",
+      "scenario_class": "user_intended_exposure",
+      "description": "The owner explicitly requested a public HTTPS endpoint; a fresh probe confirms exposure and the observed TLS configuration is recorded. Exposure is not automatically a defect.",
+      "subject": {
+        "host_id": "web-01",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "network_service",
+          "identity": "nginx",
+          "declared_value": "public HTTPS service",
+          "runtime_identity": "0.0.0.0:443"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-014-intent",
+          "kind": "user_intent",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-014-intent",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-014-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-014-listener",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-014-probe",
+          "kind": "external_reachability_probe",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-014-probe",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-014-tls",
+          "kind": "runtime_unit_properties",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-014-tls",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "confirmed",
+        "disposition": "inform_only",
+        "required_evidence": [
+          "explicit_user_intent",
+          "listener_process_identity",
+          "external_reachability_probe",
+          "tls_configuration"
+        ],
+        "must_not_claim": [
+          "exposure_is_unintended",
+          "public_service_is_inherently_vulnerable"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-015",
+      "cluster_id": "wrong-source-derivation",
+      "scenario_class": "package_advisory",
+      "description": "A derivation record is bound to a different nixpkgs revision than the target host's flake lock.",
+      "subject": {
+        "host_id": "workstation-09",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": {
+          "derivation_path": "/nix/store/dddddddddddddddddddddddddddddddd-openssl-3.0.13.drv",
+          "derivation_name": "openssl-3.0.13",
+          "pname": "openssl",
+          "version": "3.0.13",
+          "output_paths": [
+            "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-openssl-3.0.13"
+          ],
+          "process_linkage_observed": null
+        },
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0015",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-015-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-015-lock",
+          "summary": "Target host lock uses revision 1111"
+        },
+        {
+          "evidence_id": "e-015-derivation",
+          "kind": "nix_store_derivation",
+          "subject_binding": "mismatched",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "2222222222222222222222222222222222222222",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-015-derivation",
+          "summary": "Derivation evidence came from another revision"
+        },
+        {
+          "evidence_id": "e-015-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-015-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "unknown",
+        "exposure": "not_applicable",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "derivation_from_target_revision",
+          "exact_host_binding"
+        ],
+        "must_not_claim": [
+          "affected",
+          "not_affected"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-016",
+      "cluster_id": "effective-filter-negative-probe",
+      "scenario_class": "firewall_effectiveness",
+      "description": "The effective filter capture and a probe from one named vantage point show no reachability at observation time; the conclusion is scoped to that path and time.",
+      "subject": {
+        "host_id": "server-10",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "nixos_option",
+          "identity": "networking.firewall.enable",
+          "declared_value": false,
+          "runtime_identity": null
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-016-firewall",
+          "kind": "effective_firewall",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-016-firewall",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-016-probe",
+          "kind": "external_reachability_probe",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-016-probe",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "not_confirmed",
+        "disposition": "monitor",
+        "required_evidence": [
+          "fresh_effective_firewall",
+          "named_probe_vantage",
+          "probe_timestamp"
+        ],
+        "must_not_claim": [
+          "not_reachable_from_every_network",
+          "firewall_is_enabled_in_nixos_configuration"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-017",
+      "cluster_id": "advisory-package-absent",
+      "scenario_class": "package_presence",
+      "description": "A complete pinned closure observation shows that the advisory's package is absent from this host's closure.",
+      "subject": {
+        "host_id": "workstation-11",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": null
+      },
+      "advisory": {
+        "source": "SYNTHETIC",
+        "source_identity": "fixture-security-feed-v1",
+        "advisory_id": "SYNTH-GHSA-NW-0017",
+        "source_revision": "fixture-feed-rev-001",
+        "status": "current",
+        "upstream_severity": "high",
+        "published_at": "2026-10-01T00:00:00Z",
+        "modified_at": "2026-10-02T00:00:00Z",
+        "affected_package": "openssl",
+        "affected_range": "< 3.0.14",
+        "fixed_version": "3.0.14"
+      },
+      "evidence": [
+        {
+          "evidence_id": "e-017-lock",
+          "kind": "pinned_flake_lock",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-017-lock",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-017-closure",
+          "kind": "nix_store_closure",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-017-closure",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-017-advisory",
+          "kind": "advisory_record",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "authenticated",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-017-advisory",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "not_applicable",
+        "disposition": "inform_only",
+        "required_evidence": [
+          "complete_closure_for_exact_host",
+          "pinned_nixpkgs_revision",
+          "current_advisory_record"
+        ],
+        "must_not_claim": [
+          "host_is_secure",
+          "package_cannot_be_present_outside_the_examined_closure"
+        ]
+      }
+    },
+    {
+      "case_id": "NWA-018",
+      "cluster_id": "ssh-password-no-reachability",
+      "scenario_class": "ssh_authentication",
+      "description": "Effective SSH configuration permits password authentication, but no network reachability observation exists.",
+      "subject": {
+        "host_id": "server-12",
+        "nixos_release": "26.11",
+        "nixpkgs_revision": "1111111111111111111111111111111111111111",
+        "package": null,
+        "config_subject": {
+          "kind": "ssh_daemon",
+          "identity": "sshd",
+          "declared_value": null,
+          "runtime_identity": "PasswordAuthentication yes"
+        }
+      },
+      "advisory": null,
+      "evidence": [
+        {
+          "evidence_id": "e-018-sshd",
+          "kind": "sshd_effective_config",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-018-sshd",
+          "summary": "Synthetic fixture evidence"
+        },
+        {
+          "evidence_id": "e-018-listener",
+          "kind": "runtime_listener",
+          "subject_binding": "exact",
+          "observed_at": "2026-11-28T10:00:00Z",
+          "source_revision": "fixture-source-v1",
+          "integrity": "verified_local",
+          "freshness": "fresh",
+          "value_digest": "fixture:e-018-listener",
+          "summary": "Synthetic fixture evidence"
+        }
+      ],
+      "expected": {
+        "applicability": "not_applicable",
+        "exposure": "unknown",
+        "disposition": "needs_observation",
+        "required_evidence": [
+          "external_reachability_probe",
+          "account_authentication_policy"
+        ],
+        "must_not_claim": [
+          "publicly_reachable",
+          "password_authentication_is_exploited"
+        ]
+      }
+    }
+  ]
+}
