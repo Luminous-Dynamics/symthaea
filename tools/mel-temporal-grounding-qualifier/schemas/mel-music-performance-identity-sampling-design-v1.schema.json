@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-performance-identity-sampling-design-v1.schema.json",
+  "title": "Melothaea property-relative identity sampling design v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sampling_frame_id",
+    "target_population",
+    "inclusion_exclusion_policy",
+    "pseudonymization_scope",
+    "independent_source_work_sampling_claimed",
+    "independence_basis",
+    "observations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-music-performance-identity-sampling-design-v1"
+    },
+    "sampling_frame_id": { "type": "string" },
+    "target_population": { "type": "string" },
+    "inclusion_exclusion_policy": { "type": "string" },
+    "pseudonymization_scope": { "type": "string" },
+    "independent_source_work_sampling_claimed": { "type": "boolean" },
+    "independence_basis": { "type": "string" },
+    "observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observation" }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performer_identity_sha256",
+        "performer_membership_sha256",
+        "session_identity_sha256",
+        "take_identity_sha256",
+        "performance_identity_sha256"
+      ],
+      "properties": {
+        "performer_identity_sha256": { "type": "string" },
+        "performer_membership_sha256": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/digest" }
+        },
+        "session_identity_sha256": { "type": "string" },
+        "take_identity_sha256": { "type": "string" },
+        "performance_identity_sha256": { "type": "string" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "pair_id",
+        "source_work_lineage_sha256",
+        "clean",
+        "performance_stay",
+        "musical_flip"
+      ],
+      "properties": {
+        "item_id": { "type": "string" },
+        "pair_id": { "type": "string" },
+        "source_work_lineage_sha256": { "type": "string" },
+        "clean": { "$ref": "#/$defs/arm" },
+        "performance_stay": { "$ref": "#/$defs/arm" },
+        "musical_flip": { "$ref": "#/$defs/arm" }
+      }
+    }
+  }
+}
