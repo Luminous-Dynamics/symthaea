@@ -17,7 +17,7 @@ pub use candidate::{
 };
 
 pub mod evaluator;
-pub use evaluator::{F1EpisodeReport, evaluate_f1};
+pub use evaluator::{F1DecisionRecord, F1EpisodeReport, evaluate_f1};
 
 mod hidden_mechanics;
 pub use hidden_mechanics::{
