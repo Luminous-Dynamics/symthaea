@@ -3,7 +3,7 @@
 //! Standalone, deterministic game-environment primitives for Symthaea GameBench.
 //!
 //! V0.1 implements navigation (F1), Sokoban-like pushing (F2), keys/doors (F3),
-//! and partial-map exploration (F4). It is a benchmark substrate, not an agent,
+//! partial-map exploration (F4), and resource crafting (F5). It is a benchmark substrate, not an agent,
 //! game-playing result, or production runtime component.
 
 mod partial_map;
@@ -16,6 +16,12 @@ mod prerequisites;
 pub use prerequisites::{
     DoorSpec, KeySpec, PrerequisiteGame, PrerequisiteSpec, PrerequisiteSpecError,
     PrerequisiteState, PrerequisiteStepError, PrerequisiteTransition,
+};
+
+mod resource_chain;
+pub use resource_chain::{
+    CraftingAction, CraftingGame, CraftingSpec, CraftingSpecError, CraftingState,
+    CraftingStepError, CraftingTransition, Ingredient, RecipeSpec, ResourceKind, ResourcePile,
 };
 
 mod sokoban;
