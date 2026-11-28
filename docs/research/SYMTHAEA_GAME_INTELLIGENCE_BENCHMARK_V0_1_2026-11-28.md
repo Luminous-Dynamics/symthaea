@@ -409,7 +409,7 @@ Do not set a single cross-benchmark target. Use protocol-matched goals:
 | SIMA 2 held-out environments | About 14% ASKA / 13% MineDojo | Build a genuinely unseen mechanics/world split and compare success, adaptation cost, and skill transfer; do not compare unlike games directly |
 | Rust-native GameBench | Exact oracle exists only for small deterministic fixtures | 100% on frozen known-answer controls; then test held-out maps, rules and compositions with statistical uncertainty |
 
-For a GameWorld or BALROG SOTA claim, Symthaea will eventually require a real visual/action route. The current F1–F4 structured environment fixtures do not qualify pixel perception, computer-use, browser interaction, or multimodal performance.
+For a GameWorld or BALROG SOTA claim, Symthaea will eventually require a real visual/action route. The current F1–F6 structured environment fixtures do not qualify pixel perception, computer-use, browser interaction, or multimodal performance.
 
 ## 14. New research direction: skill contracts and cognitive control
 
@@ -462,3 +462,42 @@ A scan that reduces uncertainty but cannot change any optimal decision should no
 
 Permit Symthaea to propose new levels, skill candidates and adversarial counterexamples. Freeze generated tasks before the candidate sees evaluation outcomes. Have an independent generator/evaluator select the final hidden cohort. Score the improvement *process* on new tasks created after the system's proposal policy is frozen. This composes with the existing sealed-evaluator work; it does not grant the agent authority over its own score.
 
+
+## 15. Implementation checkpoint — 28 November 2026
+
+The standalone Rust research crate now contains deterministic environment fixtures for all six initial task families:
+
+| Family | Implemented environment contract | Important controls |
+|---|---|---|
+| F1 Navigation | Rectangular grid, bounded moves, full and local observation, ordered trace/replay, private exact shortest-path oracle | Invalid geometry, blocked movement, action limit, tampered transition and non-contiguous event sequence |
+| F2 Pushing | Single-box Sokoban-like movement and push mechanics, private exact reachability oracle | Blocked push, wall-trapped box, duplicate walls, overlapping objects |
+| F3 Prerequisites | Single-use keys, explicit collected-key and current-inventory state, persistent unlocked doors, private exact planner | No-key locked door, no key respawn, duplicate IDs, unknown key reference, key/door overlap |
+| F4 Partial map | Current field-of-view observations and paid one-step scan; environment does not retain observation history | Hidden distant cells, scan cost, previous cells absent from later views, blocked action costs |
+| F5 Resource chain | Scarce gatherable piles, typed recipes, workbench, acyclic recipe dependency validation, depletion and private exact planner | Zero resource pile, recipe cycle, missing station/input, depleted pile cannot be gathered |
+| F6 Hidden mechanics | Two rule variants with identical initial observations; paid lever intervention; route determined by the revealed gate state | No-probe negative control, action budget, single-use switch, hidden rule omitted from observations and debug output |
+
+The current branch contains **41 authored Rust unit tests** across F1–F6. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
+
+### 15.1 Important implementation boundary
+
+These are environment contracts and evaluator diagnostics, not a game-playing policy. The hidden-rule constructor receives the evaluator-selected mechanism; it does not infer it. The partial-observation environment discards prior views; it does not implement candidate memory. The exact planners are crate-private and are intended only for known-answer / optimality references on small fixtures.
+
+The current milestone is therefore:
+
+- **Implemented:** six deterministic task families and their source-authored controls.
+- **Structural:** skill-contract direction, causal surprise / model revision protocol, active-sensing value accounting, sealed external task portfolio.
+- **CI-pending:** rustfmt, cargo test, strict Clippy on the exact PR head.
+- **Not implemented:** Symthaea's actual cognitive-policy adapter, candidate-side episodic map memory, skill acquisition/transfer, signed evaluator receipts, procedural hidden cohorts, and public BALROG/Procgen/Crafter/GameWorld reproductions.
+- **Not qualified:** autonomous discovery, visual game play, SOTA performance, or transfer to physical systems.
+
+### 15.2 Immediate next tranche
+
+The next productive step is not another environment family. It is the candidate interface and cognitive instrumentation:
+
+1. Define an observation/action-only candidate trait in a separate adapter boundary. Do not provide Game, Spec, hidden rule, remaining pile vector, or exact planner to the candidate.
+2. Add a candidate episode loop which receives only the current observation and emits one legal action plus a typed prediction/uncertainty record.
+3. Add an independently replayed outcome trace for F1–F6; keep evaluator truth and task scoring outside candidate memory.
+4. Add matched candidate variants: random legal, deterministic heuristic, BFS only as evaluator diagnostic, HDC-only, temporal-only, memory-only, planner-only, and coupled variants where available.
+5. For F4, score memory retention by requiring the candidate to navigate from accumulated observations after earlier cells disappear from the current view.
+6. For F6, compare no-probe, fixed probe, random probe, entropy-greedy, decision-value probe, and exact evaluator-only oracle under equal interaction budgets.
+7. Only after these controls pass should an external benchmark adapter or performance campaign be treated as a capability result.
