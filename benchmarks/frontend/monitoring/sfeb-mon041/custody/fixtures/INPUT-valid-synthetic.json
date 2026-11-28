@@ -1,0 +1,70 @@
+{
+  "profile": "mon041-custody-input-v1",
+  "version": "1.0.0",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-28T08:00:00Z",
+  "claim_id": "fixture-claim-001",
+  "trial_id": "fixture-trial-001",
+  "recovery_boundary_sha256": "727ca6bbab4c91a7b290af2ad152b10a801c7777ec39a854ab1d21b3d58c7e18",
+  "required_evidence_classes": ["postgres_source_truth", "kafka_partition_capture"],
+  "expected_sources": {"kafka_partition_capture": "kafka-cluster-001", "postgres_source_truth": "postgres-primary"},
+  "issued_nonces": [
+    "70862daf9aaf88d10db6bfc0ff845ad50aff6f29a3f5c623e9bd9390559393c9",
+    "b9c6ec62bae8a1dcef33824355b47851b0a91437e31f6c83ab868c324ae67b00"
+  ],
+  "used_nonces": [],
+  "trusted_keys": [{
+    "key_id": "fixture-key-001",
+    "principal": "fixture-capture-agent",
+    "public_key_base64": "I7xUkSwebpLEqGglyGfif/3FVb/71CRPF6Jqv//ull0=",
+    "not_before": "2026-11-27T08:00:00Z",
+    "not_after": "2026-11-29T08:00:00Z"
+  }],
+  "receipts": [
+    {
+      "profile": "mon041-evidence-receipt-v1",
+      "version": "1.0.0",
+      "receipt_id": "fixture-receipt-001",
+      "session_id": "fixture-session-001",
+      "nonce": "70862daf9aaf88d10db6bfc0ff845ad50aff6f29a3f5c623e9bd9390559393c9",
+      "claim_id": "fixture-claim-001",
+      "trial_id": "fixture-trial-001",
+      "recovery_boundary_sha256": "727ca6bbab4c91a7b290af2ad152b10a801c7777ec39a854ab1d21b3d58c7e18",
+      "source_id": "postgres-primary",
+      "evidence_class": "postgres_source_truth",
+      "capture_principal": "fixture-capture-agent",
+      "captured_at": "2026-11-28T07:59:00Z",
+      "expires_at": "2026-11-28T08:10:00Z",
+      "sequence": 1,
+      "artifact_sha256": "1c49fb72e8e6641f748e3ce7250bed4bb8c5a1c55de2fd6a8416628909a57085",
+      "artifact_bytes": 4096,
+      "media_type": "application/json",
+      "signer_key_id": "fixture-key-001",
+      "signature_base64": "mIdvukuXi3go2uUOrR3XOf5lIMALCa3Ve0K0pjn0rfyjN125ZK6RsZPYoRBVoEnqLqwh6ENw+HqgWcBRjTcYCw=="
+    },
+    {
+      "profile": "mon041-evidence-receipt-v1",
+      "version": "1.0.0",
+      "receipt_id": "fixture-receipt-002",
+      "session_id": "fixture-session-001",
+      "nonce": "b9c6ec62bae8a1dcef33824355b47851b0a91437e31f6c83ab868c324ae67b00",
+      "claim_id": "fixture-claim-001",
+      "trial_id": "fixture-trial-001",
+      "recovery_boundary_sha256": "727ca6bbab4c91a7b290af2ad152b10a801c7777ec39a854ab1d21b3d58c7e18",
+      "source_id": "kafka-cluster-001",
+      "evidence_class": "kafka_partition_capture",
+      "capture_principal": "fixture-capture-agent",
+      "captured_at": "2026-11-28T07:59:00Z",
+      "expires_at": "2026-11-28T08:10:00Z",
+      "sequence": 2,
+      "previous_receipt_sha256": "40ed8ec86c012bb18af6ed3366b35d1e5f27bdd68dc8c5686ce1d57f70edf55f",
+      "artifact_sha256": "842876d944b40d1bb297aded7392dbb4195ecb96cd57b6d309bb53eba8602af9",
+      "artifact_bytes": 8192,
+      "media_type": "application/json",
+      "signer_key_id": "fixture-key-001",
+      "signature_base64": "BhogvZm5jSLO8ihyLJSrx+XGRbFjgfY/nDgAdybbmlBCPdJUL97cXkS6eYe1FaS0Y4CVJNYv9jwyGzModNsiCQ=="
+    }
+  ],
+  "max_receipt_age_seconds": 3600,
+  "allowed_clock_skew_seconds": 30
+}
