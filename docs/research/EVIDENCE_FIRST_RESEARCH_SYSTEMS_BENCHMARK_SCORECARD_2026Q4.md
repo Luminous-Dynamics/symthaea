@@ -253,6 +253,94 @@ Report:
 
 **Gate:** no off-support counterfactual is scored as observed. A live audit sample is required before claiming that historical replay predicts the ranking of real experiments.
 
+## 4.4 Scientific-agent capability — research choices, execution and independently verified transfer
+
+This lane is separate from SDCB numerical assurance and MACE memory utility. It evaluates whether an agent can run a scientific workflow, decide what to do next, make testable predictions, revise or abstain under evidence, and produce a result that another party can reproduce.
+
+### External benchmark map (snapshot: 2026-11-28)
+
+| Benchmark | What it actually measures | Current reference / caveat | Symthaea use |
+|---|---|---|---|
+| Terminal-Bench Science | 70 terminal-based scientific workflows across life, physical, earth, mathematical and engineering sciences; three trials per task | OpenResearch's 2026-11-28 sync lists GPT-6 Astra / Codex at 68.10 ± 3.22, with domain scores and reported cost. The same page separately lists maker-reported maxima of GPT-6.2 Astra 77.10, Mythos 5.2 75.30 and Fable 5.2 74.60 as **not yet on the official leaderboard**. Do not merge those evidence tiers. | End-to-end workflow reference; preserve task-level and domain breakdowns, trial variance and inclusive tool/API cost. |
+| FrontierPhysics | 56 end-to-end physics research tasks across nine fields, written by 42 physicists; a pass requires every automated test and every must-have rubric item; three trials averaged | Priors' 2026-11-28 aggregator snapshot lists Fable 5.2 at 33.3%, Opus 5.5 at 27.4%, and GPT-6.2 Astra at 26.8%. This is an aggregator snapshot, not a claim that all 29 models were freshly evaluated or that the source leaderboard has published every result. | High-bar physics workflow lane; strict task-pass definition and rubric transparency are essential. |
+| RD-Bench / Decision-Centric Research | 2,000 rule-generated research-decision cases; 24 decision types defined, ten instantiated; held-out research-domain evaluation | The 2026-10-31 paper reports state-aware DCRM Top-1 89.4%, versus 27.8% question-only DCRM and 36.4% DeepSeek-V4.1-Flash; calibrated prediction sets achieve 97.1% empirical coverage with mean set size 1.515. This is a decision-model benchmark with closed candidate options, not a full autonomous-discovery result. | Direct benchmark for the typed ResearchState → decision interface and calibrated option sets. Reproduce exact task splits before comparing. |
+| AstaBench | Evolving suite of thousands of scientific problems across literature understanding, coding/execution, data analysis and end-to-end research; includes Core-Bench-Hard, SUPER-Expert and E2E-Bench-Hard | The benchmark is explicitly evolving and exposes multiple sub-benchmarks/leaderboards. Its task families are not one interchangeable scalar. | Reproducibility and end-to-end workflow tracks; pin sub-benchmark version, task set and grader. |
+| SciAgentArena | Approximately 200 stepwise-verified tasks, 18 evaluated agents, five scientific domains and four task categories | The public benchmark reports heterogeneous task metrics (for example AUROC, F1, Jaccard and accuracy); no common aggregate should be inferred from those native metrics. The benchmark highlights uneven open-ended exploration, novelty and validity checking. | Domain-specific held-out capability tests, stability/reliability and cost. Compare per task family, not a synthetic average. |
+| R-IDeA | Active-learning acquisition under model misspecification and covariate shift | The AISTATS 2026 paper formalizes representativeness, informativeness and de-amplification as distinct acquisition requirements; information gain alone is an incomplete policy baseline under misspecification. | Add as a first-class acquisition comparator beside EIG, EVSI and robust/minimax policies; do not describe R-IDeA as original Symthaea work. |
+
+Sources are listed under References. External results have different harnesses, models, costs, task units and uncertainty treatment. They are calibration points, not a single cross-benchmark ranking.
+
+### Two competition tracks — never confound policy quality with model capability
+
+**Track A: model-locked controller tournament.** Every policy arm receives the same base model/version, context, tools, permissions, prompts, evidence prefix, task seed, wall-clock allowance and inclusive budget. Swap only the research controller / decision policy. This is the clean test of what Symthaea contributes beyond a language model.
+
+**Track B: complete-system tournament.** Compare complete runnable systems under declared hardware, base model, API/model spend, software and tool access. This measures product capability, not the isolated effect of Symthaea's controller. Report model-free/native Symthaea results separately from any model-assisted configuration.
+
+For both tracks, retain an evaluator-only upper reference on tiny worlds. Never give candidate processes hidden truth, future outcomes, score functions, oracle policies or audit-selection randomness. A JSON boundary is not a security sandbox; evaluator isolation is a separate operational requirement.
+
+### Required treatment arms
+
+Use the owners already defined in #11171, #11012, #13691, #13567 and #9230. On identical episodes and inclusive budgets, compare:
+
+1. No-action / fixed workflow and fixed schedule.
+2. Matched-cost random action/experiment selection.
+3. Entropy-greedy and conventional EIG.
+4. One-step EVSI and exact sequential oracle on tiny evaluator-only worlds.
+5. Robust minimax / RPSD and R-IDeA acquisition.
+6. Spark Engine's LCF specialist EIG baseline only on the LCF domain where its assumptions apply.
+7. Direction-board allocation (including a reproducible Coral Discovery-style baseline) versus score-only winner-take-all search.
+8. Frozen production candidate selected by #11171, once a real state-contingent callable exists.
+9. Hidden-truth or full-information oracle as a diagnostic upper bound only.
+
+Do not relabel a fixed workflow, query planner, literature summarizer or single-step EIG utility as the general Symthaea researcher. The current callable gap in #11171 remains a prerequisite, not an evaluation detail.
+
+### Primary scorecard — report a vector, not a blended score
+
+| Dimension | Required measure |
+|---|---|
+| Decision quality | Per-decision-type Top-1/Top-k, calibrated option probabilities, selective risk/coverage, safe and unnecessary abstention separately. |
+| Research control | Prospective predicted outcome branches, correct stop / continue / pivot / replicate / abstain choice, and regret versus the tiny-world exact oracle. |
+| Identifiability | Structural, finite-budget and composite-family false-unique rates with separate commitment denominators; correct set-valued claims on exact-overlap controls. |
+| Counterfactual quality | Prospective branch calibration and held-out intervention prediction, including negative controls and prediction log score where adjudication supports it. |
+| Discovery validity | Independently reproduced result rate; survival on held-out mechanism, device, site, time and task families; counterexample/negative-result retention. Textual novelty or judge preference alone earns no discovery credit. |
+| Robustness | Model misspecification, support omission, covariate shift, measurement shift, common-cause/dependence shift, delayed and missing evidence, and corrupted-source controls. |
+| Efficiency | Full cost per independently verified transferable decision: model/API, CPU/GPU, tools, experiments, data acquisition, adjudication, retries, failed runs, latency and maintenance. |
+| Integrity | Exact evidence-prefix and task digests, no future-label leakage, no unauthorized action, complete failure accounting and independently replayable receipts. |
+
+The primary economic measure is **cost per independently verified transferable decision**, not cost per token, paper, answer or benchmark attempt. A transfer credit is awarded only when the result reproduces from the recorded artifacts and survives a preregistered held-out family or regime. An unresolved or non-identifiable result can be scientifically correct, but it must be labelled as such and scored on the appropriate decision objective.
+
+### Proposed target ladder (not results)
+
+| Lane | Reproduction gate | First competitive target | Stretch target |
+|---|---|---|---|
+| RD-Bench decision layer | Reproduce the paper's state-aware and question-only baselines on the exact held-out-domain split | ≥92% pooled Top-1 and ≥85% next-action Top-1; calibrated sets ≥95% held-out coverage at mean set size ≤1.5 | ≥95% pooled Top-1 with no research-domain subgroup below 90%, while retaining calibrated coverage |
+| Terminal-Bench Science | Reproduce the official 70-task / three-trial protocol and a listed official reference under the same harness | ≥70% resolution rate, with task-clustered uncertainty and no domain-level integrity regression | ≥80% resolution rate; this would exceed the currently listed official GPT-6 Astra reference and the separately maker-reported 77.1% maximum, if those protocols remain comparable |
+| FrontierPhysics | Reproduce the 56-task, three-trial strict all-tests-plus-rubric pass protocol | ≥40% task pass rate | ≥50% task pass rate, with rubric-level and field-level results published |
+| AstaBench | Reproduce named Core-Bench-Hard and E2E-Bench-Hard baselines | Beat the strongest version-matched baseline by ≥3 absolute points on at least one named hard track, with no regression on the paired companion track | Beat the best version-matched baseline on both hard tracks with paired task-family intervals above zero |
+| SciAgentArena | Reproduce native task/metric baselines and agent-agnostic environment | ≥5 absolute points over the strongest matched baseline on at least four of five domains, without worsening the remaining domain's failure severity | Lead on ≥4/5 domains and demonstrate transfer to a newly held-out domain/task family |
+| Native SDCB active-science tournament | Complete all deterministic identifiability, oracle-regret and evidence-integrity controls | Zero false-unique passes on exact structural/family overlap and truth-absent controls; ≥25% lower inclusive cost per independently verified transferable decision than the strongest matched policy without higher false-unique risk | Transfer the advantage to at least three held-out mechanism families and two independently sourced real-data cohorts |
+| Economic efficiency | Measure all inclusive costs on matched successful and failed tasks | ≥25% lower cost per independently verified transferable decision at no worse decision regret, false-unique risk, integrity or held-out transfer | ≥40% lower cost with equal or better worst-stratum performance |
+
+The numeric goals are research gates, not predictions. The 80% Terminal-Bench and 50% FrontierPhysics stretch goals are deliberately ambitious; do not present them as achievable until a matched baseline and resource envelope have been reproduced. For closed-set RD-Bench, also report the benchmark's original candidate-set accuracy and calibration separately; a 92% result does not establish open-world scientific discovery.
+
+### Paradigm-changing extensions to test, not merely describe
+
+- **Decision sufficiency before mechanism identity:** preserve a mechanism equivalence class when the mechanism is not identifiable, while still issuing a decision when every compatible model implies the same action. Score decision regret and false-mechanism claims separately.
+- **Evidence economy with active acquisition:** choose among retrieval, source verification, simulation, intervention, replication and abstention by expected decision value per inclusive cost. Use R-IDeA and robust EVSI to test the effect of representativeness and misspecification.
+- **Direction portfolio rather than winner-take-all search:** preserve multiple causal/architectural directions with delayed payoffs; use verifier-grounded direction identity and budget accounting from #9230.
+- **Prospective branch commitments:** before each costly action, freeze predicted outcomes, their probabilities, what decision each outcome changes, and stop/pivot criteria. Score those predictions against later independently adjudicated outcomes.
+- **Discovery as a reproducibility event:** separate a plausible idea, a locally reproduced result, a held-out transfer, and an independently replicated result into distinct claim states.
+- **Two-channel quality control:** combine adaptive, decision-relevant evidence acquisition with an independent randomized audit channel. The adaptive policy may optimize value; the independent channel estimates residual false-claim risk.
+
+### Immediate implementation sequence
+
+1. #11171 pins the actual state-contingent production policy callable and exposes it through the blind AgentView/AgentAction boundary; do not build another scheduler or posterior owner.
+2. Adapt the exact ResearchState and typed decision vocabulary to RD-Bench cases; retain both candidate options and calibrated distributions, then add counterfactual and irrelevant-metadata mutation tests.
+3. Freeze one small SDCB active-science campaign with exact equivalence, finite-budget near-equivalence, nuisance-family overlap, truth-absent, and decision-sufficient/non-identifiable episodes. Use #13567 solely as the evaluator oracle.
+4. Run model-locked policies first (EIG, EVSI, R-IDeA, robust/minimax, direction-board, #11171 incumbent); only then run complete-system external benchmark submissions.
+5. Freeze external leaderboard snapshots, model versions, prompts, tools, trial counts, costs and graders before each run. Publish per-task artifacts, failures and paired cluster intervals.
+6. Do not claim “better than SOTA” until the paired held-out lower confidence bound exceeds the version-matched reference and all integrity / false-confidence gates remain satisfied.
+
 ## 5. Shared architecture that unlocks the combined programme
 
 ### 5.1 Canonical source-event projection
@@ -457,6 +545,13 @@ The exact-source Rust 1.96 workflow passed Rustfmt, `rustc -D warnings --test`, 
 This contract is only a fail-closed reference. It shape-checks receipt hashes but does not authenticate them, verify reviewer authority, prove model adequacy or detect arbitrary dependence. Production integration must place the envelope behind an independent attestation boundary, bind it to exact calibration/test episode custody, and show that an inconclusive/out-of-envelope state cannot authorize a downstream mutation. It does not change production SDCB assessment.
 
 ## References
+
+- Terminal-Bench Science leaderboard snapshot and reported-vs-official distinction (OpenResearch, synced 28 November 2026): https://www.openresearch.sh/evals
+- FrontierPhysics leaderboard snapshot (Priors, data as of 28 November 2026): https://www.mypriors.com/benchmarks/frontierphysics
+- Decision-Centric Research / RD-Bench preprint (31 October 2026): https://arxiv.org/abs/2611.00774
+- AstaBench current benchmark inventory: https://allenai.org/asta/bench
+- SciAgentArena benchmark and native task metrics: https://sciagentarena.github.io/
+- R-IDeA, AISTATS 2026 / PMLR 300: https://proceedings.mlr.press/v300/tang26d.html
 
 - AML Cycle 2 official results (19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
 - LongMemEval-V2 official benchmark and live LAFS board: https://xiaowu0162.github.io/longmemeval-v2/
