@@ -72,7 +72,8 @@
         "verifier_environment_sha256",
         "replay_status",
         "replay_result_sha256",
-        "observed_at_utc"
+        "observed_at_utc",
+        "trust_policy_sha256"
       ],
       "properties": {
         "schema": {
@@ -299,6 +300,10 @@
         "observed_at_utc": {
           "type": "string",
           "format": "date-time"
+        },
+        "trust_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
