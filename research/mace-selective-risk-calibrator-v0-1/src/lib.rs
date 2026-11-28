@@ -995,7 +995,9 @@ mod tests{
     fn digest(value:&str)->String{sha256_hex(value.as_bytes())}
     fn examples(count:usize,group_id:&str,score:f64,loss:f64)->Vec<CalibrationExampleV1>{
         (0..count).map(|index|CalibrationExampleV1{
-            run_id:"run-001".into(),independent_cluster_id:format!("cluster-{index:04}"),
+            run_id:"run-001".into(),independent_cluster_id:digest(&format!("cluster-{index:04}")),
+            episode_commitment_sha256:digest(&format!("episode-{index:04}")),
+            observation_commitment_sha256:digest(&format!("observation-{index:04}")),
             group_id:group_id.into(),sufficiency_score:score,hard_gates_pass:true,
             decision_loss:loss,outcome_receipt_sha256:digest(&format!("outcome-{index}"))
         }).collect()
@@ -1003,7 +1005,9 @@ mod tests{
     fn config(groups:&[GroupSpecV1],rows:&[CalibrationExampleV1],thresholds:Vec<f64>,minimum:usize)->CalibrationConfigV1{
         CalibrationConfigV1{
             run_id:"run-001".into(),calibration_data_sha256:digest_serialized(rows).unwrap(),
-            calibration_split_sha256:digest("split"),group_hierarchy_sha256:digest_serialized(groups).unwrap(),
+            calibration_split_sha256:digest("calibration-split"),
+            evaluation_split_sha256:digest("evaluation-split"),
+            group_hierarchy_sha256:digest_serialized(groups).unwrap(),
             sufficiency_score_definition_sha256:digest("score"),decision_loss_definition_sha256:digest("loss"),
             decision_policy_sha256:digest("policy"),candidate_code_sha256:digest("candidate"),
             evaluator_code_sha256:digest("evaluator"),threshold_grid_sha256:digest_serialized(&thresholds).unwrap(),
@@ -1011,6 +1015,92 @@ mod tests{
             risk_target_alpha:0.1,familywise_delta:0.05,unacceptable_loss_threshold:0.5,
             minimum_independent_clusters:minimum,exchangeability_justified_by_design:true
         }
+    }
+
+
+    fn finish_inventory(mut inventory: SplitInventoryV1) -> SplitInventoryV1 {
+        inventory.inventory_sha256.clear();
+        inventory.inventory_sha256 = serde_json::to_vec(&inventory)
+            .map(|bytes| sha256_hex(&bytes))
+            .unwrap();
+        inventory
+    }
+
+    fn split_inventories(
+        config: &CalibrationConfigV1,
+        rows: &[CalibrationExampleV1],
+    ) -> (SplitInventoryV1, SplitInventoryV1) {
+        let cluster_commitments: Vec<String> = rows.iter()
+            .map(|row| row.independent_cluster_id.clone())
+            .collect::<BTreeSet<_>>().into_iter().collect();
+        let episode_commitments: Vec<String> = rows.iter()
+            .map(|row| row.episode_commitment_sha256.clone())
+            .collect::<BTreeSet<_>>().into_iter().collect();
+        let observation_commitments: Vec<String> = rows.iter()
+            .map(|row| row.observation_commitment_sha256.clone())
+            .collect::<BTreeSet<_>>().into_iter().collect();
+        let common = (
+            digest("benchmark-suite"),
+            digest("dataset-snapshot"),
+            digest("task-spec"),
+            config.group_hierarchy_sha256.clone(),
+            config.sufficiency_score_definition_sha256.clone(),
+            config.decision_loss_definition_sha256.clone(),
+            digest("independence-unit-schema"),
+        );
+        let calibration = finish_inventory(SplitInventoryV1 {
+            schema_version: "mace_split_inventory_v1".into(),
+            run_id: config.run_id.clone(),
+            role: SplitRoleV1::Calibration,
+            benchmark_suite_sha256: common.0.clone(),
+            dataset_snapshot_sha256: common.1.clone(),
+            split_sha256: config.calibration_split_sha256.clone(),
+            task_spec_sha256: common.2.clone(),
+            group_hierarchy_sha256: common.3.clone(),
+            sufficiency_score_definition_sha256: common.4.clone(),
+            decision_loss_definition_sha256: common.5.clone(),
+            independence_unit_schema_sha256: common.6.clone(),
+            calibration_examples_sha256: Some(config.calibration_data_sha256.clone()),
+            cluster_commitments,
+            episode_commitments,
+            observation_commitments,
+            outcome_labels_sealed: false,
+            candidate_outcome_access: false,
+            evaluation_outcome_seal_sha256: None,
+            inventory_sha256: String::new(),
+        });
+        let count = config.minimum_independent_clusters.max(40);
+        let evaluation = finish_inventory(SplitInventoryV1 {
+            schema_version: "mace_split_inventory_v1".into(),
+            run_id: config.run_id.clone(),
+            role: SplitRoleV1::Evaluation,
+            benchmark_suite_sha256: common.0,
+            dataset_snapshot_sha256: common.1,
+            split_sha256: config.evaluation_split_sha256.clone(),
+            task_spec_sha256: common.2,
+            group_hierarchy_sha256: common.3,
+            sufficiency_score_definition_sha256: common.4,
+            decision_loss_definition_sha256: common.5,
+            independence_unit_schema_sha256: common.6,
+            calibration_examples_sha256: None,
+            cluster_commitments: (0..count).map(|index| digest(&format!("eval-cluster-{index:04}"))).collect::<BTreeSet<_>>().into_iter().collect(),
+            episode_commitments: (0..count).map(|index| digest(&format!("eval-episode-{index:04}"))).collect::<BTreeSet<_>>().into_iter().collect(),
+            observation_commitments: (0..count).map(|index| digest(&format!("eval-observation-{index:04}"))).collect::<BTreeSet<_>>().into_iter().collect(),
+            outcome_labels_sealed: true,
+            candidate_outcome_access: false,
+            evaluation_outcome_seal_sha256: Some(digest("sealed-evaluation-outcomes")),
+            inventory_sha256: String::new(),
+        });
+        (calibration, evaluation)
+    }
+
+    fn calibrate_for_test(
+        config: &CalibrationConfigV1,
+        groups: &[GroupSpecV1],
+        rows: &[CalibrationExampleV1],
+    ) -> Result<CalibrationResultV1, CalibrationRejectV1> {
+        let (calibration, evaluation) = split_inventories(config, rows);
+        calibrate_selective_evidence_v1(config, groups, rows, &calibration, &evaluation)
     }
 
     #[test]
@@ -1031,7 +1121,7 @@ mod tests{
         let mut rows=examples(80,"root",0.9,0.0);
         for row in rows.iter_mut().take(20){row.sufficiency_score=0.2;row.decision_loss=1.0;}
         let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         assert!(result.manifest.verify_integrity());
         let cert=&result.certificates[0];
         assert_eq!(cert.status,RiskStatusV1::Certified);
@@ -1046,7 +1136,7 @@ mod tests{
         let mut rows=examples(40,"root",1.0,0.0);
         for row in &mut rows{row.hard_gates_pass=false;}
         let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         assert_eq!(cert.status,RiskStatusV1::NotEstimableInsufficientCalibrationClusters);
         assert_eq!(cert.accepted_example_count,0);
@@ -1065,7 +1155,7 @@ mod tests{
     fn unsafe_clusters_are_risk_exceeds_target_not_not_estimable(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,1.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::RiskExceedsTarget);
         assert!(result.certificates[0].risk_upper_bound.unwrap()>cfg.risk_target_alpha);
     }
@@ -1080,7 +1170,7 @@ mod tests{
             group_id:"leaf".into(),sufficiency_score:0.9,hard_gates_pass:true,decision_loss:0.0,
             outcome_receipt_sha256:digest("leaf-one")});
         let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let leaf=result.certificates.iter().find(|value|value.group_id=="leaf").unwrap();
         assert_eq!(leaf.status,RiskStatusV1::ParentGroupFallback);
         assert_eq!(leaf.parent_fallback_group_id.as_deref(),Some("root"));
@@ -1090,11 +1180,11 @@ mod tests{
     fn shift_and_unjustified_exchangeability_suspend_certification(){
         let shifted=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:true}];
         let rows=examples(40,"root",0.9,0.0);let cfg=config(&shifted,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&shifted,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&shifted,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::UnsupportedDistributionShift);
         let stable=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut cfg=config(&stable,&rows,vec![0.5,0.0],30);cfg.exchangeability_justified_by_design=false;
-        let result=calibrate_selective_evidence_v1(&cfg,&stable,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&stable,&rows).unwrap();
         assert_eq!(result.certificates[0].status,RiskStatusV1::NotEstimableExchangeabilityNotEstablished);
     }
     #[test]
@@ -1108,7 +1198,7 @@ mod tests{
         let stable=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(40,"root",0.9,0.0);let mut cfg=config(&stable,&rows,vec![0.5,0.0],30);
         cfg.calibration_data_sha256=digest("wrong");
-        assert_eq!(calibrate_selective_evidence_v1(&cfg,&stable,&rows),Err(CalibrationRejectV1::CalibrationDataDigestMismatch));
+        assert_eq!(calibrate_for_test(&cfg,&stable,&rows),Err(CalibrationRejectV1::CalibrationDataDigestMismatch));
     }
     #[test]
     fn low_score_triggers_retrieve_more(){
@@ -1116,7 +1206,7 @@ mod tests{
         let mut rows=examples(80,"root",0.9,0.0);
         for row in rows.iter_mut().take(20) { row.sufficiency_score=0.2; row.decision_loss=1.0; }
         let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
         assert_eq!(cert.threshold,Some(0.5));
         let assessment=assess_decision_v1(&DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.1,
@@ -1131,7 +1221,7 @@ mod tests{
     fn acceptance_requires_matching_group_certificate_and_hard_gates(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();let cert=&result.certificates[0];
         let input=DecisionInputV1{group_id:"root".into(),sufficiency_score:0.9,
         sufficiency_score_definition_sha256:cfg.sufficiency_score_definition_sha256.clone(),
         group_hierarchy_sha256:cfg.group_hierarchy_sha256.clone(),hard_gates_pass:true,
@@ -1148,7 +1238,7 @@ mod tests{
     fn tampered_certificate_cannot_authorize_acceptance(){
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let mut cert=result.certificates[0].clone();cert.threshold=Some(0.99);
         assert!(!cert.verify_integrity());assert!(!cert.is_usable());
     }
@@ -1158,7 +1248,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);
         let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         let input=DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.9,
@@ -1180,7 +1270,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(100,"root",0.9,0.0);
         let cfg=config(&groups,&rows,vec![0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         let mut input=DecisionInputV1{
             group_id:"root".into(),sufficiency_score:0.9,
@@ -1213,7 +1303,7 @@ mod tests{
         for row in rows.iter_mut().take(20) { row.sufficiency_score=0.2; row.decision_loss=1.0; }
         let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
         cfg.risk_target_alpha=0.05;
-        let fixed=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let fixed=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let fixed_cert=&fixed.certificates[0];
         assert_eq!(fixed_cert.status,RiskStatusV1::Certified);
         assert_eq!(fixed_cert.threshold,Some(0.5));
@@ -1223,7 +1313,7 @@ mod tests{
         simultaneous.threshold_selection_method=ThresholdSelectionMethodV1::BonferroniSimultaneous;
         simultaneous.thresholds.reverse();
         simultaneous.threshold_grid_sha256=digest_serialized(&simultaneous.thresholds).unwrap();
-        let bonf=calibrate_selective_evidence_v1(&simultaneous,&groups,&rows).unwrap();
+        let bonf=calibrate_for_test(&simultaneous,&groups,&rows).unwrap();
         let bonf_cert=&bonf.certificates[0];
         assert_ne!(bonf_cert.status,RiskStatusV1::Certified);
         assert_eq!(bonf_cert.multiplicity_adjusted_delta,Some(0.05/3.0));
@@ -1234,11 +1324,12 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(40,"root",0.9,0.0);
         let mut repeated=rows[0].clone();
+        repeated.observation_commitment_sha256=digest("repeated-observation");
         repeated.sufficiency_score=0.1;
         repeated.decision_loss=1.0;
         rows.push(repeated);
         let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
-        let result=calibrate_selective_evidence_v1(&cfg,&groups,&rows).unwrap();
+        let result=calibrate_for_test(&cfg,&groups,&rows).unwrap();
         let cert=&result.certificates[0];
         assert_eq!(cert.accepted_cluster_count,40);
         assert_eq!(cert.coverage,Some(1.0));
@@ -1250,7 +1341,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let rows=examples(40,"root",0.9,0.0);
         let cfg=config(&groups,&rows,vec![0.0,0.5],30);
-        assert_eq!(calibrate_selective_evidence_v1(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidThresholdGrid));
+        assert_eq!(calibrate_for_test(&cfg,&groups,&rows),Err(CalibrationRejectV1::InvalidThresholdGrid));
     }
 
 }
