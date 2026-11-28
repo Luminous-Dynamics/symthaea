@@ -14,16 +14,14 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 use super::label_consumption_guard::{
-    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1,
-    LabelEvidenceFrontierV1,
+    LabelConsumptionEligibilityReportV1, LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
 };
 
 pub const CA_OCRC_ENGINE_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-engine.v1";
 pub const CA_OCRC_POLICY_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-policy.v1";
 pub const CA_OCRC_ROUND_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-round.v1";
 pub const CA_OCRC_FEEDBACK_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-feedback.v1";
-pub const CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1: &str =
-    "luminous.semi-bench.ca-ocrc-update-receipt.v1";
+pub const CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1: &str = "luminous.semi-bench.ca-ocrc-update-receipt.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -316,14 +314,21 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         || !policy.maximum_inverse_probability_weight.is_finite()
         || policy.maximum_inverse_probability_weight < 1.0
     {
-        return Err(CaOcrcErrorV1("CA-OCRC policy has invalid numeric parameters".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC policy has invalid numeric parameters".into(),
+        ));
     }
     let expected = usize::try_from(policy.maximum_feedback_delay + 2)
         .map_err(|_| CaOcrcErrorV1("proxy delay support exceeds platform capacity".into()))?;
     if policy.proxy_delay_probabilities.len() != expected
-        || policy.proxy_delay_probabilities.iter().any(|p| !p.is_finite() || *p < 0.0)
+        || policy
+            .proxy_delay_probabilities
+            .iter()
+            .any(|p| !p.is_finite() || *p < 0.0)
     {
-        return Err(CaOcrcErrorV1("proxy delay PMF has invalid support or probabilities".into()));
+        return Err(CaOcrcErrorV1(
+            "proxy delay PMF has invalid support or probabilities".into(),
+        ));
     }
     let total: f64 = policy.proxy_delay_probabilities.iter().sum();
     if (total - 1.0).abs() > 1e-10 {
@@ -337,7 +342,9 @@ fn validate_policy(policy: &CaOcrcPolicyV1) -> Result<(), CaOcrcErrorV1> {
         )));
     }
     if survival(policy, policy.maximum_feedback_delay) <= 0.0 {
-        return Err(CaOcrcErrorV1("proxy survival at maximum feedback delay must be positive".into()));
+        return Err(CaOcrcErrorV1(
+            "proxy survival at maximum feedback delay must be positive".into(),
+        ));
     }
     Ok(())
 }
@@ -385,7 +392,9 @@ pub fn create_ca_ocrc_engine_v1(
 
 fn sample_proxy_delay(policy: &CaOcrcPolicyV1, uniform: f64) -> Result<i64, CaOcrcErrorV1> {
     if !uniform.is_finite() || !(0.0..1.0).contains(&uniform) {
-        return Err(CaOcrcErrorV1("proxy-delay uniform draw must be in [0,1)".into()));
+        return Err(CaOcrcErrorV1(
+            "proxy-delay uniform draw must be in [0,1)".into(),
+        ));
     }
     let mut cumulative = 0.0;
     for (index, probability) in policy.proxy_delay_probabilities.iter().enumerate() {
@@ -421,7 +430,9 @@ pub fn start_ca_ocrc_round_v1(
     input: &CaOcrcRoundInputV1,
 ) -> Result<CaOcrcTrackingDecisionV1, CaOcrcErrorV1> {
     if engine.schema != CA_OCRC_ENGINE_SCHEMA_V1 || input.schema != CA_OCRC_ROUND_SCHEMA_V1 {
-        return Err(CaOcrcErrorV1("CA-OCRC engine or round schema is unsupported".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC engine or round schema is unsupported".into(),
+        ));
     }
     if json_sha256(&engine.policy)? != engine.policy_sha256 {
         return Err(CaOcrcErrorV1("CA-OCRC policy digest mismatch".into()));
@@ -442,16 +453,22 @@ pub fn start_ca_ocrc_round_v1(
         ));
     }
     if engine.guarantee_state != CaOcrcGuaranteeStateV1::ActiveUnderBoundedDelayAndUnderload {
-        return Err(CaOcrcErrorV1("CA-OCRC guarantee is suspended; explicit reset/restart required".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC guarantee is suspended; explicit reset/restart required".into(),
+        ));
     }
-    let next_round = engine.next_round.checked_add(1)
+    let next_round = engine
+        .next_round
+        .checked_add(1)
         .ok_or_else(|| CaOcrcErrorV1("round index overflow".into()))?;
     let mut next = engine.clone();
     let threshold_used = engine.threshold;
     let mut expired = Vec::new();
     next.tracked_rounds.retain(|origin, tracked| {
         let active = origin.saturating_add(tracked.proxy_delay) >= input.round_index;
-        if !active { expired.push(*origin); }
+        if !active {
+            expired.push(*origin);
+        }
         active
     });
 
@@ -461,49 +478,67 @@ pub fn start_ca_ocrc_round_v1(
     match input.prediction_kind {
         CaOcrcPredictionKindV1::KnownEmpty => {
             if threshold_used >= 0.0 || input.lower_bound.is_some() || input.upper_bound.is_some() {
-                return Err(CaOcrcErrorV1("empty-set declaration conflicts with threshold/bounds".into()));
+                return Err(CaOcrcErrorV1(
+                    "empty-set declaration conflicts with threshold/bounds".into(),
+                ));
             }
             let loss = 1.0;
             next.threshold += next.policy.learning_rate * (loss - next.policy.target_risk);
             immediate_loss = Some(loss);
         }
         CaOcrcPredictionKindV1::KnownFull => {
-            if threshold_used < next.policy.score_bound_b || input.lower_bound.is_some() || input.upper_bound.is_some() {
-                return Err(CaOcrcErrorV1("full-set declaration conflicts with threshold/bounds".into()));
+            if threshold_used < next.policy.score_bound_b
+                || input.lower_bound.is_some()
+                || input.upper_bound.is_some()
+            {
+                return Err(CaOcrcErrorV1(
+                    "full-set declaration conflicts with threshold/bounds".into(),
+                ));
             }
             let loss = 0.0;
             next.threshold += next.policy.learning_rate * (loss - next.policy.target_risk);
             immediate_loss = Some(loss);
         }
         CaOcrcPredictionKindV1::Nontrivial => {
-            if threshold_used < 0.0 || threshold_used >= next.policy.score_bound_b
-                || input.lower_bound.is_none() || input.upper_bound.is_none()
+            if threshold_used < 0.0
+                || threshold_used >= next.policy.score_bound_b
+                || input.lower_bound.is_none()
+                || input.upper_bound.is_none()
                 || input.lower_bound.is_some_and(|v| !v.is_finite())
                 || input.upper_bound.is_some_and(|v| !v.is_finite())
-                || input.lower_bound.zip(input.upper_bound).is_some_and(|(a,b)| a>b)
+                || input
+                    .lower_bound
+                    .zip(input.upper_bound)
+                    .is_some_and(|(a, b)| a > b)
             {
-                return Err(CaOcrcErrorV1("nontrivial set declaration conflicts with threshold/bounds".into()));
+                return Err(CaOcrcErrorV1(
+                    "nontrivial set declaration conflicts with threshold/bounds".into(),
+                ));
             }
             let proxy = sample_proxy_delay(&next.policy, input.uniform_draw)?;
             sampled_proxy_delay = Some(proxy);
             if proxy < 0 {
-                next.randomized_nontracking_count = next.randomized_nontracking_count.saturating_add(1);
+                next.randomized_nontracking_count =
+                    next.randomized_nontracking_count.saturating_add(1);
             } else if next.tracked_rounds.len() < next.policy.tracking_capacity {
-                next.tracked_rounds.insert(input.round_index, CaOcrcTrackedRoundV1 {
-                    round_index: input.round_index,
-                    prediction_id: input.prediction_id.clone(),
-                    sample_id: input.sample_id.clone(),
-                    measurement_event_id: input.measurement_event_id.clone(),
-                    proxy_delay: proxy as u64,
-                    lower_bound: input.lower_bound.unwrap(),
-                    upper_bound: input.upper_bound.unwrap(),
-                    threshold_used: input.threshold_used,
-                    score_contract_sha256: input.score_contract_sha256.clone(),
-                    prediction_set_sha256: input.prediction_set_sha256.clone(),
-                    event_time_unix_seconds: input.event_time_unix_seconds,
-                    prediction_at_unix_seconds: input.prediction_at_unix_seconds,
-                    clock_domain_id: input.clock_domain_id.clone(),
-                });
+                next.tracked_rounds.insert(
+                    input.round_index,
+                    CaOcrcTrackedRoundV1 {
+                        round_index: input.round_index,
+                        prediction_id: input.prediction_id.clone(),
+                        sample_id: input.sample_id.clone(),
+                        measurement_event_id: input.measurement_event_id.clone(),
+                        proxy_delay: proxy as u64,
+                        lower_bound: input.lower_bound.unwrap(),
+                        upper_bound: input.upper_bound.unwrap(),
+                        threshold_used: input.threshold_used,
+                        score_contract_sha256: input.score_contract_sha256.clone(),
+                        prediction_set_sha256: input.prediction_set_sha256.clone(),
+                        event_time_unix_seconds: input.event_time_unix_seconds,
+                        prediction_at_unix_seconds: input.prediction_at_unix_seconds,
+                        clock_domain_id: input.clock_domain_id.clone(),
+                    },
+                );
                 admitted = true;
             } else {
                 next.capacity_saturation_count = next.capacity_saturation_count.saturating_add(1);
@@ -547,12 +582,16 @@ pub fn receive_ca_ocrc_feedback_v1(
     feedback: &CaOcrcFeedbackV1,
 ) -> Result<CaOcrcFeedbackReceiptV1, CaOcrcErrorV1> {
     if feedback.schema != CA_OCRC_FEEDBACK_SCHEMA_V1 {
-        return Err(CaOcrcErrorV1("CA-OCRC feedback schema is unsupported".into()));
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC feedback schema is unsupported".into(),
+        ));
     }
     if json_sha256(&engine.policy)? != engine.policy_sha256 {
         return Err(CaOcrcErrorV1("CA-OCRC policy digest mismatch".into()));
     }
-    let current = engine.current_round.ok_or_else(|| CaOcrcErrorV1("no CA-OCRC round is active".into()))?;
+    let current = engine
+        .current_round
+        .ok_or_else(|| CaOcrcErrorV1("no CA-OCRC round is active".into()))?;
     let before = engine.threshold;
     let guarantee_before = engine.guarantee_state;
     let revision_key = format!("{}:{}", feedback.label_id, feedback.label_revision);
@@ -596,7 +635,10 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     require_text(&feedback.prediction_id, "feedback.prediction_id")?;
     require_text(&feedback.sample_id, "feedback.sample_id")?;
-    require_text(&feedback.measurement_event_id, "feedback.measurement_event_id")?;
+    require_text(
+        &feedback.measurement_event_id,
+        "feedback.measurement_event_id",
+    )?;
     let Some(tracked) = tracked else {
         let guarantee_after = if reasons.contains(&CaOcrcReasonV1::FeedbackDelayExceedsBound)
             || reasons.contains(&CaOcrcReasonV1::FeedbackRoundMismatch)
@@ -624,7 +666,11 @@ pub fn receive_ca_ocrc_feedback_v1(
             label_revision: feedback.label_revision,
             prediction_set_sha256: None,
             disposition,
-            reasons: if reasons.is_empty() { vec![CaOcrcReasonV1::FeedbackNotInTrackingSet] } else { reasons },
+            reasons: if reasons.is_empty() {
+                vec![CaOcrcReasonV1::FeedbackNotInTrackingSet]
+            } else {
+                reasons
+            },
             observed_loss: None,
             proxy_survival_probability: None,
             inverse_probability_weight: None,
@@ -655,7 +701,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     if feedback.prediction_set_sha256 != tracked.prediction_set_sha256 {
         reasons.push(CaOcrcReasonV1::InvalidPredictionIdentity);
     }
-    if feedback.clock_domain_id != tracked.clock_domain_id || feedback.clock_domain_id != engine.clock_domain_id {
+    if feedback.clock_domain_id != tracked.clock_domain_id
+        || feedback.clock_domain_id != engine.clock_domain_id
+    {
         reasons.push(CaOcrcReasonV1::ClockDomainMismatch);
     }
     if report.schema != "luminous.semi-bench.label-consumption-report.v1" {
@@ -664,7 +712,9 @@ pub fn receive_ca_ocrc_feedback_v1(
     if feedback.label_available_at_unix_seconds < tracked.prediction_at_unix_seconds {
         reasons.push(CaOcrcReasonV1::LabelAvailabilityBeforePrediction);
     }
-    if feedback.eligibility_report_available_at_unix_seconds < feedback.label_available_at_unix_seconds {
+    if feedback.eligibility_report_available_at_unix_seconds
+        < feedback.label_available_at_unix_seconds
+    {
         reasons.push(CaOcrcReasonV1::ReportBeforeLabelAvailability);
     }
     if feedback.delivered_at_unix_seconds < feedback.label_available_at_unix_seconds {
@@ -696,7 +746,8 @@ pub fn receive_ca_ocrc_feedback_v1(
     }
     if !feedback.label_value.is_finite()
         || !report.qualified_corrected_value.is_finite()
-        || report.qualified_standard_uncertainty_upper_bound
+        || report
+            .qualified_standard_uncertainty_upper_bound
             .is_none_or(|value| !value.is_finite() || value < 0.0)
         || feedback.label_revision == 0
     {
@@ -712,7 +763,8 @@ pub fn receive_ca_ocrc_feedback_v1(
         reasons.push(CaOcrcReasonV1::UpstreamAuthorityFlagSet);
     }
     match report.eligibility {
-        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy if report.downstream_consumption_allowed => {}
+        LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy
+            if report.downstream_consumption_allowed => {}
         LabelConsumptionEligibilityV1::Unknown | LabelConsumptionEligibilityV1::Blocked => {
             reasons.push(CaOcrcReasonV1::LabelNotEligible);
         }
@@ -729,7 +781,11 @@ pub fn receive_ca_ocrc_feedback_v1(
             LabelConsumptionEligibilityV1::Blocked => CaOcrcTrackingDispositionV1::Blocked,
             _ => CaOcrcTrackingDispositionV1::Rejected,
         };
-        suspend(engine, "K1 feedback was not eligible for loss observation", CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback);
+        suspend(
+            engine,
+            "K1 feedback was not eligible for loss observation",
+            CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback,
+        );
         engine.tracked_rounds.remove(&feedback.origin_round);
         let mut receipt = CaOcrcFeedbackReceiptV1 {
             schema: CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1.into(),
@@ -788,24 +844,47 @@ pub fn receive_ca_ocrc_feedback_v1(
 
     let probability = survival(&engine.policy, feedback.actual_delay);
     if probability <= 0.0 || !probability.is_finite() {
-        suspend(engine, "feedback inverse propensity is undefined", CaOcrcGuaranteeStateV1::SuspendedByDelayAssumptionViolation);
-        return Err(CaOcrcErrorV1("feedback proxy survival probability is zero".into()));
+        suspend(
+            engine,
+            "feedback inverse propensity is undefined",
+            CaOcrcGuaranteeStateV1::SuspendedByDelayAssumptionViolation,
+        );
+        return Err(CaOcrcErrorV1(
+            "feedback proxy survival probability is zero".into(),
+        ));
     }
     let inverse_weight = 1.0 / probability;
-    if !inverse_weight.is_finite() || inverse_weight > engine.policy.maximum_inverse_probability_weight {
-        suspend(engine, "inverse propensity exceeds configured numeric ceiling", CaOcrcGuaranteeStateV1::SuspendedByNumericOrProtocolViolation);
-        return Err(CaOcrcErrorV1("inverse propensity exceeds configured ceiling; no clipping applied".into()));
+    if !inverse_weight.is_finite()
+        || inverse_weight > engine.policy.maximum_inverse_probability_weight
+    {
+        suspend(
+            engine,
+            "inverse propensity exceeds configured numeric ceiling",
+            CaOcrcGuaranteeStateV1::SuspendedByNumericOrProtocolViolation,
+        );
+        return Err(CaOcrcErrorV1(
+            "inverse propensity exceeds configured ceiling; no clipping applied".into(),
+        ));
     }
 
-    let loss = if feedback.label_value < tracked.lower_bound || feedback.label_value > tracked.upper_bound {
+    let loss = if feedback.label_value < tracked.lower_bound
+        || feedback.label_value > tracked.upper_bound
+    {
         1.0
     } else {
         0.0
     };
-    let after = before + engine.policy.learning_rate * inverse_weight * (loss - engine.policy.target_risk);
+    let after =
+        before + engine.policy.learning_rate * inverse_weight * (loss - engine.policy.target_risk);
     if !after.is_finite() {
-        suspend(engine, "threshold update became non-finite", CaOcrcGuaranteeStateV1::SuspendedByNumericOrProtocolViolation);
-        return Err(CaOcrcErrorV1("CA-OCRC threshold update is non-finite".into()));
+        suspend(
+            engine,
+            "threshold update became non-finite",
+            CaOcrcGuaranteeStateV1::SuspendedByNumericOrProtocolViolation,
+        );
+        return Err(CaOcrcErrorV1(
+            "CA-OCRC threshold update is non-finite".into(),
+        ));
     }
 
     let mut receipt = CaOcrcFeedbackReceiptV1 {
@@ -857,7 +936,11 @@ pub fn ca_ocrc_risk_gap_bound_v1(
     let boundary = policy.score_bound_b / (policy.learning_rate * horizon as f64);
     let feedback = (policy.tracking_capacity as f64 + 1.0) / (f_max * horizon as f64);
     let x = ell / policy.tracking_capacity as f64;
-    let capacity = if x > 0.0 { (-policy.tracking_capacity as f64 * h_function(x)).exp() } else { 0.0 };
+    let capacity = if x > 0.0 {
+        (-policy.tracking_capacity as f64 * h_function(x)).exp()
+    } else {
+        0.0
+    };
     Ok(CaOcrcRiskGapBoundV1 {
         horizon,
         boundary_term: boundary,
@@ -878,12 +961,18 @@ pub fn optimize_ca_ocrc_proxy_policy_v1(
     horizon: u64,
 ) -> Result<CaOcrcOptimizedProxyPolicyV1, CaOcrcErrorV1> {
     if capacity == 0 || maximum_delay == 0 || horizon == 0 {
-        return Err(CaOcrcErrorV1("capacity, maximum delay and horizon must be positive".into()));
+        return Err(CaOcrcErrorV1(
+            "capacity, maximum delay and horizon must be positive".into(),
+        ));
     }
     let upper = (capacity as f64 / maximum_delay as f64).min(1.0);
     let objective = |p: f64| {
         let x = maximum_delay as f64 * p / capacity as f64;
-        let saturation = if x > 0.0 { (-capacity as f64 * h_function(x)).exp() } else { 0.0 };
+        let saturation = if x > 0.0 {
+            (-capacity as f64 * h_function(x)).exp()
+        } else {
+            0.0
+        };
         (capacity as f64 + 1.0) / (p * horizon as f64) + saturation
     };
     let mut best_p = upper;
@@ -896,8 +985,12 @@ pub fn optimize_ca_ocrc_proxy_policy_v1(
             best_p = p;
         }
     }
-    let mut probabilities = vec![0.0; usize::try_from(maximum_delay + 2)
-        .map_err(|_| CaOcrcErrorV1("proxy support exceeds platform capacity".into()))?];
+    let mut probabilities = vec![
+        0.0;
+        usize::try_from(maximum_delay + 2).map_err(|_| CaOcrcErrorV1(
+            "proxy support exceeds platform capacity".into()
+        ))?
+    ];
     probabilities[0] = 1.0 - best_p;
     probabilities[maximum_delay as usize + 1] = best_p;
     Ok(CaOcrcOptimizedProxyPolicyV1 {
@@ -914,7 +1007,9 @@ pub fn optimize_ca_ocrc_proxy_policy_v1(
 mod tests {
     use super::*;
 
-    fn digest(ch: char) -> String { std::iter::repeat_n(ch, 64).collect() }
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
 
     fn policy(capacity: usize, delay: u64, p_track_max: f64) -> CaOcrcPolicyV1 {
         let mut pmf = vec![0.0; delay as usize + 2];
@@ -937,56 +1032,87 @@ mod tests {
         }
     }
 
-    fn report(label: &str, rev: u64, event: &str, value: f64, payload: &str) -> LabelConsumptionEligibilityReportV1 {
+    fn report(
+        label: &str,
+        rev: u64,
+        event: &str,
+        value: f64,
+        payload: &str,
+    ) -> LabelConsumptionEligibilityReportV1 {
         let mut report = LabelConsumptionEligibilityReportV1 {
             schema: "luminous.semi-bench.label-consumption-report.v1".into(),
-            label_id: label.into(), label_revision: rev, measurement_event_id: event.into(),
-            calibration_certificate_id: "cal-1".into(), frontier: LabelEvidenceFrontierV1::CurrentAtK1,
+            label_id: label.into(),
+            label_revision: rev,
+            measurement_event_id: event.into(),
+            calibration_certificate_id: "cal-1".into(),
+            frontier: LabelEvidenceFrontierV1::CurrentAtK1,
             eligibility: LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
-            downstream_consumption_allowed: true, reasons: Vec::new(),
-            label_sha256: payload.into(), measurement_sha256: digest('a'),
-            qualified_corrected_value: value, qualified_standard_uncertainty_upper_bound: Some(0.01),
-            qualification_report_sha256: digest('b'), requalification_report_sha256: digest('c'),
-            requalification_frontier_sha256: digest('d'), source_authenticity_proven: false,
-            training_snapshot_mutated: false, equipment_control_authority: false, report_sha256: String::new(),
+            downstream_consumption_allowed: true,
+            reasons: Vec::new(),
+            label_sha256: payload.into(),
+            measurement_sha256: digest('a'),
+            qualified_corrected_value: value,
+            qualified_standard_uncertainty_upper_bound: Some(0.01),
+            qualification_report_sha256: digest('b'),
+            requalification_report_sha256: digest('c'),
+            requalification_frontier_sha256: digest('d'),
+            source_authenticity_proven: false,
+            training_snapshot_mutated: false,
+            equipment_control_authority: false,
+            report_sha256: String::new(),
         };
-        let mut canonical = report.clone(); canonical.report_sha256.clear();
+        let mut canonical = report.clone();
+        canonical.report_sha256.clear();
         report.report_sha256 = json_sha256(&canonical).unwrap();
         report
     }
 
     fn round(index: u64, draw: f64) -> CaOcrcRoundInputV1 {
         CaOcrcRoundInputV1 {
-            schema: CA_OCRC_ROUND_SCHEMA_V1.into(), round_index: index,
-            prediction_id: format!("pred-{index}"), sample_id: format!("sample-{index}"),
+            schema: CA_OCRC_ROUND_SCHEMA_V1.into(),
+            round_index: index,
+            prediction_id: format!("pred-{index}"),
+            sample_id: format!("sample-{index}"),
             measurement_event_id: format!("event-{index}"),
             prediction_kind: CaOcrcPredictionKindV1::Nontrivial,
-            lower_bound: Some(0.0), upper_bound: Some(1.0),
+            lower_bound: Some(0.0),
+            upper_bound: Some(1.0),
             threshold_used: 0.5,
             score_contract_sha256: digest('f'),
             prediction_set_sha256: digest('7'),
             event_time_unix_seconds: 1_800_000_000 + index as i64 * 60,
             prediction_at_unix_seconds: 1_800_000_002 + index as i64 * 60,
-            clock_domain_id: "fab-clock".into(), uniform_draw: draw,
+            clock_domain_id: "fab-clock".into(),
+            uniform_draw: draw,
         }
     }
 
     fn feedback(origin: u64, current: u64, value: f64) -> CaOcrcFeedbackV1 {
         let payload = digest('e');
         CaOcrcFeedbackV1 {
-            schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(), current_round: current,
-            origin_round: origin, actual_delay: current - origin,
+            schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(),
+            current_round: current,
+            origin_round: origin,
+            actual_delay: current - origin,
             prediction_set_sha256: digest('7'),
             prediction_id: format!("pred-{origin}"),
             sample_id: format!("sample-{origin}"),
             measurement_event_id: format!("event-{origin}"),
-            label_id: format!("label-{origin}"), label_revision: 1,
-            label_payload_sha256: payload.clone(), label_value: value,
+            label_id: format!("label-{origin}"),
+            label_revision: 1,
+            label_payload_sha256: payload.clone(),
+            label_value: value,
             label_available_at_unix_seconds: 1_800_000_120 + origin as i64 * 60,
             eligibility_report_available_at_unix_seconds: 1_800_000_121 + origin as i64 * 60,
             delivered_at_unix_seconds: 1_800_000_122 + current as i64 * 60,
             clock_domain_id: "fab-clock".into(),
-            eligibility_report: report(&format!("label-{origin}"), 1, &format!("event-{origin}"), value, &payload),
+            eligibility_report: report(
+                &format!("label-{origin}"),
+                1,
+                &format!("event-{origin}"),
+                value,
+                &payload,
+            ),
         }
     }
 
@@ -1013,7 +1139,8 @@ mod tests {
         engine.threshold = -0.01;
         let mut empty = round(0, 0.0);
         empty.prediction_kind = CaOcrcPredictionKindV1::KnownEmpty;
-        empty.lower_bound = None; empty.upper_bound = None;
+        empty.lower_bound = None;
+        empty.upper_bound = None;
         empty.threshold_used = -0.01;
         let decision = start_ca_ocrc_round_v1(&mut engine, &empty).unwrap();
         assert_eq!(decision.immediate_loss, Some(1.0));
@@ -1022,7 +1149,8 @@ mod tests {
         engine.threshold = 1.01;
         let mut full = round(1, 0.0);
         full.prediction_kind = CaOcrcPredictionKindV1::KnownFull;
-        full.lower_bound = None; full.upper_bound = None;
+        full.lower_bound = None;
+        full.upper_bound = None;
         full.threshold_used = 1.01;
         let decision = start_ca_ocrc_round_v1(&mut engine, &full).unwrap();
         assert_eq!(decision.immediate_loss, Some(0.0));
@@ -1052,7 +1180,10 @@ mod tests {
         start_ca_ocrc_round_v1(&mut engine, &round(1, 0.1)).unwrap();
         start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
         let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(0, 2, 2.0)).unwrap();
-        assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::FeedbackUpdated);
+        assert_eq!(
+            result.disposition,
+            CaOcrcTrackingDispositionV1::FeedbackUpdated
+        );
         assert_eq!(result.proxy_survival_probability, Some(0.50));
         assert_eq!(result.inverse_probability_weight, Some(2.0));
         assert_eq!(result.observed_loss, Some(1.0));
@@ -1068,7 +1199,10 @@ mod tests {
         assert!(!second.admitted);
         assert_eq!(engine.capacity_saturation_count, 1);
         let result = receive_ca_ocrc_feedback_v1(&mut engine, &feedback(1, 1, 0.5)).unwrap();
-        assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::FeedbackNotTracked);
+        assert_eq!(
+            result.disposition,
+            CaOcrcTrackingDispositionV1::FeedbackNotTracked
+        );
         assert_eq!(engine.threshold, 0.5);
     }
 
@@ -1082,12 +1216,16 @@ mod tests {
         let mut input = feedback(0, 2, 2.0);
         input.eligibility_report.eligibility = LabelConsumptionEligibilityV1::Blocked;
         input.eligibility_report.downstream_consumption_allowed = false;
-        let mut canonical = input.eligibility_report.clone(); canonical.report_sha256.clear();
+        let mut canonical = input.eligibility_report.clone();
+        canonical.report_sha256.clear();
         input.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
         let result = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
         assert_eq!(result.disposition, CaOcrcTrackingDispositionV1::Blocked);
         assert_eq!(engine.threshold, before);
-        assert_eq!(engine.guarantee_state, CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback);
+        assert_eq!(
+            engine.guarantee_state,
+            CaOcrcGuaranteeStateV1::SuspendedByUnqualifiedFeedback
+        );
     }
 
     #[test]
@@ -1098,12 +1236,17 @@ mod tests {
         start_ca_ocrc_round_v1(&mut engine, &round(2, 0.1)).unwrap();
         let input = feedback(0, 2, 0.5);
         assert_eq!(
-            receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap().disposition,
+            receive_ca_ocrc_feedback_v1(&mut engine, &input)
+                .unwrap()
+                .disposition,
             CaOcrcTrackingDispositionV1::FeedbackUpdated
         );
         let before = engine.threshold;
         let duplicate = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
-        assert_eq!(duplicate.disposition, CaOcrcTrackingDispositionV1::Duplicate);
+        assert_eq!(
+            duplicate.disposition,
+            CaOcrcTrackingDispositionV1::Duplicate
+        );
         assert!(!duplicate.threshold_mutated);
         assert_eq!(engine.threshold, before);
     }
@@ -1135,7 +1278,10 @@ mod tests {
         }
         let input = feedback(0, 6, 0.5);
         let receipt = receive_ca_ocrc_feedback_v1(&mut engine, &input).unwrap();
-        assert_eq!(receipt.disposition, CaOcrcTrackingDispositionV1::GuaranteeSuspended);
+        assert_eq!(
+            receipt.disposition,
+            CaOcrcTrackingDispositionV1::GuaranteeSuspended
+        );
         assert_eq!(
             engine.guarantee_state,
             CaOcrcGuaranteeStateV1::SuspendedByDelayAssumptionViolation
@@ -1155,12 +1301,19 @@ mod tests {
     fn optimized_proxy_distribution_satisfies_underload_condition() {
         let optimized = optimize_ca_ocrc_proxy_policy_v1(2, 8, 10_000).unwrap();
         let policy = CaOcrcPolicyV1 {
-            schema: CA_OCRC_POLICY_SCHEMA_V1.into(), policy_id: "optimized".into(), revision: 1,
-            target_risk: 0.05, learning_rate: 0.1, score_bound_b: 1.0,
-            score_contract_sha256: digest('f'), initial_threshold: 0.5,
-            tracking_capacity: 2, maximum_feedback_delay: 8,
+            schema: CA_OCRC_POLICY_SCHEMA_V1.into(),
+            policy_id: "optimized".into(),
+            revision: 1,
+            target_risk: 0.05,
+            learning_rate: 0.1,
+            score_bound_b: 1.0,
+            score_contract_sha256: digest('f'),
+            initial_threshold: 0.5,
+            tracking_capacity: 2,
+            maximum_feedback_delay: 8,
             proxy_delay_probabilities: optimized.proxy_delay_probabilities,
-            require_source_authenticity_assertion: false, maximum_inverse_probability_weight: 10_000.0,
+            require_source_authenticity_assertion: false,
+            maximum_inverse_probability_weight: 10_000.0,
         };
         validate_policy(&policy).unwrap();
     }
