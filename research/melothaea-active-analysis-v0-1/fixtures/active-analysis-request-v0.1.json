@@ -1,0 +1,80 @@
+{
+  "prior": {
+    "prior_id": "two-cause-equal-prior",
+    "hypothesis_ids": [
+      "musical-change",
+      "room-change"
+    ],
+    "probabilities": [
+      0.5,
+      0.5
+    ]
+  },
+  "decisions": [
+    {
+      "decision_id": "report-musical-change",
+      "losses_by_hypothesis": [
+        0,
+        1
+      ]
+    },
+    {
+      "decision_id": "report-room-change",
+      "losses_by_hypothesis": [
+        1,
+        0
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "longer-context-window",
+      "likelihood_model_sha256": "abababababababababababababababababababababababababababababababab",
+      "cost": 0.1,
+      "admissible": true,
+      "outcomes": [
+        {
+          "outcome_id": "supports-musical-change",
+          "likelihood_by_hypothesis": [
+            0.9,
+            0.1
+          ]
+        },
+        {
+          "outcome_id": "supports-room-change",
+          "likelihood_by_hypothesis": [
+            0.1,
+            0.9
+          ]
+        }
+      ]
+    },
+    {
+      "action_id": "expensive-stereo-source-probe",
+      "likelihood_model_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "cost": 0.8,
+      "admissible": true,
+      "outcomes": [
+        {
+          "outcome_id": "supports-musical-change",
+          "likelihood_by_hypothesis": [
+            1,
+            0
+          ]
+        },
+        {
+          "outcome_id": "supports-room-change",
+          "likelihood_by_hypothesis": [
+            0,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "policy": {
+    "resource_budget": 1,
+    "cost_to_risk_weight": 0.2,
+    "in_domain": true
+  }
+}
