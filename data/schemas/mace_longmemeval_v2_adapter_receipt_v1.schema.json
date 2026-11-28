@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_longmemeval_v2_adapter_receipt_v1.schema.json",
+  "title": "MACE LongMemEval-V2 Adapter Receipt V1",
+  "description": "Privacy-minimized insertion, query, pre-query selection and post-truncation reader-exposure receipts for the official LongMemEval-V2 Memory interface.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/trajectory_insert"
+    },
+    {
+      "$ref": "#/$defs/query_input"
+    },
+    {
+      "$ref": "#/$defs/pre_query_hook_metadata"
+    },
+    {
+      "$ref": "#/$defs/pre_query_selection"
+    },
+    {
+      "$ref": "#/$defs/reader_exposure"
+    }
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "tier": {
+      "enum": [
+        "small",
+        "medium"
+      ]
+    },
+    "domain": {
+      "enum": [
+        "web",
+        "enterprise"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "image"
+      ]
+    },
+    "trajectory_insert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "tier",
+        "domain",
+        "insert_order",
+        "trajectory_sha256",
+        "payload_sha256",
+        "source_snapshot_sha256",
+        "inserted_at_monotonic_ns",
+        "receipt_sha256",
+        "run_binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "tier": {
+          "$ref": "#/$defs/tier"
+        },
+        "domain": {
+          "$ref": "#/$defs/domain"
+        },
+        "insert_order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trajectory_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "payload_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "inserted_at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "query_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "query_invocation_id",
+        "question_text_sha256",
+        "question_image_sha256",
+        "run_binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "question_text_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "question_image_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "context_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "kind",
+        "context_item_sha256",
+        "evidence_use_receipt_sha256",
+        "source_lineage_receipt_sha256",
+        "decision_evidence_use_link_sha256"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "context_item_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "evidence_use_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "decision_evidence_use_link_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "pre_query_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "query_invocation_id",
+        "query_input_sha256",
+        "selection_policy_sha256",
+        "selected_items",
+        "pre_truncation_items_sha256",
+        "receipt_sha256",
+        "run_binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "query_input_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "selection_policy_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "selected_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/context_item"
+          }
+        },
+        "pre_truncation_items_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "final_context_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "kind",
+        "context_item_sha256"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "context_item_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "exposed_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "kind",
+        "context_item_sha256",
+        "evidence_use_receipt_sha256",
+        "source_lineage_receipt_sha256",
+        "reader_request_sha256",
+        "decision_evidence_use_link_sha256"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "context_item_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "evidence_use_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "decision_evidence_use_link_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "reader_exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "query_invocation_id",
+        "pre_query_selection_receipt_sha256",
+        "final_context_items_sha256",
+        "reader_request_sha256",
+        "reader_response_sha256",
+        "selected_item_count",
+        "exposed_item_count",
+        "context_budget_tokens",
+        "original_context_tokens",
+        "final_context_tokens",
+        "context_was_truncated",
+        "memory_query_latency_ns",
+        "post_query_hook_latency_ns",
+        "exposed_evidence",
+        "receipt_sha256",
+        "reader_model_sha256",
+        "reader_generation_config_sha256",
+        "run_binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "run_id": {
+          "$ref": "#/$defs/id"
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "pre_query_selection_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "final_context_items_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_response_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "selected_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exposed_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_budget_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "original_context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "final_context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_was_truncated": {
+          "type": "boolean"
+        },
+        "memory_query_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_query_hook_latency_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exposed_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exposed_evidence"
+          }
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_model_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "reader_generation_config_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "pre_query_hook_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "query_invocation_id",
+        "query_input_sha256",
+        "pre_query_selection_receipt_sha256",
+        "selected_item_count",
+        "metadata_sha256",
+        "run_binding_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_longmemeval_v2_adapter_receipt_v1"
+        },
+        "query_invocation_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "query_input_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "pre_query_selection_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "selected_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metadata_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}
