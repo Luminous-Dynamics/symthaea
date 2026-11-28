@@ -98,7 +98,8 @@
         "confidence_interval_95",
         "worst_cluster_directional_gain",
         "independent_cluster_count",
-        "paired_task_count"
+        "paired_task_count",
+        "inference_status"
       ],
       "properties": {
         "baseline_arm_id": {
@@ -149,6 +150,12 @@
         "paired_task_count": {
           "type": "integer",
           "minimum": 1
+        },
+        "inference_status": {
+          "enum": [
+            "exploratory",
+            "confirmatory_cluster_floor_met"
+          ]
         }
       }
     },
@@ -161,7 +168,8 @@
         "memory_method_id",
         "independent_cluster_count",
         "paired_task_count",
-        "metric_means"
+        "metric_means",
+        "inference_status"
       ],
       "properties": {
         "arm_id": {
@@ -190,6 +198,12 @@
           "additionalProperties": {
             "type": "number"
           }
+        },
+        "inference_status": {
+          "enum": [
+            "exploratory",
+            "confirmatory_cluster_floor_met"
+          ]
         }
       }
     },
@@ -218,7 +232,9 @@
         "outcome_set_sha256",
         "outcome_count",
         "evaluator_custody",
-        "candidate_saw_evaluator_labels"
+        "candidate_saw_evaluator_labels",
+        "confirmatory_cluster_floor",
+        "inference_status"
       ],
       "properties": {
         "schema_version": {
@@ -310,6 +326,15 @@
         },
         "candidate_saw_evaluator_labels": {
           "const": false
+        },
+        "confirmatory_cluster_floor": {
+          "const": 30
+        },
+        "inference_status": {
+          "enum": [
+            "exploratory",
+            "confirmatory_cluster_floor_met"
+          ]
         }
       }
     }
