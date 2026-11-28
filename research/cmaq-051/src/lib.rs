@@ -252,9 +252,11 @@ impl RepresentationEPortfolio {
         let mut contextual_difference =
             vec![0.0; self.context_count * response_dimension];
         let context_offset = context_id * response_dimension;
-        for index in 0..response_dimension {
+        for (index, (y_feature, x_feature)) in
+            response_y.iter().zip(&response_x).enumerate()
+        {
             contextual_difference[context_offset + index] =
-                0.5 * (response_y[index] - response_x[index]);
+                0.5 * (y_feature - x_feature);
         }
 
         let mut product_difference = vec![0.0; response_dimension * covariate_dimension];
