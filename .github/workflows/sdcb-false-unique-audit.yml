@@ -52,6 +52,9 @@ jobs:
       - name: Check committed-source formatting
         run: rustfmt --edition 2021 --check scripts/research/sdcb_false_unique_risk.rs
 
+      - name: Run the checked-in standalone test and report harness
+        run: bash scripts/research/run_sdcb_false_unique_risk_tests.sh
+
       - name: Compile, test and lint in isolated standard-library-only crate
         shell: bash
         run: |
