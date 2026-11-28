@@ -5,6 +5,7 @@
 //! report exposes replay evidence and aggregate regret, never the oracle plan.
 
 use std::fmt::Display;
+use std::time::Instant;
 
 use crate::{
     Action, CandidateFeedback, CandidateInput, Game, GridSpec, InteractiveCandidate, Observation,
@@ -21,6 +22,9 @@ pub struct F1EpisodeReport {
     pub candidate_protocol_valid: bool,
     pub terminal_status: TerminalStatus,
     pub actions_attempted: u32,
+    /// Wall-clock duration of each candidate decide() call, in nanoseconds.
+    /// Evaluator validation and environment transition time are excluded.
+    pub decision_latency_ns: Vec<u128>,
     pub optimal_actions: Option<u32>,
     /// Present only for successful episodes with a reachable exact optimum.
     pub excess_actions: Option<i64>,
@@ -48,6 +52,7 @@ where
     let mut trace = Trace::default();
     let mut candidate_error = None;
     let mut actions_attempted = 0_u32;
+    let mut decision_latency_ns = Vec::new();
 
     if let Err(error) = candidate.reset() {
         candidate_error = Some(format!("candidate reset failed: {error}"));
@@ -62,7 +67,10 @@ where
             episode_step: game.state().elapsed_actions,
         };
 
-        let decision = match candidate.decide(input) {
+        let decision_started = Instant::now();
+        let decision_result = candidate.decide(input);
+        decision_latency_ns.push(decision_started.elapsed().as_nanos());
+        let decision = match decision_result {
             Ok(decision) => decision,
             Err(error) => {
                 candidate_error = Some(format!("candidate decision failed: {error}"));
@@ -108,6 +116,7 @@ where
         candidate_protocol_valid,
         terminal_status,
         actions_attempted,
+        decision_latency_ns,
         optimal_actions,
         excess_actions,
         final_state,
@@ -149,6 +158,7 @@ mod tests {
         assert_eq!(report.optimal_actions, Some(4));
         assert_eq!(report.excess_actions, Some(0));
         assert_eq!(report.events.len(), 4);
+        assert_eq!(report.decision_latency_ns.len(), 4);
         assert_eq!(report.candidate_error, None);
     }
 
@@ -185,6 +195,7 @@ mod tests {
         assert!(!report.success);
         assert!(!report.candidate_protocol_valid);
         assert_eq!(report.actions_attempted, 0);
+        assert_eq!(report.decision_latency_ns.len(), 1);
         assert!(report.events.is_empty());
         assert!(report.candidate_error.is_some());
     }
