@@ -454,7 +454,9 @@ mod tests {
             .err(),
             Some(PairedKernelError::EmptyContextInventory)
         );
-        let too_many = BoxTarget::new(vec![-0.1; 1028], vec![0.1; 1028]).unwrap();
+        // A valid 1,024-dimensional target is enough to reach the
+        // context product-size guard (257 * 4 = 1,028 features).
+        let too_many = BoxTarget::new(vec![-0.1; 1024], vec![0.1; 1024]).unwrap();
         assert_eq!(
             ContextualPairedKernelMonitor::new(
                 map(),
