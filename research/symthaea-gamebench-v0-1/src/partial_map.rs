@@ -344,6 +344,14 @@ impl Display for ExploreMemoryError {
 impl Error for ExploreMemoryError {}
 
 impl ExploreMemory {
+    pub const fn width(&self) -> u16 {
+        self.width
+    }
+
+    pub const fn height(&self) -> u16 {
+        self.height
+    }
+
     pub fn new(width: u16, height: u16) -> Result<Self, ExploreMemoryError> {
         if width == 0 || height == 0 {
             return Err(ExploreMemoryError::ZeroDimension);
