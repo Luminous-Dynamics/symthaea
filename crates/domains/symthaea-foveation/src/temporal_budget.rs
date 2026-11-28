@@ -547,7 +547,7 @@ mod tests {
         let mut budget =
             TemporalFoveationBudget::new(TemporalFoveationConfig::default(), 0).unwrap();
         assert_eq!(
-            budget.observe_trigger(trigger("bad-1", 0, f32::NAN)),
+            budget.observe_trigger(trigger("bad-1", 0, f32::NAN), 0),
             Err(TemporalFoveationError::InvalidUrgency)
         );
     }
