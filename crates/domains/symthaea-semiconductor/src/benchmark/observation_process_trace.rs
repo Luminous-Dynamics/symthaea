@@ -1473,6 +1473,7 @@ mod tests {
     fn audit_reference_method_must_differ_from_operational_measurement_system() {
         let mut trace = row(1);
         trace.operational.state = OperationalAcquisitionStateV1::Measured;
+        trace.operational.design_sha256 = Some(digest('c'));
         trace.operational.measured_at_unix_seconds = Some(1010);
         trace.operational.measurement_system_sha256 = Some(digest('d'));
         trace.operational.physical_measurement_cost = Some(1.0);
@@ -1597,6 +1598,7 @@ mod tests {
     fn operational_and_audit_budgets_are_enforced_separately() {
         let mut measured = row(1);
         measured.operational.state = OperationalAcquisitionStateV1::Measured;
+        measured.operational.design_sha256 = Some(digest('d'));
         measured.operational.measured_at_unix_seconds = Some(1010);
         measured.operational.measurement_system_sha256 = Some(digest('f'));
         measured.operational.physical_measurement_cost = Some(1.0);
