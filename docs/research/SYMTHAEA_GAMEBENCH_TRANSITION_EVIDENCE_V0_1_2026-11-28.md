@@ -73,7 +73,7 @@ Current scope:
 - treats out-of-family support as unresolved;
 - validates environment-produced world-mutation events and issues a domain transition receipt.
 
-The implementation is intentionally not a planner or a generic receipt system. It does not replace the read-only PR #14193 or implement a separate EVSI/minimax/sequential oracle. It does not authenticate event digests or prove environment execution. The current source has 19 authored Rust tests, not yet run. No candidate campaign or performance result is claimed.
+The implementation is intentionally not a planner or a generic receipt system. It does not replace the read-only PR #14193 or implement a separate EVSI/minimax/sequential oracle. It does not authenticate event digests or prove environment execution. The current source has 20 authored Rust tests, not yet run. No candidate campaign or performance result is claimed.
 
 ## 4. Challenge design
 
