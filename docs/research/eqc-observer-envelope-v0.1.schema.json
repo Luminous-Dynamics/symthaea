@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/eqc-observer-envelope-v0.1.schema.json",
+  "title": "EQC Signed Observer Envelope v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "payload_hex",
+    "payload_sha256",
+    "signature_ed25519_hex"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.eqc.observer-envelope.v0.1"
+    },
+    "payload_hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2})+$"
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "signature_ed25519_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    }
+  }
+}
