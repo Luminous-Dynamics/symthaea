@@ -147,6 +147,18 @@ pub fn observation_with_symthaea_snapshot_confidence(
     observation
 }
 
+/// Evaluator-owned annotation for one item. This is accepted only by the
+/// item constructor and is never passed to the policy callback.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SelectivePredictionGroundTruth {
+    pub answerable_now: bool,
+    pub answer_correct_if_given: bool,
+    pub clarification_resolves: bool,
+    pub clarification_target: Option<ClarificationTarget>,
+    pub post_clarification_observation: Option<SelectivePredictionObservation>,
+    pub answer_correct_after_clarification: bool,
+}
+
 /// A fixed candidate-answer case. Evaluator-only fields are private so policy
 /// implementations cannot read labels through this API.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -159,6 +171,30 @@ pub struct SyntheticSelectivePredictionItem {
     clarification_target: Option<ClarificationTarget>,
     post_clarification_observation: Option<SelectivePredictionObservation>,
     answer_correct_after_clarification: bool,
+}
+
+impl SyntheticSelectivePredictionItem {
+    /// Construct an evaluator-owned item for an external benchmark adapter.
+    ///
+    /// The policy callback receives only `item.observation`; the ground-truth
+    /// annotation is retained privately by the evaluator. Call
+    /// `evaluate_policy_with` to score a policy against the item.
+    pub fn from_evaluator_annotation(
+        id: impl Into<String>,
+        observation: SelectivePredictionObservation,
+        annotation: SelectivePredictionGroundTruth,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            observation,
+            answerable_now: annotation.answerable_now,
+            answer_correct_if_given: annotation.answer_correct_if_given,
+            clarification_resolves: annotation.clarification_resolves,
+            clarification_target: annotation.clarification_target,
+            post_clarification_observation: annotation.post_clarification_observation,
+            answer_correct_after_clarification: annotation.answer_correct_after_clarification,
+        }
+    }
 }
 
 /// Transparent fixed baselines. These are policy controls, not foundation-model
@@ -459,46 +495,51 @@ pub fn fixture_items() -> Vec<SyntheticSelectivePredictionItem> {
         answer_correct_if_given: bool,
         clarification_resolves: bool,
     ) -> SyntheticSelectivePredictionItem {
-        SyntheticSelectivePredictionItem {
-            id: id.to_owned(),
-            observation: SelectivePredictionObservation {
-                evidence_strength,
-                premise_consistent,
-                source_is_current,
-                clarification_available,
-                reported_confidence: evidence_strength,
-                estimated_clarification_resolution_probability: if clarification_available {
-                    0.75
-                } else {
-                    0.0
-                },
+        let clarification_target = clarification_available.then(|| {
+            if !premise_consistent {
+                ClarificationTarget::VerifyPremise
+            } else if !source_is_current {
+                ClarificationTarget::RefreshSource
+            } else {
+                ClarificationTarget::SupplyMissingConstraint
+            }
+        });
+        let observation = SelectivePredictionObservation {
+            evidence_strength,
+            premise_consistent,
+            source_is_current,
+            clarification_available,
+            reported_confidence: evidence_strength,
+            estimated_clarification_resolution_probability: if clarification_available {
+                0.75
+            } else {
+                0.0
+            },
+            estimated_post_clarification_accuracy: 0.94,
+        };
+        let post_clarification_observation = clarification_resolves.then_some(
+            SelectivePredictionObservation {
+                evidence_strength: 0.94,
+                premise_consistent: true,
+                source_is_current: true,
+                clarification_available: false,
+                reported_confidence: 0.94,
+                estimated_clarification_resolution_probability: 0.0,
                 estimated_post_clarification_accuracy: 0.94,
             },
-            answerable_now,
-            answer_correct_if_given,
-            clarification_resolves,
-            clarification_target: clarification_available.then(|| {
-                if !premise_consistent {
-                    ClarificationTarget::VerifyPremise
-                } else if !source_is_current {
-                    ClarificationTarget::RefreshSource
-                } else {
-                    ClarificationTarget::SupplyMissingConstraint
-                }
-            }),
-            post_clarification_observation: clarification_resolves.then_some(
-                SelectivePredictionObservation {
-                    evidence_strength: 0.94,
-                    premise_consistent: true,
-                    source_is_current: true,
-                    clarification_available: false,
-                    reported_confidence: 0.94,
-                    estimated_clarification_resolution_probability: 0.0,
-                    estimated_post_clarification_accuracy: 0.94,
-                },
-            ),
-            answer_correct_after_clarification: clarification_resolves,
-        }
+        );
+        SyntheticSelectivePredictionItem::from_evaluator_annotation(
+            id,
+            observation,
+            SelectivePredictionGroundTruth {
+                answerable_now,
+                answer_correct_if_given,
+                clarification_resolves,
+                clarification_target,
+                post_clarification_observation,
+                answer_correct_after_clarification: clarification_resolves,
+            },
+        )
     }
 
     vec![
