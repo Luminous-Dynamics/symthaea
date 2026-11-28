@@ -322,7 +322,7 @@ mod tests {
     fn valid_case() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) {
         let input_audio = b"baseline synthetic audio fixture".to_vec();
         let output_audio = b"room-response intervention output".to_vec();
-        let mut manifest = InterventionManifestV1 {
+        let manifest = InterventionManifestV1 {
             schema_version: "mel-hear-012-intervention-manifest-v0.1".to_owned(),
             benchmark_id: "MEL-CAUSAL-ACOUSTIC-INTERVENTION".to_owned(),
             benchmark_version: "0.1.0".to_owned(),
@@ -436,6 +436,66 @@ mod tests {
             validate_intervention_pair(&bad_manifest, &receipt, &input, &output),
             Err(InterventionError::ReferenceLeakage)
         );
+    }
+
+    #[test]
+    fn receipt_must_bind_parameter_digest() {
+        let (manifest, receipt, input, output) = valid_case();
+        let mut json: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        json["parameter_manifest_sha256"] = serde_json::json!(digest(b"wrong-parameters"));
+        let bad_receipt = to_vec(&json).unwrap();
+        assert_eq!(
+            validate_intervention_pair(&manifest, &bad_receipt, &input, &output),
+            Err(InterventionError::ParameterBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn receipt_must_bind_implementation_identity() {
+        let (manifest, receipt, input, output) = valid_case();
+        let mut json: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        json["implementation_sha256"] = serde_json::json!(digest(b"other-renderer"));
+        let bad_receipt = to_vec(&json).unwrap();
+        assert_eq!(
+            validate_intervention_pair(&manifest, &bad_receipt, &input, &output),
+            Err(InterventionError::ImplementationBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn receipt_must_bind_deterministic_seed() {
+        let (manifest, receipt, input, output) = valid_case();
+        let mut json: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        json["seed"] = serde_json::json!(12);
+        let bad_receipt = to_vec(&json).unwrap();
+        assert_eq!(
+            validate_intervention_pair(&manifest, &bad_receipt, &input, &output),
+            Err(InterventionError::SeedBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn nondeterministic_benchmark_manifest_rejects() {
+        let (manifest, receipt, input, output) = valid_case();
+        let mut json: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
+        json["deterministic"] = serde_json::json!(false);
+        let bad_manifest = to_vec(&json).unwrap();
+        assert_eq!(
+            validate_intervention_pair(&bad_manifest, &receipt, &input, &output),
+            Err(InterventionError::NonDeterministicCase)
+        );
+    }
+
+    #[test]
+    fn unknown_reference_label_field_rejects() {
+        let (manifest, receipt, input, output) = valid_case();
+        let mut json: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
+        json["reference_label"] = serde_json::json!("same");
+        let bad_manifest = to_vec(&json).unwrap();
+        assert!(matches!(
+            validate_intervention_pair(&bad_manifest, &receipt, &input, &output),
+            Err(InterventionError::InvalidJson(_))
+        ));
     }
 
     #[test]
