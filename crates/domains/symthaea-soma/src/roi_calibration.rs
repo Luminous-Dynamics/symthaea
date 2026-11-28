@@ -9,8 +9,11 @@
 //! Digests establish content identity, not dataset authenticity or provenance.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use symthaea_foveation::{RoiValueEstimate};
+use std::collections::{HashMap, HashSet};
+use symthaea_foveation::{
+    rank_roi_information_value, RoiCandidateRejection, RoiInformationValueConfig,
+    RoiInformationValueError, RoiInformationValueScore, RoiValueEstimate,
+};
 
 pub const ROI_CALIBRATION_REPORT_SCHEMA_V1: &str = "symthaea.roi-calibration-report.v1";
 const ROI_CALIBRATION_DIGEST_CONTEXT: &str = "symthaea.roi-calibration-report.v1";
@@ -96,6 +99,67 @@ pub struct RoiCalibrationBindingResult {
     /// EVI ranker. This does not authorize sensor capture or inference.
     pub eligible: Vec<RoiValueEstimate>,
     pub rejected: Vec<RoiCalibrationBindingRejection>,
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibratedRoiInformationRanking {
+    pub ranked: Vec<RoiInformationValueScore>,
+    pub calibration_rejected: Vec<RoiCalibrationBindingRejection>,
+    pub candidate_rejected: Vec<RoiCandidateRejection>,
+}
+
+/// Verify calibration evidence before any candidate reaches the EVI ranker.
+///
+/// Candidate IDs are de-duplicated across the *entire* input before calibration
+/// binding. This prevents a duplicate from escaping rejection merely because
+/// one copy failed calibration while another copy passed.
+pub fn rank_calibrated_roi_information_value(
+    estimates: &[RoiValueEstimate],
+    reports: &[RoiCalibrationReportV1],
+    now_us: u64,
+    now_clock_domain_id: &str,
+    config: RoiInformationValueConfig,
+) -> Result<CalibratedRoiInformationRanking, RoiInformationValueError> {
+    let mut counts: HashMap<&str, usize> = HashMap::with_capacity(estimates.len());
+    for estimate in estimates {
+        *counts.entry(estimate.candidate_id.as_str()).or_insert(0) += 1;
+    }
+
+    let duplicate_ids: HashSet<&str> = counts
+        .iter()
+        .filter_map(|(id, count)| (*count > 1).then_some(*id))
+        .collect();
+    let unique: Vec<_> = estimates
+        .iter()
+        .filter(|estimate| !duplicate_ids.contains(estimate.candidate_id.as_str()))
+        .cloned()
+        .collect();
+
+    let mut candidate_rejected: Vec<_> = estimates
+        .iter()
+        .filter(|estimate| duplicate_ids.contains(estimate.candidate_id.as_str()))
+        .map(|estimate| RoiCandidateRejection {
+            candidate_id: estimate.candidate_id.clone(),
+            reason: RoiInformationValueError::DuplicateCandidateId,
+        })
+        .collect();
+
+    let binding = bind_roi_estimates_to_calibration_reports(&unique, reports);
+    let ranking = rank_roi_information_value(
+        &binding.eligible,
+        now_us,
+        now_clock_domain_id,
+        config,
+    )?;
+    candidate_rejected.extend(ranking.rejected);
+    candidate_rejected.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+
+    Ok(CalibratedRoiInformationRanking {
+        ranked: ranking.ranked,
+        calibration_rejected: binding.rejected,
+        candidate_rejected,
+    })
 }
 
 pub fn compute_roi_calibration_report_digest(
@@ -404,6 +468,61 @@ mod tests {
             &[value.clone(), value],
         );
         assert_eq!(result.rejected[0].reason, RoiCalibrationBindingError::AmbiguousReport);
+    }
+
+
+    #[test]
+    fn integrated_ranker_rejects_bad_calibration_before_scoring() {
+        let value = report();
+        let mut bad = estimate(&value);
+        bad.calibration.expected_calibration_error = 0.5;
+        let result = rank_calibrated_roi_information_value(
+            &[bad],
+            &[value],
+            1_100,
+            "clock:camera-1",
+            RoiInformationValueConfig::default(),
+        ).unwrap();
+        assert!(result.ranked.is_empty());
+        assert_eq!(result.calibration_rejected.len(), 1);
+        assert!(result.candidate_rejected.is_empty());
+    }
+
+    #[test]
+    fn duplicate_candidate_is_rejected_as_a_group_before_calibration() {
+        let value = report();
+        let first = estimate(&value);
+        let mut second = estimate(&value);
+        second.calibration.calibration_id = "missing-report".to_owned();
+        let result = rank_calibrated_roi_information_value(
+            &[first, second],
+            &[value],
+            1_100,
+            "clock:camera-1",
+            RoiInformationValueConfig::default(),
+        ).unwrap();
+        assert!(result.ranked.is_empty());
+        assert!(result.calibration_rejected.is_empty());
+        assert_eq!(result.candidate_rejected.len(), 2);
+        assert!(result.candidate_rejected.iter().all(|r|
+            r.reason == RoiInformationValueError::DuplicateCandidateId
+        ));
+    }
+
+    #[test]
+    fn integrated_ranker_returns_only_report_bound_estimates() {
+        let value = report();
+        let good = estimate(&value);
+        let result = rank_calibrated_roi_information_value(
+            &[good],
+            &[value],
+            1_100,
+            "clock:camera-1",
+            RoiInformationValueConfig::default(),
+        ).unwrap();
+        assert_eq!(result.ranked.len(), 1);
+        assert!(result.calibration_rejected.is_empty());
+        assert!(result.candidate_rejected.is_empty());
     }
 
     #[test]
