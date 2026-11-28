@@ -1,4 +1,5 @@
 mod eqc;
+pub mod observer;
 pub mod qualification;
 
 use std::env;
