@@ -99,6 +99,16 @@ struct KernelExpert {
     monitor: ConvexTargetApproachabilityMonitor,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KernelExpertBindings {
+    pub expert_id: String,
+    pub response_map_sha256: String,
+    pub covariate_map_sha256: String,
+    pub target_sha256: String,
+    pub response_reference_sha256: String,
+    pub covariate_reference_sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExpertPosteriorWeight {
     pub expert_id: String,
@@ -398,7 +408,7 @@ impl KernelFamilyPortfolio {
             .zip(staged_updates.into_iter())
             .zip(next_posterior.into_iter())
         {
-            monitor_state_replace(&mut expert.monitor, monitor);
+            expert.monitor = monitor;
             expert_updates.push(KernelExpertUpdate {
                 expert_id: expert.expert_id.clone(),
                 posterior_weight,
@@ -430,8 +440,7 @@ impl KernelFamilyPortfolio {
             .map(|expert| expert.monitor.clone())
             .collect::<Vec<_>>();
         let posterior = posterior_weights(&self.experts, &monitors, self.log_mixture_e_value)?;
-        Ok(self
-            .experts
+        self.experts
             .iter()
             .zip(monitors.iter())
             .zip(posterior)
@@ -448,7 +457,7 @@ impl KernelFamilyPortfolio {
                     member_alpha: (numerator, denominator),
                 })
             })
-            .collect::<Result<Vec<_>, KernelFamilyError>>()?)
+            .collect::<Result<Vec<_>, KernelFamilyError>>()
     }
 
     pub fn observations_seen(&self) -> u64 {
@@ -497,30 +506,19 @@ impl KernelFamilyPortfolio {
         &self.deployment_plan_sha256
     }
 
-    pub fn map_bindings(&self) -> Vec<(String, String, String, String, String, String)> {
+    pub fn map_bindings(&self) -> Vec<KernelExpertBindings> {
         self.experts
             .iter()
-            .map(|expert| {
-                (
-                    expert.expert_id.clone(),
-                    expert.response_map.map_sha256().to_string(),
-                    expert.covariate_map.map_sha256().to_string(),
-                    expert.target_sha256.clone(),
-                    expert.response_reference_sha256.clone(),
-                    expert.covariate_reference_sha256.clone(),
-                )
+            .map(|expert| KernelExpertBindings {
+                expert_id: expert.expert_id.clone(),
+                response_map_sha256: expert.response_map.map_sha256().to_string(),
+                covariate_map_sha256: expert.covariate_map.map_sha256().to_string(),
+                target_sha256: expert.target_sha256.clone(),
+                response_reference_sha256: expert.response_reference_sha256.clone(),
+                covariate_reference_sha256: expert.covariate_reference_sha256.clone(),
             })
             .collect()
     }
-}
-
-/// Replaces only the bounded CMAQ-046 state; immutable maps/bindings remain
-/// in the original expert object.
-fn monitor_state_replace(
-    destination: &mut ConvexTargetApproachabilityMonitor,
-    source: ConvexTargetApproachabilityMonitor,
-) {
-    *destination = source;
 }
 
 fn multiply_probabilities(
@@ -698,7 +696,7 @@ mod tests {
     }
 
     fn covariate_map(digest: &str) -> FourierFeatureMap {
-        FourierFeatureMap::new(1, vec![vec![0.0]], digest.into()).unwrap()
+        FourierFeatureMap::new(1, vec![vec![0.5]], digest.into()).unwrap()
     }
 
     fn target() -> BoxTarget {
@@ -766,7 +764,13 @@ mod tests {
         let mut update = None;
         for sequence in 1..=200u64 {
             let result = family
-                .observe_pair(sequence, &format!("pair-{sequence}"), &[0.0], &[0.0], &[std::f64::consts::TAU])
+                .observe_pair(
+                    sequence,
+                    &format!("pair-{sequence}"),
+                    if sequence % 2 == 0 { &[std::f64::consts::PI] } else { &[0.0] },
+                    if sequence % 2 == 0 { &[std::f64::consts::TAU] } else { &[0.0] },
+                    if sequence % 2 == 0 { &[0.0] } else { &[std::f64::consts::TAU] },
+                )
                 .unwrap();
             if result.quarantined {
                 update = Some(result);
@@ -888,7 +892,13 @@ mod tests {
         let mut stopped = false;
         for sequence in 1..=200u64 {
             let update = family
-                .observe_pair(sequence, &format!("shift-{sequence}"), &[0.0], &[0.0], &[std::f64::consts::TAU])
+                .observe_pair(
+                    sequence,
+                    &format!("shift-{sequence}"),
+                    if sequence % 2 == 0 { &[std::f64::consts::PI] } else { &[0.0] },
+                    if sequence % 2 == 0 { &[std::f64::consts::TAU] } else { &[0.0] },
+                    if sequence % 2 == 0 { &[0.0] } else { &[std::f64::consts::TAU] },
+                )
                 .unwrap();
             if update.quarantined {
                 stopped = true;
