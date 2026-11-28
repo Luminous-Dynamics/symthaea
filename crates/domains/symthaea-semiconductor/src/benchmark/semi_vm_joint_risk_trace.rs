@@ -186,14 +186,6 @@ fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String, JointRiskTrac
     Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
-fn selection_input_digest(
-    input: &SelectionRiskInputV1,
-) -> Result<String, JointRiskTraceErrorV1> {
-    let report = evaluate_selection_adjusted_population_risk_v1(input)
-        .map_err(|error| JointRiskTraceErrorV1(error.to_string()))?;
-    Ok(report.report_sha256)
-}
-
 fn canonicalize_selection_input(input: &mut SelectionRiskInputV1) {
     input.population_round_ids.sort_unstable();
     input.qualified_round_ids.sort_unstable();
@@ -1175,6 +1167,11 @@ fn validate_shared_audit(
             )));
         }
     }
+    if first_audit.is_empty() {
+        return Err(JointRiskTraceErrorV1(
+            "paired benchmark requires at least one independent audit observation".into(),
+        ));
+    }
     Ok(first_audit.len())
 }
 
@@ -1251,7 +1248,6 @@ pub fn evaluate_joint_risk_trace_v1(
         }
 
         let selection_report = validate_selection_risk_input(arm, input, &population)?;
-        let selection_input_sha = selection_report.input_sha256.clone();
         let summary = match (&arm.controller_evidence, arm.method) {
             (JointControllerEvidenceV1::FixedDelayTauAci(evidence), JointControllerMethodV1::FixedDelayTauAci) => {
                 let observed = validate_aci_arm(arm, evidence, &population)?;
@@ -1335,7 +1331,6 @@ pub fn evaluate_joint_risk_trace_v1(
                 )));
             }
         };
-        let _ = selection_input_sha;
         arm_summaries.push(summary);
     }
 
