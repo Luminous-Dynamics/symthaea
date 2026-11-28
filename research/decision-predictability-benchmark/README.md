@@ -42,6 +42,21 @@ The current known-answer tests include:
 
 The evaluator is deterministic and does not simulate probe execution. It computes the value of a requested probe from the evaluator's declared likelihood model. The posterior and risk reports are evaluator outputs and must not be returned to the candidate during a confirmatory episode.
 
+## Experimental sequential robust policy oracle
+
+The new `src/sequential.rs` module adds a finite-horizon, prior-free policy-tree reference with:
+
+- Set-valued observation supports, including overlapping outcomes.
+- Branch-specific continuations driven by public protocol state; action outcome supports are validated as exhaustive over the states reachable at that protocol node, not over unrelated branches of the global state universe.
+- Component-wise integer resource budgets and explicit result deadlines.
+- A bounded backward dynamic programme and a separately written exhaustive policy-tree enumerator.
+- Explicit terminal decisions; separate current-state minimax/risk-gate fields from the selected policy's terminal loss/risk-gate fields; evaluator-only per-terminal receipts bind action/outcome supports, terminal decision/loss and branch-specific resource vectors; no implicit abstain action or execution authorization.
+- A 16-state non-myopic branch-unlock fixture and formal policy contract in [PR #13569](https://github.com/Luminous-Dynamics/symthaea/pull/13569). The Rust implementation is tracked in [PR #13571](https://github.com/Luminous-Dynamics/symthaea/pull/13571).
+
+**Qualification status: uncompiled / untested.** Fourteen Rust test functions have been authored, including dynamic-programme versus exhaustive-enumerator comparison (including 96 deterministic generated tiny worlds), current-versus-planned risk-gate separation, sub-tolerance policy-improvement preservation, lexicographic decision tie-break determinism, exact terminal resource-path accounting with compatible-state supports, terminal decisions/losses and branch-dependent compute costs, nuisance dead-end handling, overlapping supports, deadline rejection (including a delayed follow-up), cumulative sequence-cost enforcement, component-wise budget enforcement, incomplete-support rejection and action-permission enforcement. No Rust formatter, compiler, test runner or strict Clippy result has yet been obtained for this module. Do not use it as a qualified evaluator until exact-head Rust 1.96 formatting, compilation, tests and strict Clippy pass.
+
+This module is a tiny-world reference oracle, not the production research policy, a general scheduler, a Bayesian EVSI implementation, or an experiment execution authority. It shares only the declared model semantics; the exhaustive enumerator separately constructs the full contingent policy-tree choice set rather than calling the dynamic-programming recurrence.
+
 ## Run
 
 ~~~bash
