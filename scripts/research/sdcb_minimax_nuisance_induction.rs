@@ -152,6 +152,10 @@ fn terminal_test() -> [Q; 4] {
     [Q::zero(), GAMMA, GAMMA, Q::zero()]
 }
 
+fn member_g2_at_history(_t: Trajectory, x1: bool, x2: bool) -> Q {
+    if x1 != x2 { GAMMA } else { Q::zero() }
+}
+
 fn expectation(law: [Q; 4], test: [Q; 4]) -> Q {
     (0..4).fold(Q::zero(), |sum, k| sum.add(law[k].mul(test[k])))
 }
@@ -433,10 +437,9 @@ mod tests {
         let ts = all_trajectories();
         for t in &ts {
             for (x1, x2, index) in [(false,false,0),(false,true,1),(true,false,2),(true,true,3)] {
-                let terminal_conditional = phi[index];
+                let terminal_conditional = member_g2_at_history(*t, x1, x2);
                 assert_eq!(terminal_conditional, phi[index]);
                 assert!(terminal_conditional.is_le(Q::one()));
-                let _ = (t.id, x1, x2);
             }
         }
     }
