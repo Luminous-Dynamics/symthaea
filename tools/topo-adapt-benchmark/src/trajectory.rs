@@ -173,7 +173,7 @@ impl EpisodeRuntimeState {
     pub fn state_digest(&self) -> String {
         digest_state(
             &self.context_digest,
-            self.current_tick.unwrap_or(0),
+            self.current_tick,
             &self.active_edges,
             &self.demands,
             self.remaining_edit_budget,
@@ -195,7 +195,7 @@ impl EpisodeRuntimeState {
         let prepared = self.prepare_tick(tick, events)?;
         Ok(digest_state(
             &self.context_digest,
-            tick,
+            Some(tick),
             &prepared.active_edges,
             &prepared.demands,
             self.remaining_edit_budget,
@@ -219,7 +219,7 @@ impl EpisodeRuntimeState {
         let prepared = self.prepare_tick(tick, events)?;
         let pre_action_state_digest = digest_state(
             &self.context_digest,
-            tick,
+            Some(tick),
             &prepared.active_edges,
             &prepared.demands,
             self.remaining_edit_budget,
@@ -348,7 +348,7 @@ impl EpisodeRuntimeState {
 
         let post_state_digest = digest_state(
             &self.context_digest,
-            tick,
+            Some(tick),
             &next_edges,
             &next_demands,
             next_remaining_budget,
@@ -443,7 +443,7 @@ impl EpisodeRuntimeState {
         };
 
         let mut events = external_events.to_vec();
-        for (index, intervention) in self.episode.interventions.iter().enumerate() {
+        for intervention in &self.episode.interventions {
             let is_due = intervention.time <= tick
                 && self
                     .current_tick
@@ -462,7 +462,10 @@ impl EpisodeRuntimeState {
                     .capacity_after
                     .ok_or_else(|| "fixture_intervention_missing_capacity".to_string())?;
                 events.push(ExogenousEvent {
-                    event_id: format!("fixture-intervention-{}-{index}", intervention.time),
+                    event_id: format!(
+                        "fixture-intervention-{}-{}-{}",
+                        intervention.time, from, to
+                    ),
                     kind: ExogenousEventKind::EdgeCapacityChange {
                         from,
                         to,
@@ -576,7 +579,7 @@ fn decorate_flow(
 #[allow(clippy::too_many_arguments)]
 fn digest_state(
     context_digest: &str,
-    tick: u64,
+    tick: Option<u64>,
     edges: &[Edge],
     demands: &[SinkDemand],
     remaining_edit_budget: usize,
@@ -588,7 +591,10 @@ fn digest_state(
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hash_optional_string(&mut hasher, Some(context_digest));
-    hasher.update(&tick.to_le_bytes());
+    hasher.update(&[u8::from(tick.is_some())]);
+    if let Some(tick) = tick {
+        hasher.update(&tick.to_le_bytes());
+    }
     hasher.update(&(remaining_edit_budget as u64).to_le_bytes());
     hasher.update(&cumulative_edit_cost_units.to_le_bytes());
     hasher.update(&cumulative_maintenance_cost_units.to_le_bytes());
@@ -601,6 +607,7 @@ fn digest_state(
             right.id.as_deref(),
         ))
     });
+    hasher.update(&(canonical_edges.len() as u64).to_le_bytes());
     for edge in &canonical_edges {
         hasher.update(&edge.from.to_le_bytes());
         hasher.update(&edge.to.to_le_bytes());
@@ -612,6 +619,7 @@ fn digest_state(
 
     let mut canonical_demands = demands.to_vec();
     canonical_demands.sort_by_key(|sink| sink.node);
+    hasher.update(&(canonical_demands.len() as u64).to_le_bytes());
     for sink in &canonical_demands {
         hasher.update(&sink.node.to_le_bytes());
         hasher.update(&sink.demand.to_le_bytes());
@@ -656,6 +664,7 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
 
     let mut nodes = episode.nodes.clone();
     nodes.sort_by_key(|node| node.id);
+    hasher.update(&(nodes.len() as u64).to_le_bytes());
     for node in &nodes {
         hasher.update(&node.id.to_le_bytes());
         hash_optional_string(&mut hasher, Some(&node.role));
@@ -665,6 +674,7 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
 
     for edges in [&episode.active_edges, &episode.candidate_edges] {
         let mut canonical = edges.to_vec();
+        hasher.update(&(canonical.len() as u64).to_le_bytes());
         canonical.sort_by(|left, right| {
             (left.from, left.to, left.id.as_deref()).cmp(&(
                 right.from,
@@ -680,10 +690,12 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
 
     let mut schedules = episode.demand_schedule.clone();
     schedules.sort_by_key(|step| step.time);
+    hasher.update(&(schedules.len() as u64).to_le_bytes());
     for schedule in &schedules {
         hasher.update(&schedule.time.to_le_bytes());
         let mut sinks = schedule.sinks.clone();
         sinks.sort_by_key(|sink| sink.node);
+        hasher.update(&(sinks.len() as u64).to_le_bytes());
         for sink in &sinks {
             hasher.update(&sink.node.to_le_bytes());
             hasher.update(&sink.demand.to_le_bytes());
@@ -695,6 +707,7 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
         (left.time, left.kind.as_str(), left.from, left.to, left.capacity_after)
             .cmp(&(right.time, right.kind.as_str(), right.from, right.to, right.capacity_after))
     });
+    hasher.update(&(interventions.len() as u64).to_le_bytes());
     for event in &interventions {
         hasher.update(&event.time.to_le_bytes());
         hash_optional_string(&mut hasher, Some(&event.kind));
