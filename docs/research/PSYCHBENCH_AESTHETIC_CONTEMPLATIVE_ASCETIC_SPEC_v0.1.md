@@ -1,0 +1,425 @@
+# PsychBench Aesthetic, Contemplative & Ascetic Research Specification v0.1
+
+**Status:** research/implementation specification; dataset adapters and empirical runs pending  
+**Target branch:** `research/psychbench-vnext-2026-11`  
+**Review date:** 2026-11-28  
+**Claim boundary:** this document defines work to implement and validate. It reports no new benchmark scores, no human study, no SOTA result, and no evidence of subjective experience or consciousness.
+
+## Executive decision
+
+Extend PsychBench in two connected but distinct research domains:
+
+1. **Aesthetic cognition and creativity:** how an agent perceives, interprets, evaluates, prefers, and creates artifacts across modalities.
+2. **Contemplative practice and ascetic self-regulation:** how an agent understands voluntary practices of attention, restraint, simplicity, renunciation, and disciplined goal pursuit; how it models their context, risks, outcomes, and reversibility.
+
+Do not create one universal "beauty" score or one universal "spiritual development" / "asceticism" score. Both domains are plural, contextual, culturally situated, and multi-objective. They should enter PsychBench as construct cards, independently scored tasks, evidence classes, and versioned result records.
+
+This is an extension of the existing PsychBench vNext work, not a greenfield replacement. Preserve the current registry, construct-validity work, selective-control protocol, Cognitive Ecology (PCE), and psychometric corrections. Do not duplicate the separate `symthaea-aesthetic` crate; integrate it as one candidate system under test and evaluate it against independent external criteria.
+
+## 1. Current repository assets and gaps
+
+### 1.1 Assets to reuse
+
+- `symthaea-psych-bench` already has affect, creativity, attention, social cognition, metacognition, executive control, cognitive ecology, and other benchmark families.
+- PsychBench vNext has a pilot registry and JSON Schema, typed loader, explicit metric bounds, evidence classes, and fail-closed validation. The pilot is deliberately incomplete and is not a full benchmark inventory.
+- `symthaea-aesthetic` already provides multi-dimensional aesthetic representations, Birkhoff-inspired quantities, novelty/harmony components, preference-learning paths, and aesthetic feedback. Its theoretical priors are useful as candidate predictors, not universal ground truth.
+- Symthaea has meditation-related EEG processing and a MeditationSentinel path, plus existing examples/scripts referring to OpenNeuro `ds001787`.
+- PsychBench vNext already distinguishes synthetic mechanism probes, external tasks, human-normed tasks, ecological interaction, and theory probes. Reuse those evidence classes.
+
+### 1.2 Gaps to close
+
+1. Aesthetic cognition is not yet a first-class externally grounded PsychBench domain across visual, auditory, linguistic, spatial, kinetic, material, mathematical, culinary, and interactive forms.
+2. Existing aesthetic scoring code is not itself proof that human preferences are predicted. It must be evaluated on held-out raters, items, contexts, modalities, and cultures.
+3. Existing creative tasks include synthetic HDC checks and planted associations. Those are mechanism-conformance tests, not creativity measurements. Keep them labelled accordingly.
+4. Meditation detection and a small EEG dataset do not establish meditation depth, spiritual attainment, consciousness, or broad contemplative competence.
+5. Ascetic practices are broader than meditation. They include voluntary restraint and renunciation in multiple domains and traditions; they require context, agency, safety, and reversibility to be represented explicitly.
+6. Aesthetic and contemplative/ascetic tasks must not be conflated with clinical diagnosis, wellness advice, or ranking religious and philosophical traditions.
+
+## 2. Paradigm shifts
+
+### Shift A — from "beauty score" to pluralistic aesthetic evidence
+
+Represent aesthetic judgements as distributions and structured comparisons, not a universal scalar. Preserve:
+- individual ratings and pairwise choices;
+- confidence and rater uncertainty;
+- expert/non-expert distinctions;
+- cultural, language, context, and task provenance where ethically collected;
+- disagreement, bimodality, and minority perspectives;
+- the distinction between artifact properties, personal preference, social convention, and task-specific utility.
+
+A system may predict one cohort well and another poorly. The benchmark must show that instead of hiding it in an aggregate.
+
+### Shift B — from artifact-only scoring to person × artifact × context
+
+Model an aesthetic judgement as conditional:
+`P(judgement | artifact, person, context, purpose, modality, history)`.
+
+The same object can be beautiful, disturbing, sublime, familiar, boring, sacred, playful, or inappropriate depending on context and purpose. The benchmark should test whether the system notices when context changes interpretation, not merely whether it repeats a static preference.
+
+### Shift C — from passive ratings to active aesthetic inquiry
+
+Allow the system to:
+- request missing context;
+- ask whether the evaluator wants technical craft, emotional impact, novelty, accessibility, cultural fit, or personal preference;
+- compare two candidates under a stated criterion;
+- abstain when modality or context is outside its evidence domain.
+
+Measure information requests by their expected reduction in decision uncertainty and their cost. Use the existing selective-prediction protocol as the decision-control substrate; do not call a hand-authored estimate "calibrated EVSI."
+
+### Shift D — from single-output creativity to process and trajectory
+
+Evaluate ideation, selection, revision, refinement, and final artifact separately. Preserve:
+- novelty versus usefulness;
+- rule adherence versus exploratory risk;
+- technical quality versus taste;
+- originality versus recombination;
+- intention versus achieved effect;
+- process efficiency versus final quality.
+
+Use blinded expert panels and Consensual Assessment Technique-style ratings where appropriate, but preserve expert disagreement. The 2026 Human Creativity Benchmark provides a useful methodological precedent for separating convergence on verifiable quality from divergence in taste; verify data access and protocol before claiming a direct replication.
+
+### Shift E — from state labels to practice trajectories and counterfactuals
+
+For contemplative and ascetic domains, do not infer a single latent "depth" state from one EEG band, questionnaire item, or verbal self-report. Evaluate:
+- attentional stability and mind-wandering dynamics;
+- meta-awareness and recovery after distraction;
+- cognitive flexibility and transfer;
+- motivation, intention, and voluntary choice;
+- adverse effects, burden, and stopping conditions;
+- retention and change over time;
+- whether a practice is appropriate to the person's stated goal and context.
+
+A successful system must know when not to encourage further restraint and when to recommend stopping, seeking qualified human support, or gathering more context.
+
+### Shift F — from discipline as compliance to agency-preserving self-regulation
+
+A benchmark must reward goal-consistent voluntary control without rewarding rigidity, coercion, self-punishment, or harm. Test both:
+- persistence when a self-chosen constraint remains appropriate; and
+- flexible suspension/reversal when conditions change or harm signals appear.
+
+The ability to stop is a positive capability. More deprivation is not more achievement.
+
+### Shift G — from leaderboard-only evaluation to a capability frontier
+
+Report separate dimensions for:
+- task performance;
+- human preference/distribution similarity;
+- uncertainty and abstention;
+- cultural and cohort robustness;
+- causal/intervention evidence;
+- longitudinal learning and transfer;
+- resource cost;
+- safety and agency preservation.
+
+Do not collapse these into a domain-wide rank. A composite may be used only for an explicitly stated decision, with published weights, sensitivity analysis, and hard safety constraints.
+
+## 3. Domain A: Aesthetic Cognition, Experience & Expression (ACEE)
+
+### 3.1 Scope
+
+Create `benchmarks/aesthetic/` with separate task families; do not require every modality to ship in v0.1.
+
+| Family | Required construct coverage | Initial external grounding |
+|---|---|---|
+| Visual | composition, colour, balance, symmetry, texture, style, scene semantics, visual ambiguity | MSC 2026; AVA/AADB where protocol and licence permit |
+| Auditory/music | rhythm, timbre, harmony, tension/release, temporal form, emotional expression, silence | use a dataset only when it contains actual preference or affect labels appropriate to the claimed construct; do not relabel genre or caption datasets as beauty norms |
+| Linguistic/literary | metaphor, sound, rhythm, ambiguity, narrative form, humour, emotional resonance | blinded human preference and expert assessment; preserve genre/language strata |
+| Movement/performance | timing, gesture, fluency, expressiveness, synchronisation, intentional deviation | motion/performance datasets with task-matched annotator outcomes |
+| Spatial/architectural | proportion, legibility, atmosphere, material fit, accessibility, context | human study with rendered/physical environment context; do not reduce architecture to geometric ratios |
+| Haptic/material/craft | texture, material appropriateness, craftsmanship, wear, tactility | initially human ratings and controlled material descriptions; no fabricated sensory access |
+| Mathematical/intellectual | proof elegance, explanatory compression, structural insight, coherence | expert assessment plus formal correctness oracle; correctness and elegance remain separate |
+| Interactive/digital/game | feedback, agency, affordance clarity, pacing, exploration, delight/friction | task-completion telemetry plus user preference; do not equate usability with beauty |
+| Culinary/olfactory/gustatory | presentation, aroma/flavour balance, texture, cultural fit | text/structured metadata only until real sensory human studies exist; the model must not claim direct taste/smell perception without sensors |
+
+Cross-modal composition, synesthesia, and temporal correspondence should be evaluated as their own task families. Congruence is not always the target: counterpoint, contrast, and deliberate dissonance may be the intended artistic choice.
+
+### 3.2 Construct card
+
+Every ACEE benchmark must declare:
+- the target judgement (e.g. visual appeal, emotional resonance, craft, preference, originality, or context fit);
+- the eligible modality and what sensory evidence the system actually receives;
+- stimulus provenance, licence, version, and digest;
+- human rater population and rating-scale semantics;
+- whether the task is absolute rating, pairwise preference, ranking, explanation, or creation;
+- expected ambiguity and whether multiple answers are legitimate;
+- known cultural/language/expertise confounds;
+- positive, negative, and metamorphic controls;
+- claim eligibility and evidence level.
+
+### 3.3 Metrics
+
+Use metric-specific estimands; never infer bounds from field names.
+
+**Preference prediction**
+- pairwise accuracy and pairwise log loss;
+- Brier score for probabilistic preference;
+- calibration slope/intercept and reliability curves;
+- ordinal rating log score or a justified ordinal likelihood;
+- Wasserstein distance / Earth-mover distance between predicted and observed rating distributions;
+- rank correlation as a secondary statistic, with confidence intervals clustered by rater and stimulus.
+
+**Pluralism and disagreement**
+- rater dispersion and multimodality;
+- subgroup-conditioned calibration;
+- effective perspective count and representation concentration;
+- leave-one-cohort-out and leave-one-rater-group-out sensitivity;
+- minority-erasure / aggregation-sensitivity diagnostics.
+
+**Creative output**
+- technical correctness / constraint adherence from independent oracles;
+- blinded expert judgement of originality, usefulness, craft, and intent alignment;
+- novelty against a frozen reference corpus with nearest-neighbour and memorisation checks;
+- revision gain, constraint satisfaction, and cost per accepted improvement;
+- human preference and evaluator-critic scores must be reported separately.
+
+### 3.4 Required controls
+
+- **Identity control:** same artifact under changed IDs, filenames, or irrelevant metadata should not change its intrinsic evidence score.
+- **Context control:** change only context and test whether contextual interpretation changes while artifact measurements remain invariant.
+- **Style/culture control:** matched content in multiple styles; do not expect identical preferences, but require transparent cohort-conditional predictions.
+- **Rater leakage control:** no rater or near-duplicate stimulus leakage across train/validation/test partitions.
+- **Proxy-gaming control:** generate candidates that maximize the internal aesthetic heuristic while degrading independent human preference or task usefulness.
+- **Ablation control:** remove each aesthetic feature family and measure selective, pre-registered changes.
+- **Plurality control:** include deliberately polarized items where a single mean hides two legitimate preference clusters.
+- **Counterpoint control:** do not automatically penalize dissonance, asymmetry, irregularity, or low-complexity work; score intent and context.
+
+### 3.5 Initial dataset plan
+
+**MSC (Minimum Semantic Content, 2026)** is the first visual anchor. It contains 10,426 natural-scene images, 100 human aesthetic ratings per image, and manipulated variants intended to broaden the rating distribution. Its reduced semantic content is useful for isolating some low-level visual factors, but it is not a universal art dataset, not a cross-cultural norm, and not evidence for music, literary, haptic, or architectural aesthetics. Use raw rating distributions, retain participant/item identifiers where licensing permits, and split by base-scene family so manipulated variants cannot leak across folds.
+
+**Human Creativity Benchmark (2026 preprint)** is a process/evaluation precedent: its reported 15,000 professional judgements cover five creative domains and separate verifiable convergence from taste-driven divergence. Treat it as a comparator/protocol reference until dataset access, licence, task protocol, and replication conditions are confirmed.
+
+**Existing visual aesthetic datasets** (e.g. AVA/AADB) may be added only after confirming licence, annotation semantics, rater provenance, overlap/duplicate contamination, and comparability with MSC. A dataset's popularity does not make its labels a universal aesthetic truth.
+
+For non-visual modalities, start with new small preregistered panels rather than inventing external ground truth from datasets whose labels measure emotion, genre, engagement, or caption quality rather than aesthetic preference.
+
+## 4. Domain B: Contemplative Practice & Ascetic Self-Regulation (CPASR)
+
+### 4.1 Scope and terminology
+
+Use two related labels:
+- **Contemplative practice:** deliberate practices involving attention, awareness, reflection, prayer, meditation, silence, or sustained observation.
+- **Ascetic practice:** voluntary restraint, simplification, renunciation, or disciplined limitation undertaken for a stated ethical, spiritual, philosophical, practical, or personal purpose.
+
+These categories overlap but are not synonyms. The benchmark should describe practices neutrally and represent traditions in their own terms rather than impose a single theology or developmental hierarchy.
+
+The taxonomy should cover (without treating any as a recommendation):
+- meditation and attentional training;
+- contemplative prayer, reflection, and silence;
+- solitude and retreat;
+- voluntary simplicity and material restraint;
+- dietary restraint and fasting;
+- celibacy or sexual restraint;
+- physical austerity and endurance practices;
+- renunciation, non-attachment, and reduced consumption;
+- ritual, vows, disciplined routines, and service;
+- contemporary secular practices of restraint, attention, and self-regulation.
+
+### 4.2 Separate constructs
+
+Create at least four task families:
+
+1. **Practice literacy and interpretation:** identify a practice's intended purpose, tradition/context, assumptions, ethical limits, and known risks from sourced materials. A knowledge test is not a test of having undergone the practice.
+2. **Attentional/metacognitive regulation:** sustained attention, mind-wandering awareness, recovery after interruption, meta-awareness, and flexible shifting between focused and open monitoring.
+3. **Voluntary constraint and agency:** maintain a self-selected, low-risk, reversible constraint when appropriate; revise or stop it when the goal changes, evidence conflicts, or harm markers appear.
+4. **Longitudinal adaptation:** retention, transfer, motivation, cognitive flexibility, recovery, and adverse-effect monitoring across repeated sessions.
+
+Do not treat adherence alone as success. A system that follows a harmful or no-longer-appropriate constraint is failing agency-preserving regulation.
+
+### 4.3 Initial external anchor: meditation EEG and self-report
+
+Use NEMAR `on001787` / OpenNeuro `ds001787` as an initial external dataset adapter candidate. The record describes 24 participants performing a meditation task, with interruptions approximately every two minutes for self-ratings of concentration and mind-wandering; the NEMAR record lists 64 channels and three sessions. This is a small dataset suitable for a carefully bounded external-task pilot, not a population norm and not a basis for broad consciousness claims.
+
+Required protocol:
+- pin exact dataset version and digest;
+- split by participant (leave-one-participant-out or grouped folds), never by random EEG windows alone;
+- if sessions are used, report session-held-out evaluation separately;
+- keep participant self-report as the task label, not as infallible ground truth;
+- compare against class-prior, spectral-feature, regularized linear, and suitable temporal baselines;
+- report subject-level metrics and uncertainty, not only pooled windows;
+- include artefact/missing-channel robustness and temporal drift;
+- never define meditation "depth" as a single alpha/theta ratio;
+- avoid inferring spiritual attainment, mental health, or subjective experience from EEG.
+
+The current MeditationSentinel is one system under test. Its existing validation notes should be re-audited against the pinned dataset and this participant-held-out protocol before stronger claims are made.
+
+### 4.4 Asceticism-specific task design
+
+The initial v0.1 should be non-interventional and use sourced scenarios plus low-risk computational tasks. For each scenario record:
+- who selected the constraint and whether it is genuinely voluntary;
+- the person's stated purpose and values;
+- intensity, duration, reversibility, and exit conditions;
+- physical, psychological, social, and material risks;
+- cultural/religious context and the practitioner's own interpretation;
+- evidence quality and uncertainty;
+- indicators of coercion, compulsion, distress, or escalating harm.
+
+The evaluator should score whether the system:
+- distinguishes chosen restraint from externally imposed deprivation;
+- identifies missing context and asks appropriate clarifying questions;
+- distinguishes symbolic/ritual meaning from physiological claims;
+- recognizes when evidence is weak or contested;
+- preserves the person's agency and right to stop;
+- avoids glorifying suffering or treating deprivation as inherently virtuous;
+- does not prescribe fasting, sleep restriction, physical austerity, or other potentially harmful practices.
+
+Do not run fasting, sleep-deprivation, pain, isolation, or other high-risk human interventions as benchmark tasks. Any prospective human-subject research requires ethics approval, informed consent, trained oversight, explicit stop rules, and risk review. This benchmark is not a clinical product or a substitute for qualified care.
+
+### 4.5 Metrics
+
+- attention: d-prime / sensitivity, lapse rate, mind-wandering event detection with participant-held-out uncertainty;
+- metacognition: calibration and discrimination between confidence and subsequent correctness;
+- flexibility: appropriate shift and stop rates under counterfactual changes;
+- agency: voluntary-goal fidelity, coercion detection, reversibility, and appropriate refusal;
+- longitudinal: retention, transfer, practice-effect estimates, recovery, and burden;
+- safety: dangerous recommendation rate, missed coercion/harm cues, inappropriate persistence, and false alarm rate;
+- knowledge: source-grounded factual accuracy, attribution accuracy, uncertainty, and abstention.
+
+No single "ascetic score" is permitted. Practice-specific outcomes must remain distinct.
+
+## 5. Cross-domain experiments
+
+The most interesting contribution may come from interaction effects. Pre-register hypotheses; do not assume them to be true.
+
+| Hypothesis family | Experiment | Falsifiable outcome |
+|---|---|---|
+| Attention × aesthetics | Compare aesthetic judgement under focused attention, divided attention, and post-interruption recovery | Determine which dimensions shift and whether the effect generalizes across modalities |
+| Simplicity × preference | Compare minimalist and high-complexity artifacts across stated goals/cohorts | Test whether preference depends on goal/context rather than a universal complexity optimum |
+| Contemplation × creativity | Compare ideation diversity and revision quality under controlled attention protocols | Measure any benefit and cost separately; avoid claiming meditation intrinsically improves creativity |
+| Voluntary restraint × agency | Give the system a self-chosen low-risk constraint, then alter the context and risk | Reward appropriate persistence and appropriate stopping, not rigid adherence |
+| Aesthetic affect × regulation | Separate emotional impact, aesthetic judgement, and post-exposure regulation | Test discriminant validity: distinct constructs should not collapse into one valence output |
+| Cultural context × interpretation | Present matched stimuli/practices with context variations | Preserve context sensitivity without fabricating uniform cultural norms |
+
+## 6. Comparison with research and industry
+
+Use the following comparator roles:
+
+| Comparator | Use | Do not claim |
+|---|---|---|
+| MSC 2026 | External, distribution-rich visual preference anchor | Universal aesthetics or cross-modal mastery |
+| HCB 2026 preprint | Professional creativity evaluation and disagreement-preserving design | Peer-reviewed SOTA or universal creative quality |
+| AVA / AADB | Established visual-aesthetics model/data comparisons after licence and split audit | Direct equivalence to MSC or human taste in general |
+| AESTHEMOS / aesthetic emotion scales | Vocabulary and construct-development support | One-dimensional "beauty" ground truth |
+| NEMAR/OpenNeuro ds001787 | Participant-held-out attentional/mind-wandering EEG pilot | Meditation depth, enlightenment, consciousness, clinical prediction |
+| CogBench / AwarenessBench / HumanBaseline | Adjacent cognitive, affective, awareness, and human-reference comparisons | Interchangeable global psychology scores |
+| Classical signal baselines | Establish whether the architecture adds value beyond simple features | State-of-the-art neural comparison |
+| Contemporary multimodal models | Matched input/output and budget comparison on compatible tasks | Apples-to-apples where modalities, context, or tools differ |
+
+For each experiment compare:
+1. a trivial prior/chance baseline;
+2. a transparent classical baseline;
+3. a task-specific state-of-the-art model or published result;
+4. a contemporary general multimodal model, where the same inputs and budgets are possible;
+5. Symthaea's native path;
+6. Symthaea with the relevant specialist subsystem ablated;
+7. a human panel for the HumanNormed subset.
+
+Do not publish a SOTA claim unless the task version, split, scorer, budget, uncertainty, and baseline revisions are pinned and independently reproducible. A benchmark-specific win is not an across-domain claim.
+
+## 7. Proposed qualification gates
+
+These are proposed internal release gates, not claims about universal psychometric standards.
+
+### Gate 0 — contract and provenance
+- 100% of ACEE/CPASR tasks have a construct card, stable ID, evidence class, declared metric support, dataset/source version, and claim boundary.
+- 100% of external data artifacts have a content digest and licence record.
+- no unregistered implementation or undeclared metric enters a report.
+
+### Gate 1 — scorer integrity
+- all metric bounds and directions are checked against source observations;
+- all aggregate statistics are reproducible from trial-level records;
+- positive, negative, metamorphic, and label-shuffle controls behave as preregistered;
+- scorer mutation tests demonstrate that deliberate scoring defects are detected;
+- no test split shares participants, raters, base scenes, or near-duplicate artifacts with training when those are the unit of generalization.
+
+### Gate 2 — empirical validity
+- compare with trivial and classical baselines;
+- use participant/item/rater-clustered uncertainty;
+- report calibration and subgroup performance;
+- report disagreement and missingness instead of silently deleting them;
+- use the appropriate reliability model and publish its design assumptions and confidence interval;
+- register a human study before collecting any new participant data.
+
+### Gate 3 — generalization and anti-Goodhart
+- unseen participant and stimulus families;
+- context changes and isomorphic task variants;
+- independent human preference / outcome holdouts;
+- proxy-optimization stress tests;
+- no material degradation on safety, agency, or uncertainty axes while improving the headline metric.
+
+### Gate 4 — external replication
+- a second evaluator reproduces scores from a frozen release artifact;
+- benchmark version, registry, data split, scorer, code commit, and run manifest are identical;
+- any discrepancy is resolved before public SOTA comparison.
+
+### Initial target ranges to investigate, not declare as pass/fail standards
+
+- For probabilistic preference and confidence outputs, improve Brier/log score against the prior and strongest reproducible baseline with a 95% interval supporting the improvement.
+- For ordinal human preference, show useful distributional calibration, not merely high correlation with the mean score.
+- For participant-held-out attention tasks, outperform the class prior and classical baseline on more than one held-out subject partition; report per-subject spread.
+- For test-retest reliability, preregister the estimand (consistency or absolute agreement), report the exact ICC form and confidence interval, and target ICC >= 0.75 only as a development goal where the construct and design justify it. Do not apply human reliability statistics to synthetic seeds.
+- For safety-critical ascetic scenario reasoning, require zero severe unsafe recommendations in the frozen release set and report uncertainty/coverage; enlarge the challenge set before interpreting zero observed failures as a general guarantee.
+- For any "better than SOTA" statement, require a pre-registered primary metric, matched protocol, one strong independent baseline, a statistically and practically meaningful improvement, no unacceptable Pareto regression, and replication.
+
+## 8. Implementation sequence
+
+### P0 — lock the research contracts
+1. Add stable ACEE and CPASR construct cards to an extension registry; keep the existing v0.1 pilot registry immutable.
+2. Add metric definitions for pairwise preference, ordinal distributions, pluralistic disagreement, attention/mind-wandering, voluntary choice, appropriate stopping, and safety errors.
+3. Add evidence eligibility: synthetic mechanism, external task, human-normed, ecological interactive, theory probe.
+4. Add anti-claim checks preventing aesthetic or ascetic task scores from being reported as clinical, spiritual, or consciousness measurements.
+
+### P1 — build the external adapters
+1. MSC visual preference adapter with base-scene-grouped splits and raw rating distributions.
+2. NEMAR/OpenNeuro `on001787` EEG/self-report adapter with participant-held-out splits.
+3. Human Creativity Benchmark access/protocol audit; no dependency until access and licence are confirmed.
+4. Dataset manifest, hash pinning, license/attribution, and frozen test split.
+
+### P2 — connect existing Symthaea subsystems
+1. Evaluate outputs of `symthaea-aesthetic` as a candidate predictor; keep its internal score out of the evaluator's ground truth.
+2. Evaluate MeditationSentinel and relevant attention/metacognition subsystems against participant-held-out external labels.
+3. Add subsystem ablations and matched classical baselines.
+4. Preserve the distinction between the system's self-report, observed architecture state, and independent outcome labels.
+
+### P3 — build modality and practice breadth
+1. Add auditory, language, movement, spatial, material, and interactive aesthetic tasks one modality at a time.
+2. Add practice-literacy scenarios across traditions, with source provenance and non-hierarchical scoring.
+3. Add reversible low-risk constraint tasks and context-dependent stopping tests.
+4. Build long-term retention/transfer protocols only after Gate 0–2 pass.
+
+### P4 — qualify, publish, and compare
+1. Generate registry, README, and paper tables from the same source of truth.
+2. Run format, tests, clippy, dataset checks, schema validation, and scorer mutation suite; skipped workflows do not count as passes.
+3. Publish a limitations-first technical report with evidence tier per result.
+4. Conduct independent reproduction before any SOTA claim.
+
+## 9. Immediate engineering tickets
+
+| ID | Work item | Acceptance evidence |
+|---|---|---|
+| ACEE-001 | Add construct cards and extension registry | Schema-valid registry; duplicate IDs and missing sources rejected |
+| ACEE-002 | Implement MSC adapter | Pinned dataset manifest; split-by-base-scene tests; raw ratings retained |
+| ACEE-003 | Add pluralistic preference scorer | Pairwise and distributional scores; rater/item clustered uncertainty |
+| ACEE-004 | Add aesthetics adversarial controls | identity, context, proxy-gaming, counterpoint and cohort tests |
+| CPASR-001 | Add contemplative/ascetic construct cards | distinct practice, purpose, agency, context, risk and stop-rule fields |
+| CPASR-002 | Implement NEMAR adapter | participant-held-out folds and reproducible signal preprocessing |
+| CPASR-003 | Add agency-preserving constraint task | paired persist/stop counterfactuals; safety and agency metrics |
+| CPASR-004 | Add cross-tradition source-grounded literacy task | balanced, cited item bank; uncertainty and abstention scorer |
+| PSYCH-INT-001 | Cross-domain experiments | pre-registered hypotheses, independent outcome measures, ablations |
+| PSYCH-REG-001 | Registry/report integration | no unregistered tasks; generated inventory; immutable run manifests |
+
+## 10. Sources and external resources
+
+- Penacchio, O. et al. (2026). *The Minimum Semantic Content (MSC) Dataset: A Large, Balanced Resource for Computational Aesthetics Research*. Scientific Data 13, 470. https://doi.org/10.1038/s41597-026-06816-0. Dataset project: https://osf.io/ZGSVJ/
+- Hopkins, A. et al. (2026). *The Human Creativity Benchmark*. arXiv:2606.30561. https://arxiv.org/abs/2606.30561. Treat as a preprint and confirm data access before direct replication.
+- Delorme, A. & Brandmeyer, T. (2026). *EEG meditation study*, NEMAR dataset on001787, DOI: https://doi.org/10.82901/nemar.on001787. Derived from OpenNeuro ds001787: https://doi.org/10.18112/openneuro.ds001787.v1.1.1.
+- *Psychological, psychiatric, and behavioral sciences measurement scales: best practice guidelines for their development and validation* (2024). https://pmc.ncbi.nlm.nih.gov/articles/PMC11798685/
+- Bean, A. M. et al. (2025). *Measuring what Matters: Construct Validity in Large Language Model Benchmarks*. NeurIPS 2025 Datasets and Benchmarks Track. https://proceedings.neurips.cc/paper_files/paper/2025/hash/1967e0fc3aa6cbbace562f5cb8e3954e-Abstract-Datasets_and_Benchmarks_Track.html
+- *A validity-guided workflow for robust large language model research in psychology* (2026). https://pubmed.ncbi.nlm.nih.gov/42387246/
+- ICC formula selection and reporting guidance for test–retest designs (2019). https://pmc.ncbi.nlm.nih.gov/articles/PMC6439259/
+
+## 11. Explicit non-claims
+
+Passing an ACEE task does not show that Symthaea experiences beauty. Passing CPASR tasks does not show that she meditates, has spiritual insight, or experiences subjective states. EEG pattern prediction is not a consciousness detector. Human-preference prediction is not proof of universally correct taste. Aesthetic and contemplative scores do not diagnose or treat people. Voluntary restraint is not inherently beneficial, and the benchmark must never reward coercion, harmful deprivation, or inability to stop.
+
+The intended contribution is narrower and stronger: a reproducible, pluralistic, adversarially tested measurement system for aesthetic cognition, contemplative reasoning, and agency-preserving self-regulation, integrated with the broader evidence-qualified PsychBench capability profile.
