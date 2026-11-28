@@ -66,10 +66,11 @@ Do not treat a key included only inside the receipt as trusted. A valid signatur
 
 The standalone Rust package now contains a limited verifier primitive in `tools/eqc-reference/src/observer.rs`:
 
-- Canonicalizes the payload using RFC 8785 JCS before signing or verifying.
+- Canonicalizes the payload and trust-policy document using RFC 8785 JCS before signing, hashing or verifying.
 - Verifies Ed25519 signatures using a public key selected from an out-of-band trust policy; the envelope cannot nominate its own trust root.
-- Binds the signed payload to a frozen task ID/digest, policy digest, actor, subject and exact input-digest map.
-- Binds observer ID, workflow-identity claim and measurement profile to the accepted trust-policy entry.
+- Binds the signed payload to the frozen task ID/digest, authorization policy digest, **actual canonical trust-policy digest**, actor, subject and exact input-digest map.
+- Binds SUT source commit digest, container image digest, environment digest, allowed-mutation manifest digest, verifier identity/build/environment, observer identity/version/binary digest, workflow-identity claim and measurement profile to the operator-supplied run expectation and trust policy.
+- Rejects duplicate key IDs in the out-of-band observer trust policy.
 - Checks that state remains unchanged for denial/read-only episodes, enforces the initial no-network profile, checks wall/CPU/memory/tool budgets, and requires a distinct verifier identity/environment with a matching replay artifact digest.
 - Tracks duplicate nonces in a per-evaluation in-memory ledger.
 - Preserves unavailable energy and cost as JSON null rather than coercing unknown values to zero.
