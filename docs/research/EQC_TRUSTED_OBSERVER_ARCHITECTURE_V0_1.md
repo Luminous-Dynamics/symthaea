@@ -1,6 +1,6 @@
 # EQC Trusted Observer Architecture v0.1
 
-**Status:** Architecture proposal. Not implemented, independently audited, or a security certification.
+**Status:** Architecture proposal with a partial signed-envelope verifier prototype in PR #14186. The host-side observer launcher, independent resource/state measurement, durable replay store and external audit are not implemented. This is not a security certification.
 
 **Tracking issue:** [#14189](https://github.com/Luminous-Dynamics/symthaea/issues/14189).
 
@@ -61,6 +61,31 @@ Two possible first implementations:
 - **Workload-identity mode:** a short-lived OIDC identity is constrained to an exact repository, workflow, ref, environment and audience. A verifier validates the attestation chain against a separately pinned issuer policy.
 
 Do not treat a key included only inside the receipt as trusted. A valid signature is necessary but not sufficient: the policy must separately authorize the signer and its measurement method.
+
+## 4.1 Implemented verifier primitive (PR #14186; qualification remains disabled)
+
+The standalone Rust package now contains a limited verifier primitive in `tools/eqc-reference/src/observer.rs`:
+
+- Canonicalizes the payload using RFC 8785 JCS before signing or verifying.
+- Verifies Ed25519 signatures using a public key selected from an out-of-band trust policy; the envelope cannot nominate its own trust root.
+- Binds the signed payload to a frozen task ID/digest, policy digest, actor, subject and exact input-digest map.
+- Binds observer ID, workflow-identity claim and measurement profile to the accepted trust-policy entry.
+- Checks that state remains unchanged for denial/read-only episodes, enforces the initial no-network profile, checks wall/CPU/memory/tool budgets, and requires a distinct verifier identity/environment with a matching replay artifact digest.
+- Tracks duplicate nonces in a per-evaluation in-memory ledger.
+- Preserves unavailable energy and cost as JSON null rather than coercing unknown values to zero.
+- Exposes an explicit verification report with separate signature, trust, run-binding, nonce, measurement-contract and replay results.
+
+The corresponding versioned schemas are:
+
+- `eqc-observer-envelope-v0.1.schema.json`
+- `eqc-observer-trust-policy-v0.1.schema.json`
+- `eqc-observer-run-expectation-v0.1.schema.json`
+
+The test suite includes signature tampering, unknown key IDs, workflow-identity substitution, task/input digest substitution, nonce replay, unauthorized state change, network activity, mismatched replay identity, missing energy/cost, canonical JSON key ordering and schema unknown-field mutation.
+
+**Critical boundary:** the verifier always returns `qualified=false`. It verifies a trusted key's signature and internal evidence consistency; it does not prove that the signer actually launched/isolate the SUT, that cgroup/network counters were truthful, or that before/after snapshots came from outside the SUT. A private test signing key exists only in tests. No production observer key is generated or embedded.
+
+The nonce ledger is process-local and is not concurrency-safe or durable across runs. It prevents duplicate use inside one verifier instance only. Production anti-replay requires a durable transactional ledger or an independently operated evaluation service.
 
 ## 5. Anti-replay and anti-forgery rules
 
@@ -134,4 +159,4 @@ Do not enable `qualified=true` for external systems until all of the following a
 - the observer/verifier threat model and calibration are externally reviewed;
 - a red-team exercise attempts to forge each evidence channel.
 
-This is the next architectural step, not a feature currently delivered by EQC v0.1.
+This remains the next architectural step. The signed-envelope verifier is an implemented library primitive, but a host-side observer runtime, OIDC verification, durable nonce service, externally captured resource/network/state measurements, independent replay launcher and external security audit are not delivered by EQC v0.1.
