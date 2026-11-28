@@ -29,7 +29,9 @@
           "public_key_hex",
           "workflow_identity",
           "measurement_profile",
-          "active"
+          "active",
+          "observer_version",
+          "observer_sha256"
         ],
         "properties": {
           "key_id": {
@@ -53,6 +55,14 @@
           },
           "active": {
             "type": "boolean"
+          },
+          "observer_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observer_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
