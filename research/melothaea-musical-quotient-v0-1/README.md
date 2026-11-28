@@ -4,18 +4,18 @@ This is a dependency-free, standalone Rust research harness for [MEL-HEAR-010, i
 
 ## Implemented
 
-- An exhaustive C12 pitch-class transposition action with identity, inverse, closure and root transformation.
-- Exact positive-rational tempo scaling with reduced fractions, checked composition, inverse and explicit duration/pulse-rate semantics.
-- A direct-product action C12 × Q+ over symbolic chord roots and duration scale; pitch transposition and tempo scaling commute because they act on separate coordinates.
-- A task-indexed action/property classifier. Chord quality, relative intervals and rhythmic ratios are invariant under their respective exact actions; root pitch, pulse rate and absolute duration are equivariant rather than invariant.
-- A complete finite chord-quality quotient fixture over 48 candidates (12 roots × four triad qualities), with one representative per quality and a reversible transposition witness for every original member.
-- Negative controls: partial orbit, duplicate candidate, sampled relation, human-only relation, rubato misdeclared as constant tempo scaling, one-way crop, chord inversion and timbre substitution.
+- Exhaustive C12 pitch-class transposition with identity, inverse, closure and root transformation.
+- Positive rational tempo-factor arithmetic with reduction, checked composition, inverse and explicit duration/pulse-rate semantics. The u64 representation is bounded; some valid mathematical compositions overflow it.
+- Product action C12 × Q+ over symbolic chord roots and duration scale. The independent coordinates commute algebraically for representable values.
+- A task-indexed action/property classifier: chord quality and relative intervals are invariant under C12 transposition; root pitch is equivariant. Rhythmic ratios are invariant as a mathematical property map under constant tempo scaling, but the bounded u64 implementation is soft-only for quotienting in v0.
+- A complete finite chord-quality quotient fixture over 48 candidates (12 roots × four triad qualities), with one representative per quality and reversible lift witnesses.
+- Negative controls for incomplete/duplicate orbits, sampled and human-only relations, partial domains, rubato, lossy crop, chord inversion and timbre substitution.
 
 ## Qualification boundary
 
-FixtureHardQuotientEligible means only that the bounded symbolic fixture is eligible for exact quotient testing. RUNTIME_PRUNING_AUTHORIZED_V0_1 is permanently false. This v0 does not consume or authenticate the generic #11616 V2 certificate, does not verify upstream digests, does not process audio, and does not authorize production search pruning.
+Only the finite C12 symbolic action can return FixtureHardQuotientEligible, and only on a complete declared domain. That means eligibility for exact fixture testing, not permission to prune production search. The bounded u64 rational tempo fragment remains SoftRelationOnly because its representable subset is not closed under all mathematical compositions. RUNTIME_PRUNING_AUTHORIZED_V0_1 is permanently false.
 
-Human-calibrated performer/take relations remain soft-only. Crops remain non-invertible. A symbolic score quotient does not establish acoustic equivalence or perceptual identity.
+This v0 does not consume or authenticate the generic #11616 V2 certificate, verify upstream digests, process audio, or authorize production search pruning. Human-calibrated performer/take relations remain soft-only. Crops remain non-invertible. Symbolic score equivalence does not establish acoustic equivalence or perceptual identity.
 
 ## Run
 
