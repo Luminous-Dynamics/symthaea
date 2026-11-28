@@ -106,7 +106,10 @@ impl FiniteEnumeratorBaseline {
             return Ok(submit(
                 view,
                 AgentClaim::Numeric {
-                    disposition: disposition(report.compatible_models.len()),
+                    disposition: disposition_with_adequacy(
+                        report.compatible_models.len(),
+                        next_unobserved_numeric_input(&log).is_none(),
+                    ),
                     compatible_models: report.compatible_models,
                 },
             ));
@@ -124,7 +127,10 @@ impl FiniteEnumeratorBaseline {
             None => Ok(submit(
                 view,
                 AgentClaim::Numeric {
-                    disposition: disposition(report.compatible_models.len()),
+                    disposition: disposition_with_adequacy(
+                        report.compatible_models.len(),
+                        next_unobserved_numeric_input(&log).is_none(),
+                    ),
                     compatible_models: report.compatible_models,
                 },
             )),
@@ -153,7 +159,10 @@ impl FiniteEnumeratorBaseline {
             return Ok(submit(
                 view,
                 AgentClaim::Interaction {
-                    disposition: disposition(report.compatible_models.len()),
+                    disposition: disposition_with_adequacy(
+                        report.compatible_models.len(),
+                        next_unobserved_interaction_input(&log).is_none(),
+                    ),
                     compatible_models: report.compatible_models,
                 },
             ));
@@ -170,7 +179,10 @@ impl FiniteEnumeratorBaseline {
             None => Ok(submit(
                 view,
                 AgentClaim::Interaction {
-                    disposition: disposition(report.compatible_models.len()),
+                    disposition: disposition_with_adequacy(
+                        report.compatible_models.len(),
+                        next_unobserved_interaction_input(&log).is_none(),
+                    ),
                     compatible_models: report.compatible_models,
                 },
             )),
@@ -261,7 +273,10 @@ impl StrategyEnumeratorBaseline {
                             view,
                             AgentClaim::Numeric {
                                 compatible_models: models,
-                                disposition: disposition(count),
+                                disposition: disposition_with_adequacy(
+                                    count,
+                                    next_unobserved_numeric_input(&log).is_none(),
+                                ),
                             },
                         ),
                         ProbeScoringWork::default(),
@@ -304,7 +319,10 @@ impl StrategyEnumeratorBaseline {
                             view,
                             AgentClaim::Interaction {
                                 compatible_models: models,
-                                disposition: disposition(count),
+                                disposition: disposition_with_adequacy(
+                                    count,
+                                    next_unobserved_interaction_input(&log).is_none(),
+                                ),
                             },
                         ),
                         ProbeScoringWork::default(),
@@ -366,6 +384,19 @@ fn disposition(model_count: usize) -> ClaimDisposition {
         0 => ClaimDisposition::NoCompatibleModel,
         1 => ClaimDisposition::Identified,
         _ => ClaimDisposition::Ambiguous,
+    }
+}
+
+/// A singleton is only identified after the declared intervention domain has
+/// been challenged. Otherwise the finite candidate grammar remains provisional.
+fn disposition_with_adequacy(
+    model_count: usize,
+    challenge_complete: bool,
+) -> ClaimDisposition {
+    if model_count == 1 && !challenge_complete {
+        ClaimDisposition::Abstain
+    } else {
+        disposition(model_count)
     }
 }
 
