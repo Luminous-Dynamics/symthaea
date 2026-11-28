@@ -438,6 +438,118 @@ mod tests {
     }
 
     #[test]
+    fn test_option_documentation_metadata_is_preserved() {
+        let json = r#"{
+            "services.example.readOnly": {
+                "type": "bool",
+                "default": {"_type": "literalExpression", "text": "true"},
+                "example": {"_type": "literalExpression", "text": "false"},
+                "description": "A synthetic read-only option.",
+                "declarations": ["nixos/modules/services/example.nix"],
+                "loc": ["services", "example", "readOnly"],
+                "relatedPackages": "pkgs.example",
+                "readOnly": true
+            }
+        }"#;
+
+        let schemas = parse_nixos_options(json).unwrap();
+        let schema = &schemas[0];
+
+        assert_eq!(schema.read_only, Some(true));
+        assert_eq!(
+            schema.location.as_deref(),
+            Some(&["services".to_string(), "example".to_string(), "readOnly".to_string()][..])
+        );
+        assert_eq!(
+            schema.default_value.as_ref().and_then(|value| value["_type"].as_str()),
+            Some("literalExpression")
+        );
+        assert_eq!(
+            schema.example.as_ref().and_then(|value| value["_type"].as_str()),
+            Some("literalExpression")
+        );
+        assert_eq!(
+            schema.related_packages_markdown.as_deref(),
+            Some("pkgs.example")
+        );
+    }
+
+    #[test]
+    fn failed_live_refresh_does_not_refresh_bundled_reference_age() {
+        let attempted_at = Instant::now();
+        let mut cache = OptionSchemaCache {
+            schemas: parse_nixos_options(sample_json()).unwrap(),
+            source: OptionSchemaSource::BundledReference,
+            last_attempt: attempted_at,
+            last_live_refresh: None,
+            refresh_interval: Duration::from_secs(60),
+        };
+
+        cache.apply_live_result(Err("synthetic live lookup failure".to_string()), attempted_at);
+
+        assert_eq!(cache.source(), OptionSchemaSource::BundledReference);
+        assert!(cache.last_live_refresh_age().is_none());
+        assert!(!cache.has_fresh_local_live_data());
+        assert!(!cache.is_target_bound());
+    }
+
+    #[test]
+    fn failed_live_refresh_preserves_previous_live_timestamp() {
+        let previous_success = Instant::now() - Duration::from_secs(120);
+        let attempted_at = Instant::now();
+        let mut cache = OptionSchemaCache {
+            schemas: parse_nixos_options(sample_json()).unwrap(),
+            source: OptionSchemaSource::ControllerLocalLive,
+            last_attempt: previous_success,
+            last_live_refresh: Some(previous_success),
+            refresh_interval: Duration::from_secs(60),
+        };
+
+        cache.apply_live_result(Err("synthetic live lookup failure".to_string()), attempted_at);
+
+        assert_eq!(cache.source(), OptionSchemaSource::ControllerLocalLive);
+        assert_eq!(cache.last_live_refresh, Some(previous_success));
+        assert!(!cache.has_fresh_local_live_data());
+    }
+
+    #[test]
+    fn successful_live_refresh_replaces_fallback_and_advances_live_timestamp() {
+        let attempted_at = Instant::now();
+        let mut cache = OptionSchemaCache {
+            schemas: parse_nixos_options(sample_json()).unwrap(),
+            source: OptionSchemaSource::BundledReference,
+            last_attempt: attempted_at,
+            last_live_refresh: None,
+            refresh_interval: Duration::from_secs(60),
+        };
+
+        cache.apply_live_result(Ok(parse_nixos_options(sample_json()).unwrap()), attempted_at);
+
+        assert_eq!(cache.source(), OptionSchemaSource::ControllerLocalLive);
+        assert!(cache.last_live_refresh_age().is_some());
+        assert!(cache.has_fresh_local_live_data());
+        assert!(!cache.is_target_bound());
+    }
+
+    #[test]
+    fn empty_live_result_does_not_promote_fallback_to_live() {
+        let attempted_at = Instant::now();
+        let mut cache = OptionSchemaCache {
+            schemas: parse_nixos_options(sample_json()).unwrap(),
+            source: OptionSchemaSource::BundledReference,
+            last_attempt: attempted_at,
+            last_live_refresh: None,
+            refresh_interval: Duration::from_secs(60),
+        };
+
+        cache.apply_live_result(Ok(Vec::new()), attempted_at);
+
+        assert_eq!(cache.source(), OptionSchemaSource::BundledReference);
+        assert!(cache.last_live_refresh_age().is_none());
+        assert!(!cache.has_fresh_local_live_data());
+    }
+
+    #[test]
     fn test_parse_invalid_json() {
         let result = parse_nixos_options("not json at all");
         assert!(result.is_err());
@@ -486,6 +598,7 @@ mod tests {
             description: "Enable PostgreSQL".to_string(),
             related_packages: vec![],
             declarations: vec![],
+            ..NixOptionSchema::default()
         };
         assert!(schema.is_enable_option());
         assert_eq!(schema.module_prefix(), "services");
@@ -505,6 +618,7 @@ mod tests {
             description: "".to_string(),
             related_packages: vec![],
             declarations: vec![],
+            ..NixOptionSchema::default()
         };
         assert!(schema.is_enable_option());
         assert_eq!(schema.service_name(), None);
@@ -519,6 +633,7 @@ mod tests {
             description: "".to_string(),
             related_packages: vec![],
             declarations: vec![],
+            ..NixOptionSchema::default()
         };
         assert!(pkg_list.is_package_list());
 
@@ -529,6 +644,7 @@ mod tests {
             description: "".to_string(),
             related_packages: vec![],
             declarations: vec![],
+            ..NixOptionSchema::default()
         };
         assert!(!non_list.is_package_list());
     }
