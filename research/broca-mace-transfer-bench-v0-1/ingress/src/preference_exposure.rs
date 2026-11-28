@@ -255,6 +255,9 @@ fn validate_selection_fields(
     {
         return Err(PreferenceExposureRejectV1::InvalidSelection);
     }
+    if selection.preference_ids.len() > MAX_PREFERENCE_IDS_V1 {
+        return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
+    }
     if selection.preference_ids.iter().any(|id| !nonempty(id, 256))
         || selection.preference_ids.windows(2).any(|pair| pair[0] >= pair[1])
     {
@@ -452,9 +455,11 @@ fn validate_manifest_fields(
         || !nonempty(&manifest.purpose_id, 128)
         || !nonempty(&manifest.audience_id, 256)
         || !nonempty(&manifest.model_invocation_id, 256)
-        || manifest.memory_spans.len() > MAX_MEMORY_SPANS_V1
     {
         return Err(PreferenceExposureRejectV1::InvalidIdentity);
+    }
+    if manifest.memory_spans.len() > MAX_MEMORY_SPANS_V1 {
+        return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
     }
     for value in [
         manifest.selection_sha256.as_str(),
@@ -1167,6 +1172,26 @@ mod tests {
                 &trusted_verifier()
             ),
             Err(PreferenceExposureRejectV1::ResourceLimitExceeded)
+        );
+    }
+
+    #[test]
+    fn exposure_after_preference_expiry_is_rejected_even_with_valid_original_snapshot() {
+        let selection = selection(PreferenceInfluenceModeV1::Ignore);
+        let context = b"plain request";
+        let request = b"{\"input\":\"plain request\"}";
+        let mut manifest = manifest(&selection, context, request, vec![]);
+        manifest.exposure_observed_at_ms = 1_000;
+        manifest.canonical_sha256 = manifest_digest(&manifest);
+        assert_eq!(
+            verify_preference_exposure_v1(
+                &selection,
+                &manifest,
+                context,
+                request,
+                &trusted_verifier()
+            ),
+            Err(PreferenceExposureRejectV1::InvalidSnapshot)
         );
     }
 
