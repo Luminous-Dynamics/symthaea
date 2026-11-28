@@ -837,6 +837,34 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_valid_json_fixture_deserializes_and_validates() {
+        let json = include_str!("../fixtures/transition-contract-v1/valid.json");
+        let contract: TransitionContract = serde_json::from_str(json).unwrap();
+        assert!(validate_transition_contract(&contract).is_empty());
+        assert_eq!(contract.schema_version, TRANSITION_CONTRACT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn checked_in_unsupported_version_fixture_fails_closed() {
+        let json = include_str!(
+            "../fixtures/transition-contract-v1/unsupported-schema-version.json"
+        );
+        let contract: TransitionContract = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            codes(&contract),
+            vec![TransitionViolationCode::UnsupportedSchemaVersion]
+        );
+    }
+
+    #[test]
+    fn checked_in_missing_evidence_fixture_cannot_be_deserialized() {
+        let json = include_str!(
+            "../fixtures/transition-contract-v1/missing-source-evidence.json"
+        );
+        assert!(serde_json::from_str::<TransitionContract>(json).is_err());
+    }
+
+    #[test]
     fn reports_violations_in_stable_field_order() {
         let mut contract = valid_contract();
         contract.schema_version = 9;
