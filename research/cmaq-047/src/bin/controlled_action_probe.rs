@@ -104,22 +104,13 @@ fn catalog() -> Result<ActionCatalog, String> {
             SHA_E,
         )?,
     ];
-    ActionCatalog::new(
-        SHA_A.into(),
-        SHA_B.into(),
-        SHA_C.into(),
-        actions,
-        2,
-    )
-    .map_err(|error| format!("catalog invalid: {error:?}"))
+    ActionCatalog::new(SHA_A.into(), SHA_B.into(), SHA_C.into(), actions, 2)
+        .map_err(|error| format!("catalog invalid: {error:?}"))
 }
 
 fn monitor() -> Result<ControlledBlackwellMonitor, String> {
-    let target = BoxTarget::new(
-        GLOBAL_TARGET[0].to_vec(),
-        GLOBAL_TARGET[1].to_vec(),
-    )
-    .map_err(|error| format!("global target invalid: {error:?}"))?;
+    let target = BoxTarget::new(GLOBAL_TARGET[0].to_vec(), GLOBAL_TARGET[1].to_vec())
+        .map_err(|error| format!("global target invalid: {error:?}"))?;
     ControlledBlackwellMonitor::new(target, 1.0, 1, 20, SHA_A.into(), catalog()?)
         .map_err(|error| format!("monitor construction failed: {error:?}"))
 }
@@ -143,10 +134,7 @@ fn observation(
         || null_mean_for(action_id),
         |direction| [SHIFT * direction[0], SHIFT * direction[1]],
     );
-    [
-        mean[0] + 0.01 * rng.sign(),
-        mean[1] + 0.01 * rng.sign(),
-    ]
+    [mean[0] + 0.01 * rng.sign(), mean[1] + 0.01 * rng.sign()]
 }
 
 fn run_direction(
