@@ -9,6 +9,10 @@
 use std::error::Error;
 use std::fmt;
 
+/// Maximum raw bytes accepted for one scalar recorder table in v0.1.
+/// Larger artifacts need a future streaming parser with an explicit profile.
+const MAX_RECORDER_BYTES: usize = 16 * 1024 * 1024;
+
 /// One scalar observation from a recorder table.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RecorderSample {
@@ -21,6 +25,11 @@ pub struct RecorderSample {
 /// A fail-closed error while parsing a declared recorder table.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecorderParseError {
+    /// Raw recorder input exceeded the v0.1 per-table byte bound.
+    InputSizeLimitExceeded {
+        actual_bytes: usize,
+        maximum_bytes: usize,
+    },
     /// The table must contain at least a time column and a response column.
     InvalidExpectedColumnCount {
         expected_columns: usize,
@@ -62,6 +71,10 @@ pub enum RecorderParseError {
 impl fmt::Display for RecorderParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InputSizeLimitExceeded { actual_bytes, maximum_bytes } => write!(
+                formatter,
+                "recorder input is {actual_bytes} bytes; maximum is {maximum_bytes} bytes"
+            ),
             Self::InvalidExpectedColumnCount { expected_columns } => write!(
                 formatter,
                 "expected column count must be at least 2, got {expected_columns}"
@@ -115,6 +128,9 @@ impl Error for RecorderParseError {}
 
 /// Parse one scalar column from a whitespace-delimited numeric recorder table.
 ///
+/// Raw input is bounded to 16 MiB in v0.1. Larger recorder artifacts need a
+/// separately qualified streaming parser and explicit resource profile.
+///
 /// The caller declares the exact table width and zero-based time/value columns.
 /// Every token in each data row is parsed and required to be finite, not merely
 /// the selected columns. Blank lines and full-line comments beginning with #
@@ -129,6 +145,13 @@ pub fn parse_scalar_time_series(
     time_column: usize,
     value_column: usize,
 ) -> Result<Vec<RecorderSample>, RecorderParseError> {
+    if input.len() > MAX_RECORDER_BYTES {
+        return Err(RecorderParseError::InputSizeLimitExceeded {
+            actual_bytes: input.len(),
+            maximum_bytes: MAX_RECORDER_BYTES,
+        });
+    }
+
     if expected_columns < 2 {
         return Err(RecorderParseError::InvalidExpectedColumnCount {
             expected_columns,
@@ -215,6 +238,18 @@ pub fn parse_scalar_time_series(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_recorder_input_over_the_byte_limit_before_parsing() {
+        let input = " ".repeat(MAX_RECORDER_BYTES + 1);
+        assert_eq!(
+            parse_scalar_time_series(&input, 2, 0, 1).unwrap_err(),
+            RecorderParseError::InputSizeLimitExceeded {
+                actual_bytes: MAX_RECORDER_BYTES + 1,
+                maximum_bytes: MAX_RECORDER_BYTES
+            }
+        );
+    }
 
     #[test]
     fn parses_declared_two_column_time_series() {
