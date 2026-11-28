@@ -184,11 +184,14 @@ impl std::fmt::Display for SowrcError {
             Self::InvalidNonconformityScore(id) => {
                 write!(formatter, "nonconformity score must be finite and in [0, 1] for {id}")
             }
-            Self::InvalidTargetRisk => write!(formatter, "target risk must be finite and in [0, 1]"),
-            Self::InvalidDelta => write!(formatter, "delta must be finite and in (0, 1)"),
-            Self::InvalidThresholdGrid => {
-                write!(formatter, "threshold grid must be strictly increasing in [0, 1] and end at 1")
+            Self::InvalidTargetRisk => {
+                write!(formatter, "target risk must be finite and in [0, 1]")
             }
+            Self::InvalidDelta => write!(formatter, "delta must be finite and in (0, 1)"),
+            Self::InvalidThresholdGrid => write!(
+                formatter,
+                "threshold grid must be strictly increasing in [0, 1] and end at 1"
+            ),
             Self::InvalidBettingMixture => {
                 write!(formatter, "betting fractions and mixture weights are invalid")
             }
@@ -350,20 +353,59 @@ pub fn evaluate_sowrc(
         deterministic_c: c_n,
         deterministic_b: b_n,
         assumptions: vec![
-            "Every inclusion probability q_t is known before the corresponding label and is predictable from pre-label history.".to_owned(),
-            "Conditional ignorability holds: inclusion is independent of the current true label conditional on pre-label history.".to_owned(),
-            "Every event has q_t >= q_min > 0; the lower support floor is fixed by the external audit design.".to_owned(),
-            "The candidate probabilities and nonconformity function are frozen before labels are observed.".to_owned(),
-            "The horizon and deterministic envelopes c_n=1 and b_n=1/q_min are fixed before labels.".to_owned(),
-            "The loss is bounded in [0,1], nonincreasing in lambda, and lambda=1 returns the full label space with zero miscoverage.".to_owned(),
-            "Threshold grid, betting fractions, mixture weights and delta allocation are fixed independently of the audit labels.".to_owned(),
+            concat!(
+                "Every inclusion probability q_t is known before the corresponding label ",
+                "and is predictable from pre-label history."
+            )
+            .to_owned(),
+            concat!(
+                "Conditional ignorability holds: inclusion is independent of the current ",
+                "true label conditional on pre-label history."
+            )
+            .to_owned(),
+            concat!(
+                "Every event has q_t >= q_min > 0; the lower support floor is fixed by ",
+                "the external audit design."
+            )
+            .to_owned(),
+            "The candidate probabilities and nonconformity function are frozen before labels are observed."
+                .to_owned(),
+            "The horizon and deterministic envelopes c_n=1 and b_n=1/q_min are fixed before labels."
+                .to_owned(),
+            concat!(
+                "The loss is bounded in [0,1], nonincreasing in lambda, and lambda=1 ",
+                "returns the full label space with zero miscoverage."
+            )
+            .to_owned(),
+            concat!(
+                "Threshold grid, betting fractions, mixture weights and delta allocation ",
+                "are fixed independently of the audit labels."
+            )
+            .to_owned(),
         ],
         limitations: vec![
-            "The evaluator cannot authenticate randomization, the custodian, or conditional ignorability; those are external design and governance obligations.".to_owned(),
-            "The theorem controls the weighted calibration population only; prospective deployment risk needs an independent drift certificate and a separate failure-probability allocation.".to_owned(),
-            "This fixed-horizon implementation is not the anytime/time-uniform extension and does not support adaptive budget changes.".to_owned(),
+            concat!(
+                "The evaluator cannot authenticate randomization, the custodian, or ",
+                "conditional ignorability; those are external design and governance obligations."
+            )
+            .to_owned(),
+            concat!(
+                "The theorem controls the weighted calibration population only; prospective ",
+                "deployment risk needs an independent drift certificate and a separate ",
+                "failure-probability allocation."
+            )
+            .to_owned(),
+            concat!(
+                "This fixed-horizon implementation is not the anytime/time-uniform extension ",
+                "and does not support adaptive budget changes."
+            )
+            .to_owned(),
             "Only constant predictable weights a_t=1 are implemented in v1.".to_owned(),
-            "The result is a risk-control bound under declared assumptions, not evidence that the predictor is accurate or scientifically valid.".to_owned(),
+            concat!(
+                "The result is a risk-control bound under declared assumptions, not evidence ",
+                "that the predictor is accurate or scientifically valid."
+            )
+            .to_owned(),
         ],
     })
 }
@@ -601,10 +643,9 @@ mod tests {
             observation(2, "c", 1.0, Some(0.7)),
         ];
         let report = evaluate_sowrc(&rows, &cfg).unwrap();
-        assert!(report
-            .threshold_bounds
-            .windows(2)
-            .all(|pair| pair[0].horvitz_thompson_loss_total >= pair[1].horvitz_thompson_loss_total));
+        assert!(report.threshold_bounds.windows(2).all(|pair| {
+            pair[0].horvitz_thompson_loss_total >= pair[1].horvitz_thompson_loss_total
+        }));
         let terminal = report.threshold_bounds.last().unwrap();
         assert_eq!(terminal.lambda, 1.0);
         assert_eq!(terminal.horvitz_thompson_loss_total, 0.0);
@@ -758,60 +799,58 @@ mod tests {
     }
 
     #[test]
-    fn fixed_threshold_bound_covers_all_small_finite_audit_masks() {
-        // Exact enumeration over the external Bernoulli audit outcomes for a
-        // tiny fixed-label population. This is a regression of the finite-sample
-        // inequality, not a proof of its assumptions or of the general theorem.
-        let losses = [true, false, true, false, true, false, true, false];
+    fn fixed_threshold_bound_covers_exact_bernoulli_audit_mask_enumeration() {
+        // Exact enumeration over all 2^16 independent audit masks. The
+        // probability of each mask is its Bernoulli design probability, not
+        // a uniform weight over all masks.
+        let n = 16usize;
         let q = 0.8_f64;
-        let cfg = config(q);
+        let q_min = q;
+        let delta = 0.5_f64;
+        let per_threshold_delta = delta / 2.0;
+        let eta_max = 2.0 * q_min / (1.0 + 2.0 * q_min / 3.0);
+        let etas = ETA_FACTORS
+            .iter()
+            .map(|factor| eta_max * factor)
+            .collect::<Vec<_>>();
+        let weights = vec![1.0 / etas.len() as f64; etas.len()];
+        let true_losses = (0..n)
+            .map(|index| index % 2 == 0)
+            .collect::<Vec<_>>();
+        let population_risk = 0.5_f64;
         let mut failure_probability = 0.0_f64;
-        let total_masks = 1usize << losses.len();
-        for mask in 0..total_masks {
-            let rows = losses
-                .iter()
-                .enumerate()
-                .map(|(index, loss)| {
-                    let observed = (mask & (1usize << index)) != 0;
-                    let score = if observed {
-                        Some(if *loss { 0.9 } else { 0.1 })
-                    } else {
-                        None
-                    };
-                    observation(index, &format!("event-{index}"), q, score)
-                })
-                .collect::<Vec<_>>();
-            let report = evaluate_sowrc(&rows, &cfg).unwrap();
-            let fixed = report
-                .threshold_bounds
-                .iter()
-                .find(|bound| (bound.lambda - 0.5).abs() < 1e-12)
-                .unwrap();
-            let population_risk = losses
-                .iter()
-                .map(|loss| {
-                    let score = if *loss { 0.9 } else { 0.1 };
-                    usize::from(score > fixed.lambda)
-                })
-                .sum::<usize>() as f64
-                / losses.len() as f64;
-            if fixed.upper_risk_bound + 1e-12 < population_risk {
-                let mask_probability = (0..losses.len())
-                    .map(|index| {
-                        if mask & (1usize << index) != 0 {
-                            q
-                        } else {
-                            1.0 - q
-                        }
-                    })
-                    .product::<f64>();
+        let mut saw_nontrivial_bound = false;
+
+        for mask in 0..(1usize << n) {
+            let mut ht_loss_total = 0.0_f64;
+            let mut mask_probability = 1.0_f64;
+            for index in 0..n {
+                let observed = mask & (1usize << index) != 0;
+                mask_probability *= if observed { q } else { 1.0 - q };
+                if observed && true_losses[index] {
+                    ht_loss_total += 1.0 / q;
+                }
+            }
+            let (upper_bound, _, _) = invert_mixture_upper_bound(
+                n,
+                ht_loss_total,
+                per_threshold_delta,
+                1.0,
+                1.0 / q_min,
+                &etas,
+                &weights,
+            )
+            .unwrap();
+            saw_nontrivial_bound |= upper_bound < 1.0;
+            if upper_bound + 1e-12 < population_risk {
                 failure_probability += mask_probability;
             }
         }
+
+        assert!(saw_nontrivial_bound);
         assert!(
-            failure_probability <= cfg.delta / cfg.threshold_grid.len() as f64 + 1e-12,
-            "observed failure probability {failure_probability} exceeded per-threshold delta {}",
-            cfg.delta / cfg.threshold_grid.len() as f64
+            failure_probability <= per_threshold_delta + 1e-12,
+            "exact Bernoulli audit-mask failure probability {failure_probability} exceeded {per_threshold_delta}"
         );
     }
 }
