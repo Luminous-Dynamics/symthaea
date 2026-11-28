@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-dj/transition-contract-v1.schema.json",
+  "title": "Melothaea DJ Transition Contract v1",
+  "description": "Versioned structural proposal only; validation does not grant execution authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "transition_id",
+    "kind",
+    "source",
+    "target",
+    "evidence",
+    "alignment",
+    "protected_regions",
+    "gain_envelopes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "transition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "$ref": "#/$defs/transition_kind"
+    },
+    "source": {
+      "$ref": "#/$defs/track_window_ref"
+    },
+    "target": {
+      "$ref": "#/$defs/track_window_ref"
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidence_assessment"
+    },
+    "alignment": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/alignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "protected_regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/protected_region"
+      }
+    },
+    "gain_envelopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/gain_envelope"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        }
+      }
+    },
+    "audio_source_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 18446744073709552000
+        }
+      }
+    },
+    "analysis_evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_sha256",
+        "source_audio_sha256",
+        "analysis_version",
+        "covered_window"
+      ],
+      "properties": {
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "covered_window": {
+          "$ref": "#/$defs/sample_window"
+        }
+      }
+    },
+    "track_window_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio",
+        "window",
+        "evidence"
+      ],
+      "properties": {
+        "audio": {
+          "$ref": "#/$defs/audio_source_ref"
+        },
+        "window": {
+          "$ref": "#/$defs/sample_window"
+        },
+        "evidence": {
+          "$ref": "#/$defs/analysis_evidence_ref"
+        }
+      }
+    },
+    "transition_kind": {
+      "type": "string",
+      "enum": [
+        "beatmatched_blend",
+        "phrase_handoff",
+        "hard_cut",
+        "drop_swap",
+        "breakdown_swap",
+        "ambient_bridge",
+        "other"
+      ]
+    },
+    "track_side": {
+      "type": "string",
+      "enum": [
+        "source",
+        "target"
+      ]
+    },
+    "evidence_disposition": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "ambiguous",
+        "unsupported",
+        "not_evaluated"
+      ]
+    },
+    "evidence_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timing",
+        "structure",
+        "source_roles",
+        "target_roles",
+        "perceptual_fit"
+      ],
+      "properties": {
+        "timing": {
+          "$ref": "#/$defs/evidence_disposition"
+        },
+        "structure": {
+          "$ref": "#/$defs/evidence_disposition"
+        },
+        "source_roles": {
+          "$ref": "#/$defs/evidence_disposition"
+        },
+        "target_roles": {
+          "$ref": "#/$defs/evidence_disposition"
+        },
+        "perceptual_fit": {
+          "$ref": "#/$defs/evidence_disposition"
+        }
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_anchor_frame",
+        "target_anchor_frame",
+        "beat_ordinal_milli",
+        "confidence_ppm"
+      ],
+      "properties": {
+        "source_anchor_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "target_anchor_frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "beat_ordinal_milli": {
+          "type": "integer",
+          "minimum": -9223372036854776000,
+          "maximum": 9223372036854776000
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "protected_property": {
+      "type": "string",
+      "enum": [
+        "lead_vocal",
+        "backing_vocal",
+        "melody",
+        "hook",
+        "bass_line",
+        "kick",
+        "snare",
+        "percussion",
+        "harmonic_bed",
+        "other"
+      ]
+    },
+    "protected_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "side",
+        "window",
+        "property",
+        "reason_code"
+      ],
+      "properties": {
+        "side": {
+          "$ref": "#/$defs/track_side"
+        },
+        "window": {
+          "$ref": "#/$defs/sample_window"
+        },
+        "property": {
+          "$ref": "#/$defs/protected_property"
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "gain_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "gain_millidecibels"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709552000
+        },
+        "gain_millidecibels": {
+          "type": "integer",
+          "minimum": -120000,
+          "maximum": 12000
+        }
+      }
+    },
+    "gain_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "side",
+        "points"
+      ],
+      "properties": {
+        "side": {
+          "$ref": "#/$defs/track_side"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gain_point"
+          }
+        }
+      }
+    }
+  }
+}
