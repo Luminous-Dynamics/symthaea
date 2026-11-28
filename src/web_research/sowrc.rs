@@ -115,7 +115,7 @@ pub struct SowrcReport {
     pub calibration_horizon: usize,
     pub observed_label_count: usize,
     pub q_min: f64,
-    pub minimum_observed_inclusion_probability: f64,
+    pub minimum_inclusion_probability: f64,
     pub target_risk: f64,
     pub total_delta: f64,
     pub per_threshold_delta: f64,
@@ -245,7 +245,7 @@ pub fn evaluate_sowrc(
                 observation.record_id.clone(),
             ));
         }
-        if q + SUM_TOLERANCE < config.q_min {
+        if q < config.q_min {
             return Err(SowrcError::InclusionProbabilityBelowFloor(
                 observation.record_id.clone(),
             ));
@@ -338,7 +338,7 @@ pub fn evaluate_sowrc(
         calibration_horizon: horizon,
         observed_label_count,
         q_min: config.q_min,
-        minimum_observed_inclusion_probability: minimum_probability,
+        minimum_inclusion_probability: minimum_probability,
         target_risk: config.target_risk,
         total_delta: config.delta,
         per_threshold_delta,
