@@ -14,7 +14,7 @@
 //! completeness receipt, each source/transformation mapping, the #13153
 //! preference-selection receipt, and the provider request capture.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -513,6 +513,7 @@ pub struct VerifiedPreferenceExposureV1 {
     manifest_sha256: String,
     mode: PreferenceInfluenceModeV1,
     exposed_preference_ids: BTreeSet<String>,
+    preference_span_counts: BTreeMap<String, u64>,
 }
 
 impl VerifiedPreferenceExposureV1 {
@@ -534,6 +535,12 @@ impl VerifiedPreferenceExposureV1 {
 
     pub fn exposed_preference_ids(&self) -> impl Iterator<Item = &str> {
         self.exposed_preference_ids.iter().map(String::as_str)
+    }
+
+    /// Number of distinct prompt spans containing this preference. Repeated
+    /// appearances of one source item in separate spans count separately.
+    pub fn preference_span_count(&self, preference_id: &str) -> u64 {
+        self.preference_span_counts.get(preference_id).copied().unwrap_or(0)
     }
 }
 
@@ -590,6 +597,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
     let mut previous_span: Option<(usize, usize, &str)> = None;
     let mut span_ids = BTreeSet::new();
     let mut exposed_preference_ids = BTreeSet::new();
+    let mut preference_span_counts = BTreeMap::<String, u64>::new();
 
     for span in &manifest.memory_spans {
         if !nonempty(&span.span_id, 128)
@@ -625,6 +633,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
 
         let mut prior_source_id: Option<&str> = None;
         let mut span_source_ids = BTreeSet::new();
+        let mut span_preference_ids = BTreeSet::<String>::new();
         for source in &span.sources {
             if !nonempty(&source.memory_item_id, 256)
                 || !lower_sha256(&source.source_receipt_sha256)
@@ -647,10 +656,14 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
             }
             for preference_id in &source.preference_ids {
                 exposed_preference_ids.insert(preference_id.clone());
+                span_preference_ids.insert(preference_id.clone());
             }
             verifier
                 .verify_memory_source(source, selection)
                 .map_err(|_| PreferenceExposureRejectV1::SourceMappingRejected)?;
+        }
+        for preference_id in span_preference_ids {
+            *preference_span_counts.entry(preference_id).or_default() += 1;
         }
     }
 
@@ -684,6 +697,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
         manifest_sha256: manifest.canonical_sha256.clone(),
         mode: selection.mode,
         exposed_preference_ids,
+        preference_span_counts,
     })
 }
 
@@ -1083,6 +1097,7 @@ mod tests {
             &trusted_verifier(),
         ).unwrap();
         assert!(verified.preference_was_exposed("pref:outreach"));
+        assert_eq!(verified.preference_span_count("pref:outreach"), 2);
     }
 
     #[test]
