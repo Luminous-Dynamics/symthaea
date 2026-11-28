@@ -5,6 +5,8 @@ on:
     paths:
       - "research/cmaq-046/**"
       - "research/cmaq-047/**"
+      - "research/cmaq-048/**"
+      - "research/cmaq-049/**"
       - ".github/workflows/cmaq-046.yml"
   push:
     branches:
