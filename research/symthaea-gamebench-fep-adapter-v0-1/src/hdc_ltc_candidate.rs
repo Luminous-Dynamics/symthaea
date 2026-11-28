@@ -49,7 +49,6 @@ impl Error for HdcLtcAdapterError {}
 pub struct HdcLtcSpatialCandidate {
     width: u16,
     height: u16,
-    seed: u64,
     encoder: SpatialHdcEncoder,
     neuron: HdcLtcUnifiedNeuron,
     initialized: bool,
@@ -64,7 +63,6 @@ impl HdcLtcSpatialCandidate {
         Ok(Self {
             width,
             height,
-            seed,
             encoder,
             neuron,
             initialized: false,
@@ -117,7 +115,6 @@ impl InteractiveCandidate<Observation, Action> for HdcLtcSpatialCandidate {
     type Error = HdcLtcAdapterError;
 
     fn reset(&mut self, episode_id: u64) -> Result<(), Self::Error> {
-        self.seed = episode_id;
         self.neuron = build_neuron(episode_id);
         self.initialized = false;
         self.pending_action = None;
