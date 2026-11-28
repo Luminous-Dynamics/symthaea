@@ -336,6 +336,8 @@ impl Game {
         }
 
         Observation {
+            width: self.spec.width,
+            height: self.spec.height,
             position: self.state.position,
             visible_cells,
             known_goal,
@@ -358,6 +360,8 @@ pub struct VisibleCell {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Observation {
+    pub width: u16,
+    pub height: u16,
     pub position: Position,
     pub visible_cells: Vec<VisibleCell>,
     pub known_goal: Option<Position>,
