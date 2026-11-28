@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use topo_adapt_benchmark::{evaluate_episode, Fixture, FIXTURE_JSON};
+use topo_adapt_benchmark::{evaluate_episode, select_best_single_edge, Fixture, FIXTURE_JSON};
 
 fn main() {
     if let Err(error) = run() {
@@ -44,6 +44,26 @@ fn run() -> Result<(), String> {
                     "edge_maintenance_cost_units": result.edge_maintenance_cost_units
                 }));
             }
+
+            let decision = select_best_single_edge(case, &fixture.graph_semantics, time)?;
+            let selected_edges: Vec<&str> = decision
+                .selected_candidate_id
+                .as_deref()
+                .into_iter()
+                .collect();
+            reports.push(serde_json::json!({
+                "case_id": case.id,
+                "time": time,
+                "variant": "one_step_candidate_sweep_oracle_upper_bound",
+                "selected_candidate_edge": decision.selected_candidate_id,
+                "accepted_candidate_edges": selected_edges,
+                "max_flow": decision.result.max_flow,
+                "min_cut": decision.result.min_cut,
+                "requested_flow": decision.result.requested_flow,
+                "accepted_edge_additions": decision.result.accepted_edge_additions,
+                "edit_cost_units": decision.result.edit_cost_units,
+                "edge_maintenance_cost_units": decision.result.edge_maintenance_cost_units
+            }));
         }
     }
 
