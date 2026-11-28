@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:nixward:benchmark-run-receipt:0.1",
+  "title": "NixWard benchmark run receipt v0.1",
+  "description": "Reproducibility receipt. Completed results bind exact source, target, agent, evaluator, resource budgets and per-stage evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "receipt_status", "corpus_id",
+    "corpus_digest", "protocol_revision", "comparator_arm", "agent",
+    "environment", "resource_budget", "tasks", "scorecards", "quarantine_records"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "receipt_status": {"enum": ["not_run", "partial", "completed", "interrupted", "invalid"]},
+    "corpus_id": {"type": "string", "minLength": 1},
+    "corpus_digest": {"type": ["string", "null"]},
+    "protocol_revision": {"type": ["string", "null"]},
+    "comparator_arm": {
+      "enum": [
+        "native_operator", "general_agent", "nixi",
+        "nixward_templates", "nixward_planner_ungated", "nixward_full"
+      ]
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_name", "agent_version", "model_id", "model_revision", "prompt_digest", "tool_config_digest", "harness_commit"],
+      "properties": {
+        "agent_name": {"type": "string", "minLength": 1},
+        "agent_version": {"type": ["string", "null"]},
+        "model_id": {"type": ["string", "null"]},
+        "model_revision": {"type": ["string", "null"]},
+        "prompt_digest": {"type": ["string", "null"]},
+        "tool_config_digest": {"type": ["string", "null"]},
+        "harness_commit": {"type": ["string", "null"]}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_fixture_id", "nixos_release", "system", "nix_version",
+        "nixpkgs_revision", "flake_lock_digest", "module_set_digest",
+        "configuration_identity", "evaluator_image_digest", "runner_image_digest",
+        "hardware_profile", "virtualization_backend", "cpu_model",
+        "memory_total_bytes", "storage_total_bytes"
+      ],
+      "properties": {
+        "target_fixture_id": {"type": ["string", "null"]},
+        "nixos_release": {"type": ["string", "null"]},
+        "system": {"type": ["string", "null"]},
+        "nix_version": {"type": ["string", "null"]},
+        "nixpkgs_revision": {"type": ["string", "null"]},
+        "flake_lock_digest": {"type": ["string", "null"]},
+        "module_set_digest": {"type": ["string", "null"]},
+        "configuration_identity": {"type": ["string", "null"]},
+        "evaluator_image_digest": {"type": ["string", "null"]},
+        "runner_image_digest": {"type": ["string", "null"]},
+        "hardware_profile": {"type": ["string", "null"]},
+        "virtualization_backend": {"type": ["string", "null"]},
+        "cpu_model": {"type": ["string", "null"]},
+        "memory_total_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "storage_total_bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "resource_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_limit_ms", "cpu_time_limit_ms", "memory_limit_bytes",
+        "process_limit", "log_output_limit_bytes", "network_policy",
+        "build_sandbox_enabled", "evaluation_restricted", "evaluation_pure"
+      ],
+      "properties": {
+        "wall_time_limit_ms": {"type": ["integer", "null"], "minimum": 0},
+        "cpu_time_limit_ms": {"type": ["integer", "null"], "minimum": 0},
+        "memory_limit_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "process_limit": {"type": ["integer", "null"], "minimum": 0},
+        "log_output_limit_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "network_policy": {"enum": ["disabled", "input_acquisition_only", "allowlisted", "unrestricted", "unknown"]},
+        "build_sandbox_enabled": {"type": ["boolean", "null"]},
+        "evaluation_restricted": {"type": ["boolean", "null"]},
+        "evaluation_pure": {"type": ["boolean", "null"]}
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/task"}
+    },
+    "scorecards": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/scorecard"}
+    },
+    "quarantine_records": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/quarantine"}
+    },
+    "run_started_at": {"type": ["string", "null"], "format": "date-time"},
+    "run_completed_at": {"type": ["string", "null"], "format": "date-time"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "evaluator_id", "evidence_refs"],
+      "properties": {
+        "stage": {
+          "enum": [
+            "goal_resolution", "source_resolution", "security_advice",
+            "nix_syntax", "nix_evaluation", "nix_build", "vm_boot",
+            "runtime_postconditions", "external_probe", "hardware_probe",
+            "authorization", "activation", "effect_receipt", "recovery"
+          ]
+        },
+        "status": {"enum": ["passed", "failed", "not_run", "blocked", "unknown", "quarantined"]},
+        "evaluator_id": {"type": ["string", "null"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "duration_ms": {"type": ["integer", "null"], "minimum": 0},
+        "failure_class": {"type": ["string", "null"]}
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms", "agent_time_ms", "nix_eval_time_ms",
+        "nix_build_time_ms", "cpu_time_ms", "peak_memory_bytes",
+        "input_tokens", "output_tokens", "estimated_cost_usd", "cost_source"
+      ],
+      "properties": {
+        "wall_time_ms": {"type": ["integer", "null"], "minimum": 0},
+        "agent_time_ms": {"type": ["integer", "null"], "minimum": 0},
+        "nix_eval_time_ms": {"type": ["integer", "null"], "minimum": 0},
+        "nix_build_time_ms": {"type": ["integer", "null"], "minimum": 0},
+        "cpu_time_ms": {"type": ["integer", "null"], "minimum": 0},
+        "peak_memory_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "output_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "estimated_cost_usd": {"type": ["number", "null"], "minimum": 0},
+        "cost_source": {"type": ["string", "null"]}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id", "cluster_id", "trial_index", "status", "stages",
+        "effect_flags", "cost", "evidence_refs"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^NWB-[A-Z]{2,6}-[0-9]{3}$"},
+        "cluster_id": {"type": "string", "minLength": 1},
+        "trial_index": {"type": "integer", "minimum": 1},
+        "status": {"enum": ["passed", "failed", "not_run", "blocked", "invalid", "quarantined"]},
+        "candidate_commit": {"type": ["string", "null"]},
+        "result_summary": {"type": ["string", "null"]},
+        "stages": {"type": "array", "items": {"$ref": "#/$defs/stage"}},
+        "effect_flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unauthorized_protected_effect", "secret_exposure",
+            "expression_injection_accepted", "target_mismatch",
+            "duplicate_mutation", "recovery_required", "recovery_succeeded"
+          ],
+          "properties": {
+            "unauthorized_protected_effect": {"type": ["boolean", "null"]},
+            "secret_exposure": {"type": ["boolean", "null"]},
+            "expression_injection_accepted": {"type": ["boolean", "null"]},
+            "target_mismatch": {"type": ["boolean", "null"]},
+            "duplicate_mutation": {"type": ["boolean", "null"]},
+            "recovery_required": {"type": ["boolean", "null"]},
+            "recovery_succeeded": {"type": ["boolean", "null"]}
+          }
+        },
+        "cost": {"$ref": "#/$defs/cost"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "quarantine_record_id": {"type": ["string", "null"]}
+      }
+    },
+    "scorecard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "estimate", "numerator", "denominator", "confidence_level", "interval_lower", "interval_upper", "unit", "notes"],
+      "properties": {
+        "metric": {"type": "string", "minLength": 1},
+        "estimate": {"type": ["number", "null"]},
+        "numerator": {"type": ["integer", "null"], "minimum": 0},
+        "denominator": {"type": ["integer", "null"], "minimum": 0},
+        "confidence_level": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "interval_lower": {"type": ["number", "null"]},
+        "interval_upper": {"type": ["number", "null"]},
+        "unit": {"type": "string", "minLength": 1},
+        "notes": {"type": "string"}
+      }
+    },
+    "quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "case_id", "reason", "review_status", "evidence_refs"],
+      "properties": {
+        "record_id": {"type": "string", "minLength": 1},
+        "case_id": {"type": "string", "pattern": "^NWB-[A-Z]{2,6}-[0-9]{3}$"},
+        "reason": {"type": "string", "minLength": 1},
+        "review_status": {"enum": ["open", "reproduced", "repaired", "retained_invalid", "reinstated"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

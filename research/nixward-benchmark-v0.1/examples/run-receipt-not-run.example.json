@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "run_id": "EXAMPLE-NOT-RUN",
+  "receipt_status": "not_run",
+  "corpus_id": "NIXWARD-BENCHMARK-SEED-V0.1",
+  "corpus_digest": null,
+  "protocol_revision": null,
+  "comparator_arm": "nixward_full",
+  "agent": {
+    "agent_name": "NixWard",
+    "agent_version": null,
+    "model_id": null,
+    "model_revision": null,
+    "prompt_digest": null,
+    "tool_config_digest": null,
+    "harness_commit": null
+  },
+  "environment": {
+    "target_fixture_id": null,
+    "nixos_release": null,
+    "system": null,
+    "nix_version": null,
+    "nixpkgs_revision": null,
+    "flake_lock_digest": null,
+    "module_set_digest": null,
+    "configuration_identity": null,
+    "evaluator_image_digest": null,
+    "runner_image_digest": null,
+    "hardware_profile": null,
+    "virtualization_backend": null,
+    "cpu_model": null,
+    "memory_total_bytes": null,
+    "storage_total_bytes": null
+  },
+  "resource_budget": {
+    "wall_time_limit_ms": null,
+    "cpu_time_limit_ms": null,
+    "memory_limit_bytes": null,
+    "process_limit": null,
+    "log_output_limit_bytes": null,
+    "network_policy": "unknown",
+    "build_sandbox_enabled": null,
+    "evaluation_restricted": null,
+    "evaluation_pure": null
+  },
+  "tasks": [],
+  "scorecards": [],
+  "quarantine_records": [],
+  "run_started_at": null,
+  "run_completed_at": null,
+  "notes": [
+    "This example deliberately records no execution and contains no measured result."
+  ]
+}
