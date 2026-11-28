@@ -796,3 +796,19 @@ The adapter exposes three beat-trim policies:
 That is deliberate: MIREX 2026's JSIR notes specify independent valid-segment scoring and duration weighting, but the precise clock origin for the beat task's five-second trim remains a separate protocol question. The chosen policy is recorded in the score report, not hidden.
 
 Downbeat scoring always uses no initial trim. The adapter requires valid-segment score evidence and its exact manifest digest, bounds event/segment resources, checks beat/downbeat source clocks and requires reference downbeats to be present in the reference beat sequence. It adds no dependencies beyond serde/serde_json. The branch contains nine authored Rust tests and a task-aware score schema; no Rust compile/test pass is claimed because the local environment lacks cargo/rustc.
+
+
+## 39. MEL-DJ-011 segment adapter implementation branch
+
+The implementation is in branch [`feat/mel-dj-valid-segment-adapter-v0-1`](https://github.com/Luminous-Dynamics/symthaea/tree/feat/mel-dj-valid-segment-adapter-v0-1), based on the pinned metric-scoring branch `feat/mel-dj-mirex-beat-metrics-v0-1`.
+
+The Rust adapter:
+- Scores each valid segment separately with local event clocks and no interval across invalid gaps.
+- Makes source-global 5-second, segment-local 5-second, and no-trim beat policies explicit.
+- Keeps downbeat scoring untrimmed.
+- Produces segment-specific score vectors and both duration-weighted and arithmetic-mean-per-segment aggregation, with actual segment counts and total valid-frame weights.
+- Counts excluded events once against the union of valid regions.
+- Requires exact valid-segment evidence digest; revalidates source clocks, event order, segment bounds/order, event resource limits, and reference downbeat membership in the reference beat sequence.
+- Publishes a JSON Schema with task-specific beat/downbeat receipts and trim-policy constraints.
+
+The source currently contains nine authored Rust tests; schema and source read-back are checked. The remaining JSIR ambiguity is the origin of the beat task's five-second trim when valid regions are disjoint. The adapter records the selected basis and does not claim JSIR equivalence until a pinned reference fixture determines it.
