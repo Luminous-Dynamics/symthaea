@@ -471,8 +471,10 @@ mod tests {
         let interval = clopper_pearson(0, 10_000, 0.95).unwrap();
         assert_eq!(interval.lower, 0.0);
         assert_eq!(interval.estimate, 0.0);
-        assert!(interval.upper > 0.00029);
-        assert!(interval.upper < 0.00031);
+        // Two-sided 95% Clopper–Pearson uses 0.025 in the upper tail;
+        // the one-sided 95% "rule of three" value (~0.00030) is different.
+        assert!(interval.upper > 0.00036);
+        assert!(interval.upper < 0.00038);
     }
 
     #[test]
