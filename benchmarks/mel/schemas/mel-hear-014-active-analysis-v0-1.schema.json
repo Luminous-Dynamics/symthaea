@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/mel-hear-014-active-analysis-v0-1.schema.json",
+  "title": "MEL-HEAR-014 active auditory analysis request v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "prior",
+    "decisions",
+    "actions",
+    "policy"
+  ],
+  "properties": {
+    "prior": {
+      "$ref": "#/$defs/prior"
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prior_id",
+        "hypothesis_ids",
+        "probabilities"
+      ],
+      "properties": {
+        "prior_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypothesis_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "probabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "losses_by_hypothesis"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "losses_by_hypothesis": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "likelihood_by_hypothesis"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "likelihood_by_hypothesis": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "likelihood_model_sha256",
+        "cost",
+        "admissible",
+        "outcomes"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "likelihood_model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cost": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "admissible": {
+          "type": "boolean"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_budget",
+        "cost_to_risk_weight",
+        "in_domain"
+      ],
+      "properties": {
+        "resource_budget": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cost_to_risk_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "in_domain": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
