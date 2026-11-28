@@ -1129,6 +1129,46 @@ mod tests {
     }
 
     #[test]
+    fn external_dataset_adapter_can_construct_evaluator_owned_items() {
+        let observation = SelectivePredictionObservation {
+            evidence_strength: 0.9,
+            premise_consistent: true,
+            source_is_current: true,
+            clarification_available: false,
+            reported_confidence: 0.88,
+            estimated_clarification_resolution_probability: 0.0,
+            estimated_post_clarification_accuracy: 0.9,
+        };
+        let item = SyntheticSelectivePredictionItem::from_evaluator_annotation(
+            "external-item-001",
+            observation,
+            SelectivePredictionGroundTruth {
+                answerable_now: true,
+                answer_correct_if_given: true,
+                clarification_resolves: false,
+                clarification_target: None,
+                post_clarification_observation: None,
+                answer_correct_after_clarification: false,
+            },
+        );
+        let report = evaluate_policy_with(
+            &[item],
+            "external_dataset_policy",
+            |visible| SelectivePolicyDecision {
+                action: DecisionAction::Answer,
+                confidence: visible.reported_confidence,
+                clarification_target: None,
+            },
+            SelectivePredictionCostModel::default(),
+        )
+        .expect("external evaluator annotation should score");
+
+        assert_eq!(report.items, 1);
+        assert_eq!(report.final_answer_accuracy, Some(1.0));
+        assert_eq!(report.receipts[0].item_id, "external-item-001");
+    }
+
+    #[test]
     fn external_policy_adapter_receives_observations_and_returns_replayable_report() {
         let items = fixture_items();
         let report = evaluate_policy_with(
