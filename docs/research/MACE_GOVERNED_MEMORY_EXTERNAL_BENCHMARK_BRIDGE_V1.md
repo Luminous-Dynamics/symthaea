@@ -454,7 +454,7 @@ Official results were published on 2026-11-19. The page reports 9 separate leade
 | Multimodal | Khipu | 43.26 | MemoraX | 53.68 |
 | Coding | InsightMem | 63.33% resolved | MemoraX | 68.00% resolved |
 
-The textual board exposes explicit fact recall, relational/multi-hop reasoning, temporal sequencing, governance, personalization, workflow execution, epistemic safety/privacy and streaming. The multimodal board uses retrieval, relational reasoning, temporal reasoning, continual learning, personalization and evidence governance. The coding board reports resolution rates under relevant/noisy conditions and shows resource/time tiers. Use the official track-specific denominator and rubric.
+The textual board exposes explicit fact recall, relational/multi-hop reasoning, temporal sequencing, governance, personalization, workflow execution, epistemic safety/privacy and streaming. The multimodal board uses retrieval, relational reasoning, temporal reasoning, continual learning, personalization and evidence governance. The coding board reports resolution rates under relevant/noisy conditions and shows resource/time tiers. Use the official track-specific denominator and rubric. Track subdimensions matter: Resurface reports 76.55 for textual Memory Governance and 68.59 for Epistemic Safety & Privacy, while Khipu reports 31.29 for multimodal Evidence Governance. Those are capability subscores, not the overall score; MACE should publish them beside any overall result. The corresponding commercial textual MemoraX subscores are 78.10 and 81.98, respectively.
 
 Sources:
 - https://agentmemoryleaderboard.ai/results/cycle-2/
@@ -470,7 +470,7 @@ The current public page reports:
 - AgentRunbook-C: 74.9% at 108.3s on Small; 70.1% at 139.9s on Medium.
 - AgentRunbook-R: 58.6% at 26.9s on Small; 57.0% at 25.8s on Medium.
 - RAG query-to-slice plus notes: 51.0% at 0.2s on Small; 45.9% at 0.3s on Medium.
-- The leaderboard uses LAFS Gain, the increase in reachable accuracy over a fixed accuracy/latency reference frontier. The current page highlights an AgentRunbook-C v2 Online LAFS Gain of +2.823.
+- The leaderboard uses LAFS Gain, the increase in reachable accuracy over a fixed accuracy/latency reference frontier. The current page highlights AgentRunbook-C v2 Online at +2.823 LAFS Gain, 75.6% accuracy and 130.5s; Perpetual Recall V3 at +1.096, 53.2% and 1.96s; and OPS-Agentic-Memory-v1 at +0.322, 81.4% and 153.6s. These illustrate that higher raw accuracy does not necessarily mean a better accuracy-latency frontier.
 
 Sources:
 - https://xiaowu0162.github.io/longmemeval-v2/
@@ -552,4 +552,36 @@ The testable hypothesis is:
 > At the same reader and resource budget, MACE can preserve or improve benchmark utility while reducing stale/unauthorized evidence exposure, false provenance, unnecessary personalization and post-erasure resurrection—and can demonstrate the marginal utility of each exposed evidence span.
 
 The research path is to test this hypothesis through matched benchmarks and independent instrumentation. The architecture alone does not establish it.
+
+
+### 13.8 ServeLearnBench — continual learning under hidden environment change
+
+ServeLearnBench is a separate, highly relevant challenge: agents must infer latent environment rules from service interactions, apply them, revise them as policies change, and measure the cost and regression caused by adaptation. The benchmark spans retail support, banking and sales-pitch generation; the 2026 release reports 53 environment windows and 7,718 tasks across 28 model/harness pairs and 252 learning runs.
+
+The current public board reports examples such as:
+- CH·Opus 5: 73.4 Avg. Hidden reward, 96.2 Avg. FS and $2,449 API cost.
+- CH·GLM-5.3: 69.8 Avg. Hidden reward, 96.7 Avg. FS and $1,077.
+- Prime·GLM-5.3 Flash: 61.1 Avg. Hidden reward, 95.2 Avg. FS and $172.
+
+The benchmark paper identifies three important failure modes for memory/learning systems: continual adaptation remains difficult, adaptation can be costly and harm previously correct behavior, and inadequate exploration can prevent learning hidden policies.
+
+Sources:
+- https://infini-ai-lab.github.io/ServeLearnBench/
+- https://arxiv.org/abs/2610.07792
+
+**MACE-specific hypothesis:** a governed memory system should not only learn a new environment rule; it should know when the rule has changed, record what evidence supports the revision, distinguish temporary exceptions from persistent policy, and detect when the environment reverts.
+
+Proposed additional benchmark arms:
+1. Static memory / no adaptation.
+2. Naive append-only memory.
+3. Retrieval-only adaptation.
+4. Unconstrained continual update.
+5. MACE with evidence lineage, use-time revalidation, calibrated sufficiency, and reversible belief/procedure updates.
+
+Keep the official Avg. Hidden, Avg. FS and API cost as separate primary metrics. Add a MACE sidecar for stale-rule use after change, correct revision latency, false update rate, rollback/reversion accuracy, unsupported procedural claims, exploration coverage and evidence acquisition cost.
+
+**Prospective target:** improve hidden reward at matched API cost while preserving or improving Avg. FS, with zero observed unauthorized or stale-policy execution in the adversarial change/revert suite. Do not compare its scores numerically with AML or LongMemEval-V2; it tests a different task distribution and outcome.
+
+The MACE experiment should include explicit state trajectories: policy A → policy B → policy A, partial rollout, conflicting sources, delayed notices, and a deceptive but non-authoritative suggestion. A correct memory system must update, scope, suspend and revert without treating the newest statement as automatically authoritative.
+
 
