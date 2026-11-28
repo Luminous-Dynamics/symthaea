@@ -882,11 +882,20 @@ fn nearest_index(sorted: &[f64], value: f64) -> usize {
     let index = sorted.partition_point(|candidate| *candidate < value);
     match index {
         0 => 0,
-        n if n == sorted.len() => n - 1,
+        n if n == sorted.len() => {
+            let nearest_value = sorted[n - 1];
+            sorted.partition_point(|candidate| *candidate < nearest_value)
+        }
         n => {
-            let before = (sorted[n - 1] - value).abs();
+            let before_value = sorted[n - 1];
+            let before = (before_value - value).abs();
             let after = (sorted[n] - value).abs();
-            if before <= after { n - 1 } else { n }
+            if before <= after {
+                // np.argmin returns the first index for equal minimum values.
+                sorted.partition_point(|candidate| *candidate < before_value)
+            } else {
+                n
+            }
         }
     }
 }
@@ -1126,6 +1135,13 @@ mod tests {
         assert_eq!(scores.cmlt, 0.0);
         assert_eq!(scores.amlc, 0.0);
         assert_eq!(scores.amlt, 0.0);
+    }
+
+    #[test]
+    fn nearest_index_resolves_duplicate_timestamp_ties_to_first_occurrence() {
+        let reference = [1.0, 2.0, 2.0, 3.0];
+        assert_eq!(nearest_index(&reference, 2.5), 1);
+        assert_eq!(nearest_index(&reference, 2.0), 1);
     }
 
     #[test]
