@@ -59,6 +59,9 @@ struct MemoryResult {
 #[derive(Debug, Clone, Serialize)]
 struct ScenarioEnergyEstimate {
     system_label: String,
+    measurement_status: String,
+    physical_scope: String,
+    claim_ceiling: String,
     assumed_power_watts: f64,
     observed_pipeline_latency_ms: f64,
     scenario_energy_joules_not_measured: f64,
@@ -156,6 +159,9 @@ fn build_scenario_energy_estimate(
 ) -> ScenarioEnergyEstimate {
     ScenarioEnergyEstimate {
         system_label: scenario_label.to_string(),
+        measurement_status: "SCENARIO_ESTIMATE_NOT_MEASURED".to_string(),
+        physical_scope: "assumed CPU-power input only; no sensor coverage".to_string(),
+        claim_ceiling: "not comparable to another system and not a hardware energy receipt".to_string(),
         assumed_power_watts,
         observed_pipeline_latency_ms,
         scenario_energy_joules_not_measured: scenario_energy_from_assumed_power(
@@ -447,4 +453,30 @@ fn main() {
         "\nTotal benchmark wall-clock time: {:.2}s",
         total_elapsed.as_secs_f64()
     );
+}
+
+
+#[cfg(test)]
+mod scenario_energy_tests {
+    use super::*;
+
+    #[test]
+    fn scenario_energy_arithmetic_preserves_watt_millisecond_units() {
+        // 65 W × 100 ms = 6.5 J as a scenario calculation only.
+        assert!((scenario_energy_from_assumed_power(65.0, 100.0) - 6.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn zero_latency_produces_zero_scenario_energy() {
+        assert_eq!(scenario_energy_from_assumed_power(65.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn output_labels_the_energy_as_unmeasured() {
+        let estimate = build_scenario_energy_estimate(100.0, 65.0, "test scenario");
+        assert_eq!(estimate.measurement_status, "SCENARIO_ESTIMATE_NOT_MEASURED");
+        assert!(estimate.physical_scope.contains("no sensor coverage"));
+        assert!(estimate.claim_ceiling.contains("not comparable"));
+        assert_eq!(estimate.scenario_energy_joules_not_measured, 6.5);
+    }
 }
