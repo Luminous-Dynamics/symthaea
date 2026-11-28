@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
-//! Reproducible wiring probe for the localized context-tree portfolio.
-//! This is not a Type-I calibration or power benchmark.
+//! Reproducible wiring probe for a fixed-prior localized context tree.
+//! This is not a Type-I calibration or performance result.
 
 use std::error::Error;
 
