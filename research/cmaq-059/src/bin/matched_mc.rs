@@ -334,8 +334,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             if kind.is_null() {
-                false_alarms_c058 += u64::from(c058_alarm.is_some());
-                false_alarms_scpt += u64::from(scpt_alarm.is_some());
+                if c058_alarm.is_some() { false_alarms_c058 += 1; }
+                if scpt_alarm.is_some() { false_alarms_scpt += 1; }
             } else {
                 detections_c058.push(DetectionTrial {
                     horizon,
