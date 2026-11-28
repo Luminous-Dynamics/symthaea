@@ -528,8 +528,16 @@ mod tests {
     #[test]
     fn rejects_missing_personalized_predictions() {
         let ratings = vec![rating("item", "r1", 0)];
-        let error = score_personalized_ordinal(&ratings, &[], 5).unwrap_err();
-        assert_eq!(error, OrdinalScoringError::EmptyPredictions);
+        let predictions = vec![PersonalizedOrdinalPrediction {
+            item_id: "different-item".to_owned(),
+            rater_id: "r1".to_owned(),
+            probabilities: vec![0.2, 0.2, 0.2, 0.2, 0.2],
+        }];
+        let error = score_personalized_ordinal(&ratings, &predictions, 5).unwrap_err();
+        assert!(matches!(
+            error,
+            OrdinalScoringError::MissingPersonalizedPrediction { .. }
+        ));
     }
 
     #[test]
