@@ -8,7 +8,7 @@
 //!   cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines -- --jsonl
 
 use symthaea_psych_bench::benchmarks::cognitive_ecology::{
-    ScenarioManifest, receipts_to_jsonl, run_cost_oracle, run_random_policy, run_reference_policy, run_search_oracle,
+    ScenarioManifest, run_cost_oracle, run_random_policy, run_reference_policy, run_search_oracle,
 };
 use serde_json::json;
 
