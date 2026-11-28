@@ -22,6 +22,7 @@ use std::fmt;
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
 const MAX_ARTIFACTS: usize = 4096;
+const MAX_CLAIMS: usize = 8192;
 
 const TASK_SCHEMA: &str = include_str!("../../financial-agent-v1/task.schema.json");
 const EVIDENCE_SCHEMA: &str = include_str!("../../financial-agent-v1/evidence.schema.json");
@@ -834,6 +835,16 @@ fn verify_semantic_relations(
         .and_then(Value::as_array)
         .map(Vec::as_slice)
         .unwrap_or_default();
+    if claims.len() > MAX_CLAIMS {
+        report.record(
+            Gate::Semantic,
+            Disposition::Fail,
+            "CLAIM_COUNT_LIMIT_EXCEEDED",
+            "$.claims",
+            format!("claim count exceeds verifier limit {MAX_CLAIMS}"),
+        );
+        return;
+    }
     let mut claim_by_id: BTreeMap<&str, &Value> = BTreeMap::new();
     for (index, claim) in claims.iter().enumerate() {
         let claim_id = claim.get("claim_id").and_then(Value::as_str).unwrap_or_default();
@@ -1242,40 +1253,46 @@ fn verify_semantic_relations(
 }
 
 fn find_claim_cycle(graph: &BTreeMap<String, Vec<String>>) -> Option<Vec<String>> {
-    fn visit(
-        node: &str,
-        graph: &BTreeMap<String, Vec<String>>,
-        visiting: &mut Vec<String>,
-        visited: &mut BTreeSet<String>,
-    ) -> Option<Vec<String>> {
-        if let Some(position) = visiting.iter().position(|value| value == node) {
-            let mut cycle = visiting[position..].to_vec();
-            cycle.push(node.to_owned());
-            return Some(cycle);
+    // Iterative depth-first traversal keeps adversarially deep derivation
+    // graphs from consuming the Rust call stack.
+    let mut visited = BTreeSet::new();
+
+    for start in graph.keys() {
+        if visited.contains(start) {
+            continue;
         }
-        if visited.contains(node) {
-            return None;
-        }
-        visiting.push(node.to_owned());
-        if let Some(children) = graph.get(node) {
-            for child in children {
-                if let Some(cycle) = visit(child, graph, visiting, visited) {
+
+        let mut stack: Vec<(String, usize)> = vec![(start.clone(), 0)];
+        let mut path = vec![start.clone()];
+        let mut active_positions = BTreeMap::from([(start.clone(), 0usize)]);
+
+        while let Some((node, next_child)) = stack.last_mut() {
+            let children = graph.get(node).map(Vec::as_slice).unwrap_or_default();
+            if *next_child < children.len() {
+                let child = children[*next_child].clone();
+                *next_child += 1;
+
+                if let Some(position) = active_positions.get(&child).copied() {
+                    let mut cycle = path[position..].to_vec();
+                    cycle.push(child);
                     return Some(cycle);
                 }
+
+                if !visited.contains(&child) && graph.contains_key(&child) {
+                    let position = path.len();
+                    active_positions.insert(child.clone(), position);
+                    path.push(child.clone());
+                    stack.push((child, 0));
+                }
+            } else {
+                let (finished, _) = stack.pop().expect("stack is non-empty");
+                active_positions.remove(&finished);
+                path.pop();
+                visited.insert(finished);
             }
         }
-        visiting.pop();
-        visited.insert(node.to_owned());
-        None
     }
 
-    let mut visiting = Vec::new();
-    let mut visited = BTreeSet::new();
-    for node in graph.keys() {
-        if let Some(cycle) = visit(node, graph, &mut visiting, &mut visited) {
-            return Some(cycle);
-        }
-    }
     None
 }
 
@@ -1711,6 +1728,20 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.code == "DERIVATION_CYCLE"));
+    }
+
+    #[test]
+    fn deep_derivation_cycles_are_checked_without_recursive_stack_growth() {
+        let count = 10_000usize;
+        let mut graph = BTreeMap::new();
+        for index in 0..count {
+            let next = if index + 1 == count { 0 } else { index + 1 };
+            graph.insert(format!("C-{index}"), vec![format!("C-{next}")]);
+        }
+
+        let cycle = find_claim_cycle(&graph).expect("cycle must be found");
+        assert!(cycle.len() >= 3);
+        assert_eq!(cycle.first(), cycle.last());
     }
 
     #[test]
