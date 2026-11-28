@@ -463,19 +463,16 @@ impl NixOptionCatalogV1 {
     ) -> Result<(), TypedNixError> {
         let path = NixAttributePath::parse(path)?;
         let rendered = path.as_nix();
-        if self
-            .options
-            .insert(
-                path,
-                NixOptionRecord {
-                    value_kind,
-                    read_only,
-                },
-            )
-            .is_some()
-        {
+        if self.options.contains_key(&path) {
             return Err(TypedNixError::DuplicateCatalogOption(rendered));
         }
+        self.options.insert(
+            path,
+            NixOptionRecord {
+                value_kind,
+                read_only,
+            },
+        );
         Ok(())
     }
 
