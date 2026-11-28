@@ -124,7 +124,10 @@
         "influence_assessment_opportunities",
         "lifecycle_transition_opportunities",
         "authorization_opportunities",
-        "erasure_verification_opportunities"
+        "erasure_verification_opportunities",
+        "provenance_claim_opportunities",
+        "proactive_disclosure_opportunities",
+        "privacy_sensitive_opportunities"
       ],
       "properties": {
         "evidence_use_opportunities": {
@@ -146,6 +149,15 @@
           "$ref": "#/$defs/nonnegative"
         },
         "erasure_verification_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "provenance_claim_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "proactive_disclosure_opportunities": {
+          "$ref": "#/$defs/nonnegative"
+        },
+        "privacy_sensitive_opportunities": {
           "$ref": "#/$defs/nonnegative"
         }
       }
