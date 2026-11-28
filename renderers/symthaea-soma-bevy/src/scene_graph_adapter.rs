@@ -12,10 +12,9 @@
 use super::{
     color_for_role, is_before_expiry, mesh_for_glyph, render_amplitude,
     ActiveScene, ActiveSceneTransition, AdapterError, AdapterSubmissionStatus,
-    LatestSceneSubmissionAck, PresentationPolicyState, RenderedSceneEntity,
+    PresentationPolicyState, RenderedSceneEntity,
     SceneClock, SceneElementPresentation, SceneFrameMetadata, SceneGroupId,
 };
-use bevy::color::Alpha;
 use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
 use symthaea_soma::embodiment_policy::{
@@ -25,9 +24,8 @@ use symthaea_soma::embodiment_projection::CanonicalCue;
 use symthaea_soma::embodiment_receipt::{
     PresentationReceipt, ReceiptPhase,
 };
-use symthaea_soma::embodiment_scene::{SceneGlyph, SceneMotion, SceneRole};
 use symthaea_soma::embodiment_scene_graph::{
-    verify_scene_graph_v2, SceneGraphV2, SceneGraphV2Error, SceneRelationKind,
+    verify_scene_graph_v2, SceneGraphV2, SceneRelationKind,
 };
 
 #[derive(Debug, Clone)]
