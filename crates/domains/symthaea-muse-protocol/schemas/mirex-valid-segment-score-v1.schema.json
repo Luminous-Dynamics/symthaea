@@ -644,6 +644,68 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "config": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "duration_weighted"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "beat_aggregate": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "duration_weighted"
+              }
+            }
+          },
+          "downbeat_aggregate": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "duration_weighted"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "config": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "arithmetic_mean_per_segment"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "beat_aggregate": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "arithmetic_mean_per_segment"
+              }
+            }
+          },
+          "downbeat_aggregate": {
+            "properties": {
+              "aggregation_mode": {
+                "const": "arithmetic_mean_per_segment"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
