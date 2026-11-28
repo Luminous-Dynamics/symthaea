@@ -897,6 +897,57 @@ mod tests {
     }
 
     #[test]
+    fn schema_mutation_probe_detects_a_weakened_authority_object_contract() {
+        let root = repository_root();
+        let schema = load_schema(&root.join("docs/research/eqc-task-v0.1.schema.json"))
+            .expect("task schema meta-validates");
+        let strict_validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("strict task schema compiles");
+
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/eqc-seed-corpus-v0.1.json"
+        ))
+        .expect("seed JSON parses");
+        let mut mutant_task = corpus["tasks"][0].clone();
+        mutant_task["authority_snapshot"]["unreviewed_override"] =
+            Value::Bool(true);
+
+        assert!(
+            !strict_validator.is_valid(&mutant_task),
+            "the published task schema must reject undeclared authority fields"
+        );
+
+        // Deliberately weaken exactly the authority object's closed-world
+        // constraint. The malformed task should now pass; this proves the
+        // preceding assertion is sensitive to this schema mutation rather
+        // than vacuously rejecting every task.
+        let mut weakened_schema = schema;
+        weakened_schema["properties"]["authority_snapshot"]["additionalProperties"] =
+            Value::Bool(true);
+        let weakened_validator = jsonschema::options()
+            .offline()
+            .should_validate_formats(true)
+            .build(&weakened_schema)
+            .expect("mutated task schema still compiles");
+
+        assert!(
+            weakened_validator.is_valid(&mutant_task),
+            "the mutation probe must demonstrate that relaxing authority additionalProperties changes the verdict"
+        );
+    }
+
+    #[test]
+    fn receipt_schema_rejects_unknown_top_level_fields() {
+        let validator = receipt_schema_validator();
+        let mut receipt = valid_receipt();
+        receipt["unreviewed_override"] = Value::Bool(true);
+        assert!(!validator.is_valid(&receipt));
+    }
+
+    #[test]
     fn receipt_schema_accepts_a_fully_qualified_receipt() {
         let validator = receipt_schema_validator();
         assert!(validator.is_valid(&valid_receipt()));
