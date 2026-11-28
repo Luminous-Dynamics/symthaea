@@ -778,6 +778,26 @@ mod tests {
     }
 
     #[test]
+    fn human_intervention_budget_is_enforced() {
+        let key = signing_key();
+        let mut changed = payload();
+        changed.human_interventions = 1;
+        let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
+        let mut ledger = ObserverNonceLedger::default();
+        let report = verify_envelope(&envelope, &trust_policy(&key), &expectation(), &mut ledger)
+            .unwrap();
+        assert!(!report.measurement_contract_pass);
+        assert!(!report.qualified);
+    }
+
+    #[test]
+    fn values_outside_the_jcs_safe_integer_range_are_rejected() {
+        let mut changed = payload();
+        changed.elapsed_ms = 9_007_199_254_740_992;
+        assert!(validate_payload_shape(&changed).is_err());
+    }
+
+    #[test]
     fn failed_or_reused_verifier_does_not_pass_replay_receipt_consistency() {
         let key = signing_key();
         let mut changed = payload();
