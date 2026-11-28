@@ -122,7 +122,9 @@ fn array<'a>(value: &'a Value, key: &str) -> Option<&'a Vec<Value>> {
 }
 
 fn relation_has(relations: &[Value], relation: &str) -> bool {
-    relations.iter().any(|item| get_str(item, "relation") == Some(relation))
+    relations
+        .iter()
+        .any(|item| get_str(item, "relation") == Some(relation))
 }
 
 fn first_relation_evidence(relations: &[Value], relation: &str) -> Option<String> {
@@ -133,10 +135,7 @@ fn first_relation_evidence(relations: &[Value], relation: &str) -> Option<String
         .min()
 }
 
-fn evidence_for_claim<'a>(
-    state: &'a Value,
-    relations: &[Value],
-) -> Vec<&'a Value> {
+fn evidence_for_claim<'a>(state: &'a Value, relations: &[Value]) -> Vec<&'a Value> {
     let ids: HashSet<&str> = relations
         .iter()
         .filter_map(|item| get_str(item, "evidence_id"))
@@ -148,15 +147,13 @@ fn evidence_for_claim<'a>(
         .collect()
 }
 
-fn need_for_claim(
-    state: &Value,
-    claim: &Value,
-    risk_class: &str,
-) -> Option<PolicyNeed> {
+fn need_for_claim(state: &Value, claim: &Value, risk_class: &str) -> Option<PolicyNeed> {
     let claim_id = get_str(claim, "claim_id").map(str::to_owned);
     let usability = claim.get("decision_usability");
     let usability_status = usability.and_then(|value| get_str(value, "status"));
-    let relations = array(claim, "evidence_relations").map(Vec::as_slice).unwrap_or(&[]);
+    let relations = array(claim, "evidence_relations")
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
     let evidence = evidence_for_claim(state, relations);
 
     // Repair broken artifact capture/attribution before reasoning over content.
@@ -215,12 +212,12 @@ fn need_for_claim(
 
     // Do not treat a page as claim support. Request classification of the exact pair.
     if relations.is_empty() || relation_has(relations, "UNCLASSIFIED") {
-        let evidence_id = first_relation_evidence(relations, "UNCLASSIFIED")
-            .or_else(|| {
-                evidence.iter()
-                    .filter_map(|item| get_str(item, "evidence_id").map(str::to_owned))
-                    .min()
-            });
+        let evidence_id = first_relation_evidence(relations, "UNCLASSIFIED").or_else(|| {
+            evidence
+                .iter()
+                .filter_map(|item| get_str(item, "evidence_id").map(str::to_owned))
+                .min()
+        });
         return Some(PolicyNeed {
             priority: 2,
             claim_id,
@@ -258,7 +255,9 @@ fn need_for_claim(
     let adjudication = claim.get("truth_adjudication");
     let adjudication_status = adjudication.and_then(|value| get_str(value, "status"));
     let adjudication_result = adjudication.and_then(|value| get_str(value, "result"));
-    if ["REFUTED", "MIXED", "UNDECIDABLE"].contains(&adjudication_result.unwrap_or("NOT_ADJUDICATED")) {
+    if ["REFUTED", "MIXED", "UNDECIDABLE"]
+        .contains(&adjudication_result.unwrap_or("NOT_ADJUDICATED"))
+    {
         return Some(PolicyNeed {
             priority: 4,
             claim_id,
@@ -274,8 +273,7 @@ fn need_for_claim(
     }
 
     if ["HIGH", "CRITICAL"].contains(&risk_class)
-        && (adjudication_status != Some("ADJUDICATED")
-            || adjudication_result != Some("SUPPORTED"))
+        && (adjudication_status != Some("ADJUDICATED") || adjudication_result != Some("SUPPORTED"))
     {
         return Some(PolicyNeed {
             priority: 4,
@@ -331,8 +329,11 @@ fn fits_budget(cost: &BTreeMap<String, u64>, budget: &BTreeMap<String, u64>) -> 
     if cost.len() != budget.len() || !cost.keys().eq(budget.keys()) {
         return false;
     }
-    cost.iter()
-        .all(|(dimension, amount)| budget.get(dimension).is_some_and(|remaining| amount <= remaining))
+    cost.iter().all(|(dimension, amount)| {
+        budget
+            .get(dimension)
+            .is_some_and(|remaining| amount <= remaining)
+    })
 }
 
 fn offer_matches_need(offer: &ActionOffer, need: &PolicyNeed) -> bool {
@@ -421,7 +422,9 @@ fn select_offer(
             .iter()
             .all(|offer| same_cost(&offer.resource_cost, &nondominated[0].resource_cost))
         {
-            return Ok(nondominated.into_iter().min_by(|a, b| a.offer_id.cmp(&b.offer_id)));
+            return Ok(nondominated
+                .into_iter()
+                .min_by(|a, b| a.offer_id.cmp(&b.offer_id)));
         }
         return Err("PARETO_INCOMPARABLE_PERMITTED_OFFERS".to_owned());
     }
@@ -454,18 +457,23 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
     )
     .unwrap_or_default()
     .to_owned();
-    let action_offer_bytes = serde_json::to_vec(&input.permitted_action_offers).map_err(|error| {
-        vec![PolicyIssue {
-            path: "permitted_action_offers".to_owned(),
-            message: format!("cannot serialize action offers: {error}"),
-        }]
-    })?;
+    let action_offer_bytes =
+        serde_json::to_vec(&input.permitted_action_offers).map_err(|error| {
+            vec![PolicyIssue {
+                path: "permitted_action_offers".to_owned(),
+                message: format!("cannot serialize action offers: {error}"),
+            }]
+        })?;
     let action_offers_sha256 = sha256_hex(&action_offer_bytes);
 
     let mut issues = Vec::new();
     for dimension in input.remaining_budget.keys() {
         if dimension.trim().is_empty() {
-            issue(&mut issues, "remaining_budget", "resource dimension names must be non-empty");
+            issue(
+                &mut issues,
+                "remaining_budget",
+                "resource dimension names must be non-empty",
+            );
         }
     }
     let mut offer_ids = HashSet::new();
@@ -482,19 +490,35 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
 
     for (index, offer) in input.permitted_action_offers.iter().enumerate() {
         if offer.offer_id.trim().is_empty() {
-            issue(&mut issues, format!("permitted_action_offers[{index}].offer_id"), "offer ID must be non-empty");
+            issue(
+                &mut issues,
+                format!("permitted_action_offers[{index}].offer_id"),
+                "offer ID must be non-empty",
+            );
         }
         if !offer_ids.insert(offer.offer_id.clone()) {
-            issue(&mut issues, format!("permitted_action_offers[{index}].offer_id"), "duplicate permitted offer ID");
+            issue(
+                &mut issues,
+                format!("permitted_action_offers[{index}].offer_id"),
+                "duplicate permitted offer ID",
+            );
         }
         if let Some(claim_id) = offer.target_claim_id.as_deref() {
             if !known_claims.contains(claim_id) {
-                issue(&mut issues, format!("permitted_action_offers[{index}].target_claim_id"), "offer references unknown claim");
+                issue(
+                    &mut issues,
+                    format!("permitted_action_offers[{index}].target_claim_id"),
+                    "offer references unknown claim",
+                );
             }
         }
         if let Some(evidence_id) = offer.target_evidence_id.as_deref() {
             if !known_evidence.contains(evidence_id) {
-                issue(&mut issues, format!("permitted_action_offers[{index}].target_evidence_id"), "offer references unknown evidence");
+                issue(
+                    &mut issues,
+                    format!("permitted_action_offers[{index}].target_evidence_id"),
+                    "offer references unknown evidence",
+                );
             }
         }
         if !offer.resource_cost.keys().eq(input.remaining_budget.keys()) {
@@ -532,7 +556,11 @@ pub fn decide(input: &PolicyInput) -> Result<PolicyDecision, Vec<PolicyIssue>> {
     }
 
     let need = &needs[0];
-    match select_offer(need, &input.permitted_action_offers, &input.remaining_budget) {
+    match select_offer(
+        need,
+        &input.permitted_action_offers,
+        &input.remaining_budget,
+    ) {
         Ok(Some(offer)) => Ok(PolicyDecision {
             policy_id: POLICY_ID.to_owned(),
             policy_version: POLICY_VERSION.to_owned(),
@@ -602,12 +630,11 @@ mod tests {
         }
         let evidence = state["evidence"].as_array().unwrap().clone();
         let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
-        let sequence = state["evidence_prefix"]["sequence_number"].as_u64().unwrap();
-        let prefix = typed_research_state_contract::evidence_prefix_sha256(
-            &episode,
-            sequence,
-            &evidence,
-        );
+        let sequence = state["evidence_prefix"]["sequence_number"]
+            .as_u64()
+            .unwrap();
+        let prefix =
+            typed_research_state_contract::evidence_prefix_sha256(&episode, sequence, &evidence);
         state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
         for claim in state["claims"].as_array_mut().unwrap() {
             for relation in claim["evidence_relations"].as_array_mut().unwrap() {
@@ -632,7 +659,10 @@ mod tests {
             kind,
             target_claim_id: claim.map(str::to_owned),
             target_evidence_id: evidence.map(str::to_owned),
-            resource_cost: cost.iter().map(|(key, value)| (key.to_string(), *value)).collect(),
+            resource_cost: cost
+                .iter()
+                .map(|(key, value)| (key.to_string(), *value))
+                .collect(),
         }
     }
 
@@ -659,13 +689,23 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("classify-claim-a"));
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("classify-claim-a")
+        );
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::ClassifyClaimSource)
+        );
     }
 
     #[test]
@@ -685,19 +725,30 @@ mod tests {
                     ActionKind::VerifyArtifact,
                     Some("claim-a"),
                     Some("ev-a1"),
-                    &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                    &[
+                        ("query_units", 0),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
                 ),
                 offer(
                     "classify-claim-a",
                     ActionKind::ClassifyClaimSource,
                     Some("claim-a"),
                     Some("ev-a1"),
-                    &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                    &[
+                        ("query_units", 1),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
                 ),
             ],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-artifact"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("verify-artifact")
+        );
         assert_eq!(
             decision.reason_codes,
             vec!["ARTIFACT_NOT_YET_CAPTURED_AND_INTEGRITY_VERIFIED"]
@@ -715,11 +766,18 @@ mod tests {
                 ActionKind::VerifyArtifact,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("check-source-corrections"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("check-source-corrections")
+        );
         assert_eq!(
             decision.reason_codes,
             vec!["SOURCE_CORRECTION_STATUS_NOT_YET_VERIFIED"]
@@ -732,14 +790,16 @@ mod tests {
         state["evidence"][0]["retrieval_state"] = Value::String("FETCHED".to_owned());
         let evidence = state["evidence"].as_array().unwrap().clone();
         let episode = get_str(&state, "research_episode_id").unwrap().to_owned();
-        let sequence = state["evidence_prefix"]["sequence_number"].as_u64().unwrap();
-        let prefix = typed_research_state_contract::evidence_prefix_sha256(
-            &episode,
-            sequence,
-            &evidence,
-        );
+        let sequence = state["evidence_prefix"]["sequence_number"]
+            .as_u64()
+            .unwrap();
+        let prefix =
+            typed_research_state_contract::evidence_prefix_sha256(&episode, sequence, &evidence);
         state["evidence_prefix"]["prefix_sha256"] = Value::String(prefix.clone());
-        for relation in state["claims"][0]["evidence_relations"].as_array_mut().unwrap() {
+        for relation in state["claims"][0]["evidence_relations"]
+            .as_array_mut()
+            .unwrap()
+        {
             if relation["classifier_provenance"].is_object() {
                 relation["classifier_provenance"]["evidence_prefix_sha256"] =
                     Value::String(prefix.clone());
@@ -752,11 +812,18 @@ mod tests {
                 ActionKind::VerifyArtifact,
                 Some("claim-b"),
                 Some("ev-b1"),
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("verify-before-use"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("verify-before-use")
+        );
     }
 
     #[test]
@@ -768,7 +835,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let first = decide(&input).unwrap();
@@ -801,7 +872,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let second_input = input(
@@ -811,7 +886,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let first = decide(&first_input).unwrap();
@@ -838,11 +917,18 @@ mod tests {
                 ActionKind::RetrieveOrRecapture,
                 Some("claim-b"),
                 Some("ev-b1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-retracted"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("refresh-retracted")
+        );
         assert_eq!(
             decision.reason_codes,
             vec!["SOURCE_CORRECTED_RETRACTED_OR_SUPERSEDED"]
@@ -867,11 +953,18 @@ mod tests {
                 ActionKind::RequestDiscriminatingExperiment,
                 Some("claim-b"),
                 None,
-                &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 2),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::RequestDiscriminatingExperiment)
+        );
     }
 
     #[test]
@@ -883,11 +976,18 @@ mod tests {
                 ActionKind::Escalate,
                 None,
                 None,
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("escalate-episode"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("escalate-episode")
+        );
     }
 
     #[test]
@@ -899,12 +999,22 @@ mod tests {
                 ActionKind::RequestDiscriminatingExperiment,
                 Some("claim-c"),
                 None,
-                &[("query_units", 0), ("experiment_units", 2), ("review_minutes", 0)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 2),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("probe-conflict"));
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestDiscriminatingExperiment));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("probe-conflict")
+        );
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::RequestDiscriminatingExperiment)
+        );
     }
 
     #[test]
@@ -916,12 +1026,19 @@ mod tests {
                 ActionKind::RetrieveOrRecapture,
                 Some("claim-d"),
                 None,
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 0),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
-        assert_eq!(decision.selected_offer_id.as_deref(), Some("refresh-policy"));
+        assert_eq!(
+            decision.selected_offer_id.as_deref(),
+            Some("refresh-policy")
+        );
     }
 
     #[test]
@@ -935,26 +1052,43 @@ mod tests {
                 ActionKind::RequestIndependentAdjudication,
                 Some("claim-b"),
                 None,
-                &[("query_units", 0), ("experiment_units", 0), ("review_minutes", 2)],
+                &[
+                    ("query_units", 0),
+                    ("experiment_units", 0),
+                    ("review_minutes", 2),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
-        assert_eq!(decision.selected_action_kind, Some(ActionKind::RequestIndependentAdjudication));
+        assert_eq!(
+            decision.selected_action_kind,
+            Some(ActionKind::RequestIndependentAdjudication)
+        );
     }
 
     #[test]
     fn action_not_in_the_offer_list_cannot_be_invented() {
-        let input = input(artifact_verified_state(0), vec![offer(
-            "only-search",
-            ActionKind::SeekIndependentSource,
-            Some("claim-a"),
-            None,
-            &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 0)],
-        )]);
+        let input = input(
+            artifact_verified_state(0),
+            vec![offer(
+                "only-search",
+                ActionKind::SeekIndependentSource,
+                Some("claim-a"),
+                None,
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 0),
+                ],
+            )],
+        );
         let decision = decide(&input).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Selected);
         assert_eq!(decision.selected_offer_id.as_deref(), Some("only-search"));
-        assert_ne!(decision.selected_action_kind, Some(ActionKind::ClassifyClaimSource));
+        assert_ne!(
+            decision.selected_action_kind,
+            Some(ActionKind::ClassifyClaimSource)
+        );
     }
 
     #[test]
@@ -966,7 +1100,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 11), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 11),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         input.remaining_budget.insert("query_units".to_owned(), 10);
@@ -979,15 +1117,36 @@ mod tests {
         let input = input(
             artifact_verified_state(0),
             vec![
-                offer("offer-a", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                    &[("query_units", 2), ("experiment_units", 0), ("review_minutes", 1)]),
-                offer("offer-b", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                    &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 2)]),
+                offer(
+                    "offer-a",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 2),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
+                ),
+                offer(
+                    "offer-b",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 1),
+                        ("experiment_units", 0),
+                        ("review_minutes", 2),
+                    ],
+                ),
             ],
         );
         let decision = decide(&input).unwrap();
         assert_eq!(decision.disposition, DecisionDisposition::Abstain);
-        assert_eq!(decision.reason_codes, vec!["PARETO_INCOMPARABLE_PERMITTED_OFFERS"]);
+        assert_eq!(
+            decision.reason_codes,
+            vec!["PARETO_INCOMPARABLE_PERMITTED_OFFERS"]
+        );
     }
 
     #[test]
@@ -995,10 +1154,28 @@ mod tests {
         let input = input(
             artifact_verified_state(0),
             vec![
-                offer("offer-a", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                    &[("query_units", 2), ("experiment_units", 0), ("review_minutes", 1)]),
-                offer("offer-b", ActionKind::ClassifyClaimSource, Some("claim-a"), Some("ev-a1"),
-                    &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)]),
+                offer(
+                    "offer-a",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 2),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
+                ),
+                offer(
+                    "offer-b",
+                    ActionKind::ClassifyClaimSource,
+                    Some("claim-a"),
+                    Some("ev-a1"),
+                    &[
+                        ("query_units", 1),
+                        ("experiment_units", 0),
+                        ("review_minutes", 1),
+                    ],
+                ),
             ],
         );
         let decision = decide(&input).unwrap();
@@ -1014,7 +1191,11 @@ mod tests {
                 ActionKind::ClassifyClaimSource,
                 Some("claim-a"),
                 Some("ev-a1"),
-                &[("query_units", 1), ("experiment_units", 0), ("review_minutes", 1)],
+                &[
+                    ("query_units", 1),
+                    ("experiment_units", 0),
+                    ("review_minutes", 1),
+                ],
             )],
         );
         let decision = decide(&input).unwrap();
