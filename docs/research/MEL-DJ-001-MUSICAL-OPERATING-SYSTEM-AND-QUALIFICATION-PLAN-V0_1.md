@@ -346,3 +346,17 @@ Sources:
 - Engine DJ official downloads/release notes: https://enginedj.com/downloads
 
 Treat this matrix as a dated public-feature inventory. It does not establish equivalent quality, compatibility across all devices, or the internal implementation of any competitor. Re-check release notes when a new comparison is run. The strategic conclusion is unchanged: do not compete on hardware catalog breadth or streaming rights. Build the cross-vendor evidence, musical-property, transition-planning and set-intent layer that a DJ can audit and carry between tools.
+
+
+## 17. Existing Muse rhythm/audio inventory — ownership boundary
+
+A source inspection of the current `symthaea-muse` crate found useful adjacent components, but did not find an existing waveform-to-beat/downbeat tracker:
+
+- `rhythm.rs` computes a **generative** tempo from cognitive state (arousal, noradrenaline, harmony activation) and provides note-duration/subdivision helpers. It is not an audio beat detector.
+- `rhythm_engine.rs` generates meter groupings, groove pockets, syncopation and expressive microtiming. It is not a beat-grid estimator over source recordings.
+- `audio_analyzer.rs` uses mel features and an active-inference agent for entropy/surprise curves and peak markers. Its peaks are not annotated beats or downbeats.
+- `mixing.rs` is a synthesis/output EQ-compressor-limiter chain, not a DJ transition mixer or source-stem gain planner.
+- `streaming.rs` is a PCM synthesis pipeline, not an external-track playback deck or source-audio analysis service.
+- `analyst.rs` is an authoritative symbolic composition/structure auditor; its symbolic facts must not be represented as audio-only recognition.
+
+Reuse these components only within their proven semantics. In particular, don't infer an observed beat grid from the generative `compute_tempo`, don't interpret FEP surprise peaks as onsets, and don't use a symbolic score's tempo map as ground-truth audio beat detection. The proposed DJ beat-tracker adapter belongs beside, not inside, those generative systems until a cross-domain interface is reviewed.
