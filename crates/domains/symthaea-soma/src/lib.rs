@@ -62,6 +62,7 @@ pub mod embodiment_receipt;
 pub mod embodiment_scene;
 pub mod embodiment_scene_graph;
 pub mod embodiment_action_timeline;
+pub mod embodiment_multiparty_control;
 pub mod roi_calibration;
 pub mod embodiment_turn_control;
 pub mod embodiment_transition;
