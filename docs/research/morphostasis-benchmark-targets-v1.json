@@ -173,7 +173,9 @@
     "Symthaea HDC-only, temporal-only, HDC x CfC/LTC, and verified adaptive communication arms",
     "centralized MPC/optimizer as upper bound only",
     "random, no-memory, no-remapping, no-slow-channel, fixed-topology, shuffled-channel, target-blind controls",
-    "TOPO-ADAPT-001: fixed graph, weight-only adaptation, local greedy repair, fixed-topology distributed routing, adaptive-topology heuristic, degree-matched random rewiring, exact max-flow/min-cost oracle on small instances"
+    "TOPO-ADAPT-001: fixed graph, weight-only adaptation, local greedy repair, fixed-topology distributed routing, adaptive-topology heuristic, degree-matched random rewiring, exact max-flow/min-cost oracle on small instances",
+    "GNN communication-topology rewiring family: Delaunay/dynamic triangulation, FOSR/spectral-gap/expander, curvature/effective-resistance, spectrum-preserving sparsification, virtual nodes and learned rewiring",
+    "Resilience-based network-design family: exact MILP/topology-capacity oracle for small cases, PSDA-style stochastic design and GA, subject to exact paper-protocol/artifact admission"
   ],
   "metrics": {
     "geometry": [
@@ -507,6 +509,13 @@
           "min_cut_after_edit": 4,
           "correct_edit": "restore_sink_route"
         }
+      ],
+      "additional_episode_family": "repeated/correlated disruptions with recovery horizons and chance-constrained recovered flow",
+      "new_comparator_families": [
+        "GNN message-passing graph rewirers",
+        "MILP topology+capacity design",
+        "PSDA-style stochastic network design",
+        "genetic algorithm"
       ]
     },
     "claim_limit": "No controller implementation, score or superiority claim exists yet.",
@@ -530,6 +539,52 @@
       "test_count_authored": 8,
       "exact_head_status": "not compiled or executed; cargo/rustc/rustfmt unavailable in execution environment",
       "message_and_update_budget": "declared in fixture but not charged until controller traces exist"
+    },
+    "competitive_update": {
+      "as_of": "2026-11-28",
+      "comparator_families": [
+        {
+          "name": "GNN graph rewiring for message propagation",
+          "doi": "10.24963/ijcai.2026/861",
+          "methods": [
+            "Delaunay/geometric augmentation",
+            "dynamic triangulation",
+            "spectral-gap/FOSR",
+            "expander-inspired rewiring",
+            "curvature/effective-resistance-ranked edits",
+            "spectrum-preserving sparsification",
+            "virtual-node/hub shortcuts",
+            "learned signal-guided edits"
+          ],
+          "claim_limit": "Communication/message-passing baseline only; does not establish capacity-feasible service restoration."
+        },
+        {
+          "name": "Resilience-based network design optimization under aleatory uncertainty",
+          "source": "https://www.sciencedirect.com/science/article/abs/pii/S0360835226006790",
+          "methods": [
+            "joint topology and integer link-capacity selection",
+            "repeated disruption and recover-mode dynamics",
+            "chance-constrained recovered-flow requirements",
+            "MILP probabilistic solution-discovery algorithm (PSDA)",
+            "genetic algorithm baseline"
+          ],
+          "reported_case_sizes": [
+            7,
+            13,
+            20,
+            74
+          ],
+          "admission_status": "secondary-source lead; reconcile exact objective, uncertainty model, constraints, artifacts and evaluation before claiming reproduction"
+        }
+      ],
+      "required_extension": [
+        "repeated and correlated disruptions with explicit recovery horizons",
+        "chance-constrained or distributionally robust recovered-service constraints",
+        "task-specific service and capacity metrics separate from spectral gap/diameter",
+        "joint topology and capacity actions when the environment permits capacity decisions",
+        "no-edit stationary control and charged maintenance/downtime costs"
+      ],
+      "key_differentiator": "Pareto improvement in recovered service, latency and resilience per reconfiguration/communication cost against the strongest applicable capacity-aware MILP/PSDA/GA and graph-rewiring baselines."
     }
   },
   "architecture_topology_layers": [
