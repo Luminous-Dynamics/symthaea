@@ -661,6 +661,7 @@ mod tests {
             challenge_nonce: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             verification_time: "2026-11-28T10:01:00Z",
             task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
             observation_bytes: &observation_bytes,
         };
         assert!(verify_and_consume(
@@ -690,6 +691,7 @@ mod tests {
             challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             verification_time: "2026-11-28T10:01:00Z",
             task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
             observation_bytes: &observation_bytes,
         };
         assert!(verify_and_consume(
@@ -729,6 +731,7 @@ mod tests {
             challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             verification_time: "2026-11-30T10:01:00Z",
             task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
             observation_bytes: &observation_bytes,
         };
         let ledger = ledger();
