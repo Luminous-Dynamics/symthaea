@@ -664,7 +664,10 @@ mod tests {
             claims[0].resolve(text),
             Some("Rust is a systems programming language")
         );
-        assert_eq!(claims[1].resolve(text), Some("Café is a useful UTF-8 test case"));
+        assert_eq!(
+            claims[1].resolve(text),
+            Some("Café is a useful UTF-8 test case")
+        );
     }
 
     #[test]
