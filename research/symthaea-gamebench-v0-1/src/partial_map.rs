@@ -495,13 +495,18 @@ mod tests {
     use super::*;
 
     fn fixture(max_actions: u32) -> ExploreSpec {
-        // P . . . # . G. The wall at x=4 is revealed by a paid scan.
+        // The direct middle corridor is blocked at (3,1), but a lower
+        // route remains available. The distant goal is not initially visible.
         ExploreSpec::new(
             7,
-            1,
-            vec![Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor, Cell::Wall, Cell::Floor, Cell::Goal],
-            Position::new(0, 0),
-            Position::new(6, 0),
+            3,
+            vec![
+                Cell::Wall, Cell::Wall, Cell::Wall, Cell::Wall, Cell::Wall, Cell::Wall, Cell::Wall,
+                Cell::Floor, Cell::Floor, Cell::Floor, Cell::Wall, Cell::Floor, Cell::Floor, Cell::Goal,
+                Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor, Cell::Floor,
+            ],
+            Position::new(0, 1),
+            Position::new(6, 1),
             max_actions,
             1,
             4,
@@ -513,10 +518,10 @@ mod tests {
     fn initial_observation_does_not_disclose_distant_wall_or_goal() {
         let game = ExploreGame::new(fixture(12));
         let observation = game.observe();
-        assert_eq!(observation.position, Position::new(0, 0));
-        assert_eq!(observation.visible_cells.len(), 2);
+        assert_eq!(observation.position, Position::new(0, 1));
+        assert_eq!(observation.visible_cells.len(), 4);
         assert!(!observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(4, 0) || cell.position == Position::new(6, 0)
+            cell.position == Position::new(3, 1) || cell.position == Position::new(6, 1)
         }));
     }
 
@@ -527,12 +532,12 @@ mod tests {
         assert!(transition.scanned);
         assert!(!transition.moved);
         assert_eq!(transition.state.elapsed_actions, 1);
-        assert_eq!(transition.observation.visible_cells.len(), 5);
+        assert_eq!(transition.observation.visible_cells.len(), 13);
         assert!(transition.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(4, 0) && cell.cell == Cell::Wall
+            cell.position == Position::new(3, 1) && cell.cell == Cell::Wall
         }));
         assert!(!transition.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(6, 0)
+            cell.position == Position::new(6, 1)
         }));
     }
 
@@ -541,7 +546,7 @@ mod tests {
         let mut game = ExploreGame::new(fixture(12));
         let scan = game.step(ExploreAction::Scan).expect("scan");
         assert!(scan.observation.visible_cells.iter().any(|cell| {
-            cell.position == Position::new(0, 0)
+            cell.position == Position::new(0, 1)
         }));
 
         game.step(ExploreAction::Move(Action::East)).expect("move to x=1");
@@ -562,7 +567,7 @@ mod tests {
             .step(ExploreAction::Move(Action::West))
             .expect("blocked border move is still a legal attempt");
         assert!(!transition.moved);
-        assert_eq!(transition.state.position, Position::new(0, 0));
+        assert_eq!(transition.state.position, Position::new(0, 1));
         assert_eq!(transition.state.elapsed_actions, 2);
         assert_eq!(transition.status, TerminalStatus::ActionLimit);
     }
