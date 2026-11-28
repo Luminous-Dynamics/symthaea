@@ -1,0 +1,819 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Design-based risk estimation for custodian-randomized stratified audits.
+//!
+//! This module composes a frozen candidate-prediction cohort with the
+//! first-/second-order inclusion design from stratified_audit.rs. For fixed
+//! acceptance sets it reports Horvitz-Thompson error totals and the standard
+//! unbiased SRSWOR variance estimator. Normal intervals are explicitly
+//! asymptotic pointwise intervals, not finite-sample or simultaneous guarantees.
+
+use super::selective_prediction::{RiskCoverageConfig, SelectivePredictionRecord};
+use super::stratified_audit::{StratifiedAuditPlan, STRATIFIED_AUDIT_DESIGN_VERSION};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+const NORMAL_95_Z: f64 = 1.959_963_984_540_054;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApproximateRiskInterval {
+    pub lower: f64,
+    pub upper: f64,
+    pub confidence_level: f64,
+    pub method: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StratumRiskEstimate {
+    pub stratum_id: String,
+    pub population_size: usize,
+    pub audit_sample_size: usize,
+    pub accepted_population_count: usize,
+    pub accepted_audit_count: usize,
+    pub observed_error_count: usize,
+    pub estimated_error_total: f64,
+    pub estimated_error_total_variance: Option<f64>,
+    pub sample_error_variance: Option<f64>,
+    pub variance_estimable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DesignBasedRiskEstimate {
+    pub acceptance_rule: String,
+    pub accepted_population_count: usize,
+    pub accepted_coverage: f64,
+    pub accepted_audit_count: usize,
+    pub estimated_error_total: f64,
+    /// HT estimated error total divided by the exact accepted count in the
+    /// frozen prediction cohort. Never clipped to [0, 1].
+    pub estimated_risk: Option<f64>,
+    pub estimated_risk_outside_unit_interval: bool,
+    pub estimated_error_total_variance: Option<f64>,
+    pub estimated_risk_variance: Option<f64>,
+    pub standard_error: Option<f64>,
+    /// Pointwise normal approximation only. Not finite-sample, anytime-valid
+    /// or simultaneous across operating points/strata.
+    pub approximate_normal_95_interval: Option<ApproximateRiskInterval>,
+    pub variance_estimable: bool,
+    pub variance_unavailable_strata: Vec<String>,
+    pub strata: Vec<StratumRiskEstimate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DesignBasedOperatingPoint {
+    pub target_coverage: f64,
+    pub achieved_coverage: f64,
+    pub confidence_cutoff: f64,
+    pub estimate: DesignBasedRiskEstimate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DesignBasedThresholdPoint {
+    pub confidence_threshold: f64,
+    pub estimate: DesignBasedRiskEstimate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DesignBasedCurvePoint {
+    pub confidence_cutoff: f64,
+    pub estimate: DesignBasedRiskEstimate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StratifiedRiskReport {
+    pub metric_version: String,
+    pub design_id: String,
+    pub population_size: usize,
+    pub audit_sample_size: usize,
+    pub audit_fraction: f64,
+    pub always_answer: DesignBasedRiskEstimate,
+    pub observed_model_policy: DesignBasedRiskEstimate,
+    pub operating_points: Vec<DesignBasedOperatingPoint>,
+    pub confidence_threshold_baselines: Vec<DesignBasedThresholdPoint>,
+    pub risk_coverage_curve: Vec<DesignBasedCurvePoint>,
+    /// Tie-aware item-wise point estimate. No AURC uncertainty is reported
+    /// because covariance across nested coverage prefixes is not yet included.
+    pub aurc: Option<f64>,
+    pub aurc_uncertainty_status: String,
+    pub interval_scope: String,
+    pub assumptions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StratifiedRiskError {
+    UnsupportedDesignVersion,
+    EmptyDesignIdentity,
+    InvalidPlan(String),
+    PredictionCountMismatch,
+    EmptyPredictionId,
+    DuplicatePredictionId(String),
+    UnknownPredictionId(String),
+    MissingPredictionId(String),
+    InvalidPredictionConfidence(String),
+    SelectedRecordMissingAdjudication(String),
+    NonSelectedRecordHasAdjudication(String),
+    NoAuditSample,
+}
+
+impl std::fmt::Display for StratifiedRiskError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedDesignVersion => write!(formatter, "unsupported stratified audit design version"),
+            Self::EmptyDesignIdentity => write!(formatter, "audit design identity or randomization manifest reference is empty"),
+            Self::InvalidPlan(message) => write!(formatter, "invalid stratified audit plan: {message}"),
+            Self::PredictionCountMismatch => write!(formatter, "prediction cohort size does not match the audit plan"),
+            Self::EmptyPredictionId => write!(formatter, "prediction record ID must not be empty"),
+            Self::DuplicatePredictionId(id) => write!(formatter, "duplicate prediction record ID: {id}"),
+            Self::UnknownPredictionId(id) => write!(formatter, "prediction record is not in audit plan: {id}"),
+            Self::MissingPredictionId(id) => write!(formatter, "audit-plan record has no candidate prediction: {id}"),
+            Self::InvalidPredictionConfidence(id) => write!(formatter, "prediction confidence is invalid for record: {id}"),
+            Self::SelectedRecordMissingAdjudication(id) => write!(formatter, "selected audit record has no independent adjudication: {id}"),
+            Self::NonSelectedRecordHasAdjudication(id) => write!(formatter, "non-selected record has an audit label: {id}"),
+            Self::NoAuditSample => write!(formatter, "audit plan contains no selected records"),
+        }
+    }
+}
+
+impl std::error::Error for StratifiedRiskError {}
+
+fn close_probability(left: f64, right: f64) -> bool {
+    (left - right).abs() <= 1e-12
+}
+
+fn validate_plan(plan: &StratifiedAuditPlan) -> Result<(), StratifiedRiskError> {
+    if plan.design_version != STRATIFIED_AUDIT_DESIGN_VERSION {
+        return Err(StratifiedRiskError::UnsupportedDesignVersion);
+    }
+    if plan.design_id.trim().is_empty() || plan.randomization_manifest_ref.trim().is_empty() {
+        return Err(StratifiedRiskError::EmptyDesignIdentity);
+    }
+    if plan.population_size == 0 || plan.selections.len() != plan.population_size {
+        return Err(StratifiedRiskError::InvalidPlan(
+            "selection list must contain every unit in the nonempty cohort".to_owned(),
+        ));
+    }
+
+    let mut stratum_by_id = HashMap::new();
+    let mut population_sum = 0usize;
+    let mut sample_sum = 0usize;
+    for stratum in &plan.strata {
+        if stratum.stratum_id.trim().is_empty()
+            || stratum.population_size == 0
+            || stratum.sample_size == 0
+            || stratum.sample_size > stratum.population_size
+            || stratum_by_id.insert(stratum.stratum_id.as_str(), stratum).is_some()
+        {
+            return Err(StratifiedRiskError::InvalidPlan(
+                "stratum IDs, population sizes, quotas or uniqueness are invalid".to_owned(),
+            ));
+        }
+        let pi = stratum.sample_size as f64 / stratum.population_size as f64;
+        let pi_pair = if stratum.sample_size < 2 || stratum.population_size < 2 {
+            0.0
+        } else {
+            stratum.sample_size as f64 * (stratum.sample_size - 1) as f64
+                / (stratum.population_size as f64 * (stratum.population_size - 1) as f64)
+        };
+        let variance_estimable = stratum.sample_size == stratum.population_size
+            || stratum.sample_size >= 2
+            || stratum.population_size == 1;
+        if !close_probability(pi, stratum.first_order_inclusion_probability)
+            || !close_probability(pi, stratum.sampling_fraction)
+            || !close_probability(pi_pair, stratum.distinct_pair_joint_inclusion_probability)
+            || variance_estimable != stratum.variance_estimable
+        {
+            return Err(StratifiedRiskError::InvalidPlan(format!(
+                "inclusion probabilities or variance support disagree for stratum {}",
+                stratum.stratum_id
+            )));
+        }
+        population_sum += stratum.population_size;
+        sample_sum += stratum.sample_size;
+    }
+
+    if population_sum != plan.population_size || sample_sum != plan.audit_sample_size {
+        return Err(StratifiedRiskError::InvalidPlan(
+            "stratum populations/quotas do not sum to plan totals".to_owned(),
+        ));
+    }
+
+    let mut unit_ids = HashSet::with_capacity(plan.selections.len());
+    let mut selected_by_stratum = BTreeMap::<String, usize>::new();
+    let mut population_by_stratum = BTreeMap::<String, usize>::new();
+    for selection in &plan.selections {
+        let Some(stratum) = stratum_by_id.get(selection.stratum_id.as_str()) else {
+            return Err(StratifiedRiskError::InvalidPlan(
+                "selection references an unknown stratum".to_owned(),
+            ));
+        };
+        if selection.record_id.trim().is_empty() || !unit_ids.insert(selection.record_id.as_str()) {
+            return Err(StratifiedRiskError::InvalidPlan(
+                "selection IDs must be nonempty and unique".to_owned(),
+            ));
+        }
+        if !close_probability(
+            selection.inclusion_probability,
+            stratum.first_order_inclusion_probability,
+        ) {
+            return Err(StratifiedRiskError::InvalidPlan(format!(
+                "unit inclusion probability disagrees for {}",
+                selection.record_id
+            )));
+        }
+        *population_by_stratum
+            .entry(selection.stratum_id.clone())
+            .or_default() += 1;
+        if selection.selected_for_adjudication {
+            *selected_by_stratum
+                .entry(selection.stratum_id.clone())
+                .or_default() += 1;
+        }
+    }
+    for (stratum_id, stratum) in stratum_by_id {
+        if population_by_stratum.get(stratum_id).copied().unwrap_or(0)
+            != stratum.population_size
+            || selected_by_stratum.get(stratum_id).copied().unwrap_or(0)
+                != stratum.sample_size
+        {
+            return Err(StratifiedRiskError::InvalidPlan(format!(
+                "selection counts disagree for stratum {stratum_id}"
+            )));
+        }
+    }
+    if plan.audit_sample_size == 0 {
+        return Err(StratifiedRiskError::NoAuditSample);
+    }
+    Ok(())
+}
+
+/// Estimate accepted-prediction risk on the complete frozen cohort using the
+/// custodian's stratified SRSWOR audit. The candidate prediction cohort must be
+/// frozen before sampling; only selected audit records may carry audit labels.
+///
+/// For each fixed acceptance set, x_i is 1 if the candidate answers and is
+/// wrong, otherwise 0. Within each stratum the HT total is N_h * mean_s(x).
+/// The usual SRSWOR variance estimate is used when n_h >= 2 or the stratum is
+/// a census. A one-unit non-census sample still yields a point estimate, but
+/// the overall variance/interval is withheld.
+pub fn evaluate_stratified_audit_risk(
+    predictions: &[SelectivePredictionRecord],
+    plan: &StratifiedAuditPlan,
+    config: &RiskCoverageConfig,
+) -> Result<StratifiedRiskReport, StratifiedRiskError> {
+    validate_plan(plan)?;
+    if predictions.len() != plan.population_size {
+        return Err(StratifiedRiskError::PredictionCountMismatch);
+    }
+
+    let mut prediction_by_id = HashMap::with_capacity(predictions.len());
+    for prediction in predictions {
+        if prediction.id.trim().is_empty() {
+            return Err(StratifiedRiskError::EmptyPredictionId);
+        }
+        if !prediction_by_id
+            .insert(prediction.id.as_str(), prediction)
+            .is_none()
+        {
+            return Err(StratifiedRiskError::DuplicatePredictionId(
+                prediction.id.clone(),
+            ));
+        }
+        if !prediction.predicted_confidence.is_finite()
+            || !(0.0..=1.0).contains(&prediction.predicted_confidence)
+        {
+            return Err(StratifiedRiskError::InvalidPredictionConfidence(
+                prediction.id.clone(),
+            ));
+        }
+    }
+
+    for prediction in predictions {
+        if !plan
+            .selections
+            .iter()
+            .any(|selection| selection.record_id == prediction.id)
+        {
+            return Err(StratifiedRiskError::UnknownPredictionId(
+                prediction.id.clone(),
+            ));
+        }
+    }
+    for selection in &plan.selections {
+        let Some(prediction) = prediction_by_id.get(selection.record_id.as_str()) else {
+            return Err(StratifiedRiskError::MissingPredictionId(
+                selection.record_id.clone(),
+            ));
+        };
+        if selection.selected_for_adjudication
+            && prediction.adjudicated_truth.is_none()
+        {
+            return Err(StratifiedRiskError::SelectedRecordMissingAdjudication(
+                selection.record_id.clone(),
+            ));
+        }
+        if !selection.selected_for_adjudication
+            && prediction.adjudicated_truth.is_some()
+        {
+            return Err(StratifiedRiskError::NonSelectedRecordHasAdjudication(
+                selection.record_id.clone(),
+            ));
+        }
+    }
+
+    let mut sorted: Vec<&SelectivePredictionRecord> = predictions.iter().collect();
+    sorted.sort_by(|left, right| {
+        right
+            .predicted_confidence
+            .total_cmp(&left.predicted_confidence)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    let all_ids: HashSet<&str> = sorted.iter().map(|row| row.id.as_str()).collect();
+    let always_answer = estimate_for_acceptance(
+        "always_answer",
+        &all_ids,
+        predictions,
+        plan,
+    );
+    let observed_ids: HashSet<&str> = sorted
+        .iter()
+        .filter(|row| !row.model_abstained)
+        .map(|row| row.id.as_str())
+        .collect();
+    let observed_model_policy = estimate_for_acceptance(
+        "observed_model_policy",
+        &observed_ids,
+        predictions,
+        plan,
+    );
+
+    let mut curve = Vec::new();
+    let mut index = 0usize;
+    let mut aurc_area = 0.0_f64;
+    let mut aurc_supported = true;
+    let total = sorted.len();
+    while index < total {
+        let cutoff = sorted[index].predicted_confidence;
+        let mut end = index;
+        while end < total && sorted[end].predicted_confidence == cutoff {
+            end += 1;
+        }
+        let accepted_ids: HashSet<&str> = sorted[..end].iter().map(|row| row.id.as_str()).collect();
+        let estimate = estimate_for_acceptance(
+            &format!("confidence_at_least_{cutoff:.17}"),
+            &accepted_ids,
+            predictions,
+            plan,
+        );
+        if let Some(risk) = estimate.estimated_risk {
+            let previous_end = index;
+            let group_size = end - index;
+            let previous_error_total = if let Some(previous) = curve.last() {
+                previous.estimate.estimated_error_total
+            } else {
+                0.0
+            };
+            let group_error_total = estimate.estimated_error_total - previous_error_total;
+            for rank in 1..=group_size {
+                let expected_error_total = previous_error_total
+                    + rank as f64 * group_error_total / group_size as f64;
+                let accepted_at_rank = previous_end + rank;
+                aurc_area += (expected_error_total / accepted_at_rank as f64) / total as f64;
+            }
+            let _ = risk;
+        } else {
+            aurc_supported = false;
+        }
+        curve.push(DesignBasedCurvePoint {
+            confidence_cutoff: cutoff,
+            estimate,
+        });
+        index = end;
+    }
+    let aurc = (aurc_supported && total > 0).then_some(aurc_area);
+
+    let mut operating_points = Vec::new();
+    let mut targets = config.target_coverages.clone();
+    targets.sort_by(f64::total_cmp);
+    for target in targets {
+        if !target.is_finite() || target <= 0.0 || target > 1.0 {
+            continue;
+        }
+        let required = (target * total as f64).ceil() as usize;
+        if let Some(point) = curve.iter().find(|point| {
+            point.estimate.accepted_population_count >= required
+        }) {
+            operating_points.push(DesignBasedOperatingPoint {
+                target_coverage: target,
+                achieved_coverage: point.estimate.accepted_coverage,
+                confidence_cutoff: point.confidence_cutoff,
+                estimate: point.estimate.clone(),
+            });
+        }
+    }
+
+    let mut thresholds = config.confidence_thresholds.clone();
+    thresholds.sort_by(f64::total_cmp);
+    let confidence_threshold_baselines = thresholds
+        .into_iter()
+        .filter(|threshold| threshold.is_finite() && (0.0..=1.0).contains(threshold))
+        .map(|threshold| {
+            let accepted_ids: HashSet<&str> = sorted
+                .iter()
+                .filter(|row| row.predicted_confidence >= threshold)
+                .map(|row| row.id.as_str())
+                .collect();
+            DesignBasedThresholdPoint {
+                confidence_threshold: threshold,
+                estimate: estimate_for_acceptance(
+                    &format!("confidence_threshold_{threshold:.17}"),
+                    &accepted_ids,
+                    predictions,
+                    plan,
+                ),
+            }
+        })
+        .collect();
+
+    Ok(StratifiedRiskReport {
+        metric_version: "symthaea-stratified-design-risk-v1".to_owned(),
+        design_id: plan.design_id.clone(),
+        population_size: plan.population_size,
+        audit_sample_size: plan.audit_sample_size,
+        audit_fraction: plan.audit_sample_size as f64 / plan.population_size as f64,
+        always_answer,
+        observed_model_policy,
+        operating_points,
+        confidence_threshold_baselines,
+        risk_coverage_curve: curve,
+        aurc,
+        aurc_uncertainty_status:
+            "Not estimated: nested confidence-prefix covariance and simultaneous uncertainty are not implemented"
+                .to_owned(),
+        interval_scope:
+            "Pointwise asymptotic normal approximation only; not finite-sample, anytime-valid or simultaneous"
+                .to_owned(),
+        assumptions: vec![
+            "The candidate prediction, confidence and abstention state for every cohort row is frozen before audit selection.".to_owned(),
+            "The audit plan is a valid stratified simple-random sample without replacement within each pre-label stratum.".to_owned(),
+            "Random priorities were generated independently and uniformly by an external custodian; the plan does not authenticate that process.".to_owned(),
+            "Every selected unit received an independent adjudication and nonselected units did not receive labels in this audit lane.".to_owned(),
+            "The strata and quotas were frozen before labels and are not selected using adjudication outcomes.".to_owned(),
+            "Normal intervals are approximate and pointwise; no multiple-comparison or finite-sample risk guarantee is asserted.".to_owned(),
+        ],
+    })
+}
+
+fn estimate_for_acceptance(
+    acceptance_rule: &str,
+    accepted_ids: &HashSet<&str>,
+    predictions: &[SelectivePredictionRecord],
+    plan: &StratifiedAuditPlan,
+) -> DesignBasedRiskEstimate {
+    let prediction_by_id: HashMap<&str, &SelectivePredictionRecord> = predictions
+        .iter()
+        .map(|prediction| (prediction.id.as_str(), prediction))
+        .collect();
+
+    let mut accepted_by_stratum = BTreeMap::<&str, usize>::new();
+    for selection in &plan.selections {
+        if accepted_ids.contains(selection.record_id.as_str()) {
+            *accepted_by_stratum
+                .entry(selection.stratum_id.as_str())
+                .or_default() += 1;
+        }
+    }
+
+    let mut accepted_audit_count = 0usize;
+    let mut estimated_error_total = 0.0_f64;
+    let mut estimated_variance_total = 0.0_f64;
+    let mut variance_estimable = true;
+    let mut variance_unavailable_strata = Vec::new();
+    let mut strata = Vec::with_capacity(plan.strata.len());
+
+    for stratum in &plan.strata {
+        let sample: Vec<&SelectivePredictionRecord> = plan
+            .selections
+            .iter()
+            .filter(|selection| {
+                selection.stratum_id == stratum.stratum_id
+                    && selection.selected_for_adjudication
+            })
+            .filter_map(|selection| prediction_by_id.get(selection.record_id.as_str()).copied())
+            .collect();
+        let n = stratum.sample_size;
+        let n_population = stratum.population_size;
+        let accepted_population_count = accepted_by_stratum
+            .get(stratum.stratum_id.as_str())
+            .copied()
+            .unwrap_or(0);
+        let accepted_sample: Vec<&SelectivePredictionRecord> = sample
+            .iter()
+            .copied()
+            .filter(|prediction| accepted_ids.contains(prediction.id.as_str()))
+            .collect();
+        let observed_error_count = accepted_sample
+            .iter()
+            .filter(|prediction| {
+                prediction.predicted_label != prediction.adjudicated_truth.unwrap()
+            })
+            .count();
+        let sample_sum = observed_error_count as f64;
+        let stratum_estimated_error = n_population as f64 * sample_sum / n as f64;
+        estimated_error_total += stratum_estimated_error;
+        accepted_audit_count += accepted_sample.len();
+
+        let sample_error_variance = if n_population == n {
+            Some(0.0)
+        } else if n >= 2 {
+            let sample_mean = sample_sum / n as f64;
+            let sum_squared = sample
+                .iter()
+                .map(|prediction| {
+                    let value = if accepted_ids.contains(prediction.id.as_str())
+                        && prediction.predicted_label != prediction.adjudicated_truth.unwrap()
+                    {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    (value - sample_mean).powi(2)
+                })
+                .sum::<f64>();
+            Some(sum_squared / (n - 1) as f64)
+        } else {
+            None
+        };
+
+        let stratum_variance = sample_error_variance.map(|sample_variance| {
+            (n_population as f64).powi(2)
+                * (1.0 - n as f64 / n_population as f64)
+                * sample_variance
+                / n as f64
+        });
+        if let Some(value) = stratum_variance {
+            estimated_variance_total += value;
+        } else {
+            variance_estimable = false;
+            variance_unavailable_strata.push(stratum.stratum_id.clone());
+        }
+
+        strata.push(StratumRiskEstimate {
+            stratum_id: stratum.stratum_id.clone(),
+            population_size: n_population,
+            audit_sample_size: n,
+            accepted_population_count,
+            accepted_audit_count: accepted_sample.len(),
+            observed_error_count,
+            estimated_error_total: stratum_estimated_error,
+            estimated_error_total_variance: stratum_variance,
+            sample_error_variance,
+            variance_estimable: stratum_variance.is_some(),
+        });
+    }
+
+    let accepted_population_count = accepted_by_stratum.values().sum::<usize>();
+    let estimated_risk = (accepted_population_count > 0)
+        .then_some(estimated_error_total / accepted_population_count as f64);
+    let estimated_error_total_variance = variance_estimable.then_some(estimated_variance_total);
+    let estimated_risk_variance = estimated_error_total_variance.and_then(|variance| {
+        (accepted_population_count > 0)
+            .then_some(variance / (accepted_population_count as f64).powi(2))
+    });
+    let standard_error = estimated_risk_variance.map(f64::sqrt);
+    let approximate_normal_95_interval = estimated_risk.zip(standard_error).map(|(risk, se)| {
+        ApproximateRiskInterval {
+            lower: risk - NORMAL_95_Z * se,
+            upper: risk + NORMAL_95_Z * se,
+            confidence_level: 0.95,
+            method: "pointwise normal approximation using unbiased stratified-SRSWOR variance".to_owned(),
+        }
+    });
+
+    DesignBasedRiskEstimate {
+        acceptance_rule: acceptance_rule.to_owned(),
+        accepted_population_count,
+        accepted_coverage: accepted_population_count as f64 / plan.population_size as f64,
+        accepted_audit_count,
+        estimated_error_total,
+        estimated_risk,
+        estimated_risk_outside_unit_interval: estimated_risk.is_some_and(|risk| {
+            !(0.0..=1.0).contains(&risk)
+        }),
+        estimated_error_total_variance,
+        estimated_risk_variance,
+        standard_error,
+        approximate_normal_95_interval,
+        variance_estimable,
+        variance_unavailable_strata,
+        strata,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::stratified_audit::{
+        build_stratified_random_audit_plan, AuditCandidate, AuditStratumQuota,
+    };
+
+    fn four_unit_plan() -> StratifiedAuditPlan {
+        let candidates = vec![
+            AuditCandidate { record_id: "a".to_owned(), stratum_id: "all".to_owned(), random_priority: 10 },
+            AuditCandidate { record_id: "b".to_owned(), stratum_id: "all".to_owned(), random_priority: 20 },
+            AuditCandidate { record_id: "c".to_owned(), stratum_id: "all".to_owned(), random_priority: 30 },
+            AuditCandidate { record_id: "d".to_owned(), stratum_id: "all".to_owned(), random_priority: 40 },
+        ];
+        let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
+        build_stratified_random_audit_plan(
+            &candidates,
+            &quotas,
+            "design-v1",
+            "custody://randomization/four",
+        )
+        .unwrap()
+    }
+
+    fn prediction(id: &str, confidence: f64, label: bool, truth: Option<bool>) -> SelectivePredictionRecord {
+        SelectivePredictionRecord {
+            id: id.to_owned(),
+            predicted_label: label,
+            predicted_confidence: confidence,
+            adjudicated_truth: truth,
+            model_abstained: false,
+            abstention_reason: None,
+            domain: Some("science".to_owned()),
+            source_family: Some("source-a".to_owned()),
+            delayed_or_censored: Some(false),
+            adjudicator: truth.map(|_| "independent-panel".to_owned()),
+        }
+    }
+
+    fn config() -> RiskCoverageConfig {
+        RiskCoverageConfig {
+            minimum_sample_size: 1,
+            target_coverages: vec![0.5, 0.8],
+            confidence_thresholds: vec![0.5, 0.9],
+            decision_costs: None,
+            include_stratified_reports: false,
+        }
+    }
+
+    #[test]
+    fn ht_risk_and_srswor_variance_match_known_hand_calculation() {
+        let plan = four_unit_plan();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        let estimate = report.always_answer;
+        assert_eq!(estimate.accepted_population_count, 4);
+        assert_eq!(estimate.accepted_audit_count, 2);
+        assert_eq!(estimate.estimated_error_total, 2.0);
+        assert_eq!(estimate.estimated_risk, Some(0.5));
+        assert_eq!(estimate.estimated_error_total_variance, Some(2.0));
+        assert_eq!(estimate.estimated_risk_variance, Some(0.125));
+        assert!(estimate.approximate_normal_95_interval.is_some());
+    }
+
+    #[test]
+    fn census_has_zero_design_variance() {
+        let candidates = vec![
+            AuditCandidate { record_id: "a".to_owned(), stratum_id: "all".to_owned(), random_priority: 10 },
+            AuditCandidate { record_id: "b".to_owned(), stratum_id: "all".to_owned(), random_priority: 20 },
+        ];
+        let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
+        let plan = build_stratified_random_audit_plan(
+            &candidates,
+            &quotas,
+            "census-v1",
+            "custody://randomization/census",
+        )
+        .unwrap();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+        ];
+        let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        assert_eq!(report.always_answer.estimated_risk, Some(0.5));
+        assert_eq!(report.always_answer.estimated_risk_variance, Some(0.0));
+        assert_eq!(report.always_answer.standard_error, Some(0.0));
+    }
+
+    #[test]
+    fn singleton_non_census_stratum_withholds_variance_not_point_estimate() {
+        let candidates = vec![
+            AuditCandidate { record_id: "a".to_owned(), stratum_id: "single".to_owned(), random_priority: 10 },
+            AuditCandidate { record_id: "b".to_owned(), stratum_id: "single".to_owned(), random_priority: 20 },
+        ];
+        let quotas = vec![AuditStratumQuota { stratum_id: "single".to_owned(), sample_size: 1 }];
+        let plan = build_stratified_random_audit_plan(
+            &candidates,
+            &quotas,
+            "singleton-v1",
+            "custody://randomization/singleton",
+        )
+        .unwrap();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, None),
+        ];
+        let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        assert_eq!(report.always_answer.estimated_risk, Some(1.0));
+        assert!(!report.always_answer.variance_estimable);
+        assert_eq!(report.always_answer.estimated_risk_variance, None);
+        assert_eq!(
+            report.always_answer.variance_unavailable_strata,
+            vec!["single".to_owned()]
+        );
+    }
+
+    #[test]
+    fn selected_audit_rows_must_be_adjudicated_and_nonselected_rows_pending() {
+        let plan = four_unit_plan();
+        let missing = vec![
+            prediction("a", 0.9, true, None),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        assert!(matches!(
+            evaluate_stratified_audit_risk(&missing, &plan, &config()),
+            Err(StratifiedRiskError::SelectedRecordMissingAdjudication(_))
+        ));
+
+        let leaked = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, Some(true)),
+            prediction("d", 0.2, true, None),
+        ];
+        assert!(matches!(
+            evaluate_stratified_audit_risk(&leaked, &plan, &config()),
+            Err(StratifiedRiskError::NonSelectedRecordHasAdjudication(_))
+        ));
+    }
+
+    #[test]
+    fn confidence_ties_are_atomic_and_aurc_is_order_invariant() {
+        let plan = four_unit_plan();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.9, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        let mut reversed = rows.clone();
+        reversed.reverse();
+        let first = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        let second = evaluate_stratified_audit_risk(&reversed, &plan, &config()).unwrap();
+        assert_eq!(first.aurc, second.aurc);
+        assert_eq!(first.operating_points[0].achieved_coverage, 0.5);
+        assert_eq!(first.operating_points[0].estimate.accepted_population_count, 2);
+    }
+
+    #[test]
+    fn invalid_prediction_cohort_size_and_duplicate_ids_fail_closed() {
+        let plan = four_unit_plan();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+        ];
+        assert_eq!(
+            evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap_err(),
+            StratifiedRiskError::PredictionCountMismatch
+        );
+
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("a", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        assert!(matches!(
+            evaluate_stratified_audit_risk(&rows, &plan, &config()),
+            Err(StratifiedRiskError::DuplicatePredictionId(_))
+        ));
+    }
+
+    #[test]
+    fn threshold_baselines_and_observed_policy_are_reported() {
+        let plan = four_unit_plan();
+        let mut rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        rows[1].model_abstained = true;
+        let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
+        assert_eq!(report.observed_model_policy.accepted_population_count, 3);
+        assert_eq!(report.confidence_threshold_baselines.len(), 2);
+        assert_eq!(report.confidence_threshold_baselines[0].estimate.accepted_population_count, 1);
+    }
+}
