@@ -217,6 +217,14 @@ The InteractionBench and Duplex-MPE data/code usage rights must be checked throu
 
 ## New research frontier — state-changing conversation and recovery (2026-11-28)
 
+### Expanded comparison set: action follow-through and streaming state
+
+- [DuplexAct paper](https://arxiv.org/abs/2610.17738) — eight dialogue actions, 24 action-condition pairs, and distinct immediate-execution/subsequent-follow-through evaluation. It reports 4,691 test instances, 2,531 from real recordings; its analysis shows immediate action success can substantially overstate sustained interactive competence.
+- [StreamEval paper](https://arxiv.org/abs/2610.28402) and [leaderboard](https://streameval.ai/) — 300 scripted interactive-streaming cases across 15–300 seconds, 37 evaluated models, and dimensions for task execution, state consistency, visual fidelity and A/V coordination. The best reported Following score in its avatar-performance subgroup is 36.90; this is a task-specific score, not a universal model score.
+- [Full-Duplex-Bench v3 code and data](https://github.com/DanielLin94144/Full-Duplex-Bench) — current benchmark family includes v1, v1.5, v2 and v3. The maintainers note that CANDOR v1 subsets moved to a gated BetterUp Hugging Face repository in November 2026; do not assume prior open access means present redistribution or training rights.
+
+The competitive layering is now explicit: DuplexAct evaluates conversational action execution and follow-through; StreamEval evaluates interactive generated-content request execution and consistency; CGRB adds an independently read external-state oracle, transactional side-effect lifecycle, interruption reconciliation and truthful completion claims. These are complementary boundaries and require separate matched experiments.
+
 A November 19, 2026 survey, *Evaluating Real-Time Voice Agents: A Survey from Component Quality to Grounded Outcomes* (arXiv:2609.30798v2), reports that only 13 of 91 evaluation works check external state or action traces, only 5 of 21 grounded-outcome benchmarks use real human speech, and only 2 of 26 multiparty benchmarks verify state. It proposes Timing–Recovery–Grounded (TRG) reporting, with a conditional multiparty dimension.
 
 This shifts the next competitive question from “did the avatar respond well?” to “did the authorized spoken action produce the intended external state, survive or recover correctly from interruption, and was completion reported only after independent observation?”
