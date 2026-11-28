@@ -23,10 +23,13 @@ pub use change_blindness::ChangeBlindnessBenchmark;
 pub use feeling_of_knowing::FeelingOfKnowingBenchmark;
 
 pub use selective_prediction_task::{
-    ClarificationTarget, SelectivePolicyDecision, SelectivePredictionActionReceipt,
-    SelectivePredictionBaseline, SelectivePredictionCostModel, SelectivePredictionEpisodeReceipt,
-    SelectivePredictionObservation, SelectivePredictionStage, SelectivePredictionTaskReport,
-    SyntheticSelectivePredictionItem, evaluate_policy_with,
+    ClarificationTarget, RuntimeConfidencePolicy, SelectivePolicyDecision,
+    SelectivePredictionActionReceipt, SelectivePredictionBaseline, SelectivePredictionCostModel,
+    SelectivePredictionEpisodeReceipt, SelectivePredictionObservation, SelectivePredictionStage,
+    SelectivePredictionTaskReport, SyntheticSelectivePredictionItem, evaluate_policy_with,
     run_reference_suite as run_selective_prediction_reference_suite, verify_report_integrity,
     verify_report_receipts, verify_report_with_policy,
 };
+
+#[cfg(feature = "symthaea-backend")]
+pub use selective_prediction_task::observation_with_symthaea_snapshot_confidence;
