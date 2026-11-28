@@ -41,6 +41,7 @@ pub enum KernelFamilyError {
     TotalFeatureBudgetExceeded,
     InputDimensionMismatch,
     TargetDimensionMismatch,
+    TargetExcludesConditionalNull,
     InvalidPairId,
     PairIdTooLong,
     DuplicatePairId,
@@ -260,6 +261,20 @@ impl KernelFamilyPortfolio {
             }
             if configuration.target.dimension() != expert_dimension {
                 return Err(KernelFamilyError::TargetDimensionMismatch);
+            }
+            // Under H0: Law(X|Z,F) = Law(Y|Z,F), the paired feature
+            // difference has conditional expectation zero. Every betting
+            // target must therefore contain the zero vector. Dimension-only
+            // validation is insufficient: a target excluding zero would
+            // systematically reject under the null while appearing valid.
+            if configuration
+                .target
+                .lower()
+                .iter()
+                .zip(configuration.target.upper())
+                .any(|(lower, upper)| *lower > 0.0 || *upper < 0.0)
+            {
+                return Err(KernelFamilyError::TargetExcludesConditionalNull);
             }
 
             match response_input_dimension {
@@ -964,6 +979,28 @@ mod tests {
             .observe_pair(1, "retry-me", &[0.0], &[0.0], &[1.0])
             .unwrap();
         assert_eq!(family.observations_seen(), 1);
+    }
+
+    #[test]
+    fn target_excluding_zero_is_rejected_before_any_monitor_is_created() {
+        let risk = risk_plan(vec![
+            RepresentationWeight {
+                member_id: "low-frequency".into(),
+                weight: weight(1, 2),
+            },
+            RepresentationWeight {
+                member_id: "high-frequency".into(),
+                weight: weight(1, 2),
+            },
+        ]);
+        let mut configs = two_expert_configs();
+        configs[0].target =
+            BoxTarget::new(vec![0.01; 4], vec![0.02; 4]).unwrap();
+
+        assert_eq!(
+            KernelFamilyPortfolio::new(&risk, SHA_1.into(), configs).err(),
+            Some(KernelFamilyError::TargetExcludesConditionalNull)
+        );
     }
 
     #[test]
