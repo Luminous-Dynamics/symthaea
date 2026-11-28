@@ -957,7 +957,6 @@ mod tests {
                     ("query_units", 0),
                     ("experiment_units", 2),
                     ("review_minutes", 0),
-                ],
             )],
         );
         let decision = decide(&input).unwrap();
