@@ -1030,6 +1030,52 @@ mod tests {
     }
 
     #[test]
+    fn reference_policy_reports_cost_units_for_both_layouts() {
+        let depot = ScenarioManifest { seed: 42, ..ScenarioManifest::default() };
+        let outpost = ScenarioManifest { seed: 43, ..ScenarioManifest::default() };
+        let depot_run = run_reference_policy(&depot, false).expect("depot baseline");
+        let outpost_run = run_reference_policy(&outpost, false).expect("outpost baseline");
+
+        assert_eq!(depot_run.score.resource_cost_units, 10);
+        assert_eq!(outpost_run.score.resource_cost_units, 12);
+        assert!((depot_run.score.goal_completion_per_cost_unit - 0.1).abs() < 1e-12);
+        assert!((outpost_run.score.goal_completion_per_cost_unit - (1.0 / 12.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn invalid_actions_pay_the_configured_surcharge() {
+        let manifest = ScenarioManifest::default();
+        let commands = vec![RecordedCommand::Agent(Action::Deliver)];
+        let run = evaluate_trace(&manifest, &commands).expect("invalid attempt trace");
+        assert_eq!(run.score.invalid_actions, 1);
+        assert_eq!(
+            run.score.resource_cost_units,
+            manifest.cost_model.interaction as u64
+                + manifest.cost_model.invalid_action_surcharge as u64
+        );
+        assert_eq!(run.score.goal_completion_per_cost_unit, 0.0);
+    }
+
+    #[test]
+    fn manifest_cost_model_is_digest_bound_and_changes_scores() {
+        let default_manifest = ScenarioManifest::default();
+        let expensive_inspection = ScenarioManifest {
+            cost_model: CostModel { inspect: 5, ..CostModel::default() },
+            ..ScenarioManifest::default()
+        };
+        assert_ne!(
+            default_manifest.digest().expect("default digest"),
+            expensive_inspection.digest().expect("modified digest")
+        );
+        let default_run =
+            run_reference_policy(&default_manifest, false).expect("default costs");
+        let expensive_run =
+            run_reference_policy(&expensive_inspection, false).expect("expensive inspect");
+        assert_eq!(default_run.score.resource_cost_units, 10);
+        assert_eq!(expensive_run.score.resource_cost_units, 16);
+    }
+
+    #[test]
     fn reference_policy_recovers_after_an_evaluator_intervention() {
         let manifest = ScenarioManifest::default();
         let run = run_reference_policy(&manifest, true).expect("recovery policy");
