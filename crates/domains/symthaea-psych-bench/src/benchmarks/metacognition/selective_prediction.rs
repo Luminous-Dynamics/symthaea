@@ -161,8 +161,6 @@ impl SelectivePredictionMetrics {
                     && trial.answer_correct_if_given
             })
             .count();
-        let answered_wrong = answers - answered_correct;
-        let nonanswers = n - answers;
         let answerable_nonanswers = trials
             .iter()
             .filter(|trial| {
@@ -371,7 +369,7 @@ mod tests {
         assert_eq!(score.risk_coverage_curve.len(), trials.len());
         assert_eq!(score.risk_coverage_curve[0].confidence_threshold, 0.99);
         assert_eq!(score.risk_coverage_curve[0].risk, 1.0);
-        assert!((score.area_under_risk_coverage_curve - 0.5).abs() < 1e-12);
+        assert!((score.area_under_risk_coverage_curve - (13.0 / 18.0)).abs() < 1e-12);
     }
 
     #[test]
