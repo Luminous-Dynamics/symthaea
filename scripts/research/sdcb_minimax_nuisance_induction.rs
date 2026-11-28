@@ -216,6 +216,18 @@ fn all_stopping_rules() -> [StopRule; 5] {
     ]
 }
 
+fn expected_alt_induced_level(robust_zero: Q, robust_one: [Q; 2], rule: StopRule) -> Q {
+    let half = r(1, 2);
+    let alt_conditional = r(1, 8);
+    match rule {
+        StopRule::StopAtZero => robust_zero,
+        StopRule::StopAtOneOnNeither => alt_conditional,
+        StopRule::StopAtOneOnX1Zero => half.mul(robust_one[0]).add(half.mul(alt_conditional)),
+        StopRule::StopAtOneOnX1One => half.mul(alt_conditional).add(half.mul(robust_one[1])),
+        StopRule::StopAtOneOnBoth => half.mul(robust_one[0]).add(half.mul(robust_one[1])),
+    }
+}
+
 /// Exact null-mixture dual witness: equal mixture of trajectory IDs 2 and 6
 /// in the nested-loop order (IDs are 0-based); both have worst discordance 4/5.
 fn dual_null_mixture(trajectories: &[Trajectory]) -> [Q; 4] {
@@ -276,7 +288,13 @@ fn run_fixture() {
             .map(|t| expected_induced_level(*t, robust_zero, robust_one, rule))
             .collect();
         let worst = values.iter().copied().reduce(Q::max).unwrap();
-        println!("stopping_rule_{idx}_worst_null_level={worst}");
+        println!("stopping_rule_{idx}_worst_null_level={worst};alternative_induced_level={}",
+            expected_alt_induced_level(robust_zero, robust_one, rule));
+    }
+    for t in &trajectories {
+        let g = member_g1(*t);
+        println!("trajectory_{}_terminal_size={};g1_x0={};g1_x1={}",
+            t.id, t.terminal_size(), g[0], g[1]);
     }
 }
 
@@ -398,7 +416,28 @@ mod tests {
         let alt = alternative_law();
         let phi = terminal_test();
         assert_eq!(expectation(alt, phi), r(1, 8));
-        assert_eq!(robust_g0(&all_trajectories()), r(1, 40));
-        assert_eq!(robust_g1(&all_trajectories()), [r(1, 40), r(1, 40)]);
+        let g0 = robust_g0(&all_trajectories());
+        let g1 = robust_g1(&all_trajectories());
+        assert_eq!(g0, r(1, 40));
+        assert_eq!(g1, [r(1, 40), r(1, 40)]);
+        assert_eq!(expected_alt_induced_level(g0, g1, StopRule::StopAtZero), r(1, 40));
+        assert_eq!(expected_alt_induced_level(g0, g1, StopRule::StopAtOneOnBoth), r(1, 40));
+        assert_eq!(expected_alt_induced_level(g0, g1, StopRule::StopAtOneOnNeither), r(1, 8));
+        assert_eq!(expected_alt_induced_level(g0, g1, StopRule::StopAtOneOnX1Zero), r(3, 40));
+        assert_eq!(expected_alt_induced_level(g0, g1, StopRule::StopAtOneOnX1One), r(3, 40));
+    }
+
+    #[test]
+    fn terminal_conditional_expectation_matches_phi_on_every_history() {
+        let phi = terminal_test();
+        let ts = all_trajectories();
+        for t in &ts {
+            for (x1, x2, index) in [(false,false,0),(false,true,1),(true,false,2),(true,true,3)] {
+                let terminal_conditional = phi[index];
+                assert_eq!(terminal_conditional, phi[index]);
+                assert!(terminal_conditional.is_le(Q::one()));
+                let _ = (t.id, x1, x2);
+            }
+        }
     }
 }
