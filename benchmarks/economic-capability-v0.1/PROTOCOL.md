@@ -37,6 +37,7 @@ The benchmark composes existing owners. It must not make a new canonical source 
 | Concern | Canonical work to consume |
 |---|---|
 | Task integrity, benchmark custody and engineering-agent evaluation | Symthaea CEB [#10115](https://github.com/Luminous-Dynamics/symthaea/pull/10115), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419) |
+| IT operations, incident recovery and operator capability dividend/debt | Mycelix [ITOPS-CAP #6846](https://github.com/Luminous-Dynamics/mycelix/issues/6846), under [CIV-IMPACT #5046](https://github.com/Luminous-Dynamics/mycelix/issues/5046); candidate synthetic pilot [Mycelix PR #6849](https://github.com/Luminous-Dynamics/mycelix/pull/6849) |
 | Manufacturing output and economics | Symthaea [MFG-VALUE #7608](https://github.com/Luminous-Dynamics/symthaea/issues/7608) |
 | Accepted productive work per robot-hour | Symthaea [ROB-OPERATIONAL-UTILITY #11607](https://github.com/Luminous-Dynamics/symthaea/issues/11607) |
 | Agricultural service economics | Symtropy [AGRI-ROBOT-COST #1814](https://github.com/Luminous-Dynamics/symtropy/issues/1814) and Symthaea [AGRI platform kernel #7817](https://github.com/Luminous-Dynamics/symthaea/pull/7817) |
@@ -172,6 +173,8 @@ Any occupation-level task-hour projection must expose its underlying task mappin
 Start with two digital and one bounded physical cohort. Add others only after the measurement contract is stable.
 
 ### A. Digital IT operations
+
+The first synthetic incident-to-restoration pilot is owned under Mycelix ITOPS-CAP-001 #6846; see [pilot blueprint PR #6849](https://github.com/Luminous-Dynamics/mycelix/pull/6849). This cross-domain protocol measures economics and composition; it does not replace ITOPS-CAP's task, authority, action, or outcome contracts.
 
 `incident intake -> evidence retrieval -> diagnosis -> proposed remediation -> authorized change -> independent service-restoration check -> incident record`
 
