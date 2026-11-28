@@ -128,7 +128,8 @@ impl HiddenMechanicsGame {
             position: self.state.position,
             north_gate_open: self.state.north_gate_open,
             east_gate_open: self.state.east_gate_open,
-            switch_available: !self.state.switch_used,
+            switch_available: !self.state.switch_used
+                && self.state.position == Position::new(1, 1),
             remaining_actions: self.max_actions - self.state.elapsed_actions,
         }
     }
@@ -145,7 +146,8 @@ impl HiddenMechanicsGame {
         let mut rule_intervened = false;
 
         match action {
-            HiddenAction::UseSwitch if !self.state.switch_used => {
+            HiddenAction::UseSwitch
+                if !self.state.switch_used && self.state.position == Position::new(1, 1) => {
                 match self.hidden_effect {
                     SwitchEffect::OpenNorthGate => self.state.north_gate_open = true,
                     SwitchEffect::OpenEastGate => self.state.east_gate_open = true,
