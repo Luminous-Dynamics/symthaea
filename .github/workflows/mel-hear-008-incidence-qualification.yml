@@ -1,0 +1,85 @@
+name: MEL HEAR-008 estimand and incidence replay
+
+on:
+  push:
+    branches:
+      - research/mel-hear-008-estimand-support-v0-20261128
+    paths:
+      - "research/mel-hear-008/**"
+      - "tools/mel-hear-008-qualifier/**"
+      - "docs/research/MEL-HEAR-008-ESTIMANDS-AND-INCIDENCE-SUPPORT-V0.md"
+      - ".github/workflows/mel-hear-008-incidence-qualification.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/mel-crossed-performer-work-inference-v0-20261127
+    paths:
+      - "research/mel-hear-008/**"
+      - "tools/mel-hear-008-qualifier/**"
+      - "docs/research/MEL-HEAR-008-ESTIMANDS-AND-INCIDENCE-SUPPORT-V0.md"
+      - ".github/workflows/mel-hear-008-incidence-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head incidence and estimand qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head or pushed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact tested source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'tested_head=%s\n' "$actual"
+
+      - name: Install pinned Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify canonical formatting
+        run: cargo +1.96.0 fmt --manifest-path tools/mel-hear-008-qualifier/Cargo.toml --check
+
+      - name: Verify committed lock and workspace resolution
+        run: cargo +1.96.0 metadata --locked --manifest-path tools/mel-hear-008-qualifier/Cargo.toml --no-deps --format-version 1
+
+      - name: Run exact-source tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-hear-008-qualifier/Cargo.toml
+
+      - name: Warnings-denied Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path tools/mel-hear-008-qualifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Replay retained incidence and estimand fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path tools/mel-hear-008-qualifier/Cargo.toml -- research/mel-hear-008/incidence-panel-v0.json > "$RUNNER_TEMP/incidence-report.json"
+          jq -e '
+            .schema == "mel-hear-008-incidence-replay-v0"
+            and (.fixture_sha256 | test("^[a-f0-9]{64}$"))
+            and .report.work_count == 3
+            and .report.performer_count == 3
+            and .report.potential_cells == 9
+            and .report.observed_cells == 7
+            and .report.missing_cells == 2
+            and .report.complete_cartesian_support == false
+            and .report.connected_components == 1
+            and ([.report.estimands[] | select(.estimand_id == "observed-cell-v0") | .point_estimate][0] > 0.57142857142856)
+            and ([.report.estimands[] | select(.estimand_id == "observed-cell-v0") | .point_estimate][0] < 0.57142857142859)
+            and ([.report.estimands[] | select(.estimand_id == "equal-work-v0") | .point_estimate][0] > 0.55555555555554)
+            and ([.report.estimands[] | select(.estimand_id == "equal-work-v0") | .point_estimate][0] < 0.55555555555557)
+            and ([.report.estimands[] | select(.estimand_id == "equal-performer-v0") | .point_estimate][0] > 0.61111111111110)
+            and ([.report.estimands[] | select(.estimand_id == "equal-performer-v0") | .point_estimate][0] < 0.61111111111113)
+            and ([.report.estimands[] | select(.estimand_id == "full-crossed-target-v0") | .point_estimate][0] == null)
+            and ([.report.estimands[] | select(.estimand_id == "full-crossed-target-v0") | .missing_target_cells | length][0] == 2)
+          ' "$RUNNER_TEMP/incidence-report.json"
