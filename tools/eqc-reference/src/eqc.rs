@@ -539,7 +539,9 @@ fn validate_synthetic_input(task: &Task, input: &InputRef, bytes: &[u8]) -> anyh
     })?;
 
     match input.input_id.as_str() {
-        "synthetic-consent-001" | "synthetic-consent-revoked-001" => {
+        "synthetic-consent-001"
+        | "synthetic-consent-revoked-001"
+        | "synthetic-consent-expired-001" => {
             if json_string(&artifact, "schema", task, input)?
                 != "luminous.eqc.synthetic-consent.v0.1"
                 || json_string(&artifact, "consent_id", task, input)? != input.input_id
@@ -776,8 +778,8 @@ mod tests {
         let report =
             validate_corpus_file(&root.join("docs/research/eqc-seed-corpus-v0.1.json"), &root)
                 .expect("seed validates");
-        assert_eq!(report.task_count, 4);
-        assert_eq!(report.reference_pass_count, 4);
+        assert_eq!(report.task_count, 7);
+        assert_eq!(report.reference_pass_count, 7);
         assert!(report.no_op_fails_positive_controls);
         assert!(report.allow_all_fails_negative_controls);
         assert!(report.task_schema_validated);
@@ -866,7 +868,7 @@ mod tests {
             .should_validate_formats(true)
             .build(&schema)
             .expect("task schema compiles offline");
-        assert_eq!(tasks.len(), 4);
+        assert_eq!(tasks.len(), 7);
         for (index, task) in tasks.iter().enumerate() {
             assert!(
                 validator.is_valid(task),
@@ -982,6 +984,27 @@ mod tests {
         receipt["verifier"]["independent"] = Value::Bool(false);
         receipt["verifier"]["replay"] = Value::String("not_run".to_owned());
         assert!(validator.is_valid(&receipt));
+    }
+
+    #[test]
+    fn expanded_seed_expiry_scope_and_principal_controls_fail_closed() {
+        let corpus = seed_corpus();
+        for task_id in [
+            "eqc-health-expired-consent-deny-001",
+            "eqc-health-read-with-write-only-scope-deny-001",
+            "eqc-health-wrong-principal-deny-001",
+        ] {
+            let task = corpus
+                .tasks
+                .iter()
+                .find(|task| task.task_id == task_id)
+                .unwrap_or_else(|| panic!("missing public seed task {task_id}"));
+            assert_eq!(
+                reference_disposition(task),
+                "deny",
+                "{task_id} must fail closed in the reference policy"
+            );
+        }
     }
 
     #[test]
@@ -1107,7 +1130,7 @@ mod tests {
         let encoded = serde_json::to_vec(&report).expect("report serializes");
         let decoded: serde_json::Value =
             serde_json::from_slice(&encoded).expect("report JSON parses");
-        assert_eq!(decoded["task_count"], 4);
+        assert_eq!(decoded["task_count"], 7);
         assert!(decoded.get("qualified").is_none());
     }
 }
