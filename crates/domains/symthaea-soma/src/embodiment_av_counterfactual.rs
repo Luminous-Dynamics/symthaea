@@ -24,7 +24,7 @@ pub enum AvTaskFamily {
     TemporalAlignment,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AvConditionType {
     AvPositive,
@@ -283,7 +283,7 @@ fn verify_condition(
             if condition.annotated_visual_cue.is_some() {
                 return Err(AvCounterfactualError::UnexpectedVisualCueAnnotation);
             }
-            if condition.model_visible_payloads != [AvPayload::Audio] {
+            if condition.model_visible_payloads.as_slice() != &[AvPayload::Audio] {
                 return Err(AvCounterfactualError::PayloadVisibilityMismatch);
             }
         }
@@ -297,7 +297,7 @@ fn verify_condition(
                 .ok_or(AvCounterfactualError::MissingVideoDigest)?;
             validate_digest(digest)?;
             verify_timing_profile(item, condition)?;
-            if condition.model_visible_payloads != [AvPayload::Video] {
+            if condition.model_visible_payloads.as_slice() != &[AvPayload::Video] {
                 return Err(AvCounterfactualError::PayloadVisibilityMismatch);
             }
         }
@@ -319,7 +319,7 @@ fn verify_condition(
                 .ok_or(AvCounterfactualError::MissingVideoDigest)?;
             validate_digest(video)?;
             verify_timing_profile(item, condition)?;
-            if condition.model_visible_payloads != [AvPayload::Audio, AvPayload::Video] {
+            if condition.model_visible_payloads.as_slice() != &[AvPayload::Audio, AvPayload::Video] {
                 return Err(AvCounterfactualError::PayloadVisibilityMismatch);
             }
             match condition.condition_type {
@@ -513,8 +513,8 @@ pub fn evaluate_av_counterfactual_item(
     Ok(AvGroundingItemMetrics {
         av_positive_correct,
         audio_only_correct,
-        visual_causal_contribution_item: i8::from(av_positive_correct)
-            - i8::from(audio_only_correct),
+        visual_causal_contribution_item: (if av_positive_correct { 1 } else { 0 })
+            - (if audio_only_correct { 1 } else { 0 }),
         counterfactual_sensitive_and_correct,
         irrelevant_visual_invariant_and_correct,
         temporal_shuffle_rejected,
