@@ -41,6 +41,8 @@ use super::{
 /// The 48 MiB cap leaves room for JSON framing without accepting unbounded
 /// bodies. Deployments may lower this limit; they must not silently truncate.
 pub const DEFAULT_MAX_JSON_BODY_BYTES: usize = 48 * 1024 * 1024;
+/// Operator overrides remain bounded even when supplied through environment.
+pub const MAX_CONFIGURABLE_JSON_BODY_BYTES: usize = 64 * 1024 * 1024;
 
 /// These schemes are mutually exclusive. PublicSmoke is explicit and must
 /// never be selected for a production deployment.
@@ -128,7 +130,7 @@ impl AmlHttpConfigV1 {
         auth: ApiAuthV1,
         max_json_body_bytes: usize,
     ) -> Result<Self, HttpConfigErrorV1> {
-        if max_json_body_bytes < 1024 {
+        if !(1024..=MAX_CONFIGURABLE_JSON_BODY_BYTES).contains(&max_json_body_bytes) {
             return Err(HttpConfigErrorV1::InvalidBodyLimit);
         }
         Ok(Self {
@@ -674,6 +676,25 @@ mod tests {
         );
         let response = SearchResponse { data: Vec::new() };
         assert_eq!(search_response_json(response), json!({"data":[]}));
+    }
+
+    #[test]
+    fn body_limit_override_has_a_hard_upper_bound() {
+        assert!(AmlHttpConfigV1::with_body_limit(
+            Track::Coding,
+            ApiAuthV1::public_smoke(),
+            1023,
+        ).is_err());
+        assert!(AmlHttpConfigV1::with_body_limit(
+            Track::Coding,
+            ApiAuthV1::public_smoke(),
+            MAX_CONFIGURABLE_JSON_BODY_BYTES,
+        ).is_ok());
+        assert!(AmlHttpConfigV1::with_body_limit(
+            Track::Coding,
+            ApiAuthV1::public_smoke(),
+            MAX_CONFIGURABLE_JSON_BODY_BYTES + 1,
+        ).is_err());
     }
 
     #[test]
