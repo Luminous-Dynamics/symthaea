@@ -229,6 +229,61 @@ Compare the same base model and tools with/without the Symthaea orchestration, d
 
 No LLM judge should be the sole oracle for application state, accounting arithmetic, physical inspection or solver convergence. Use deterministic application postconditions or independent domain-specific adjudication wherever such a reference is available.
 
+## 10b. Attribute capability gains to the architecture, not the harness
+
+A comparison between a base model and a composed Luminous workflow is not a causal estimate of the contribution of Symthaea unless the foundation model, task, tools, permissions, budgets, task oracle and evaluation procedure are controlled.
+
+### Matched arms
+
+For each eligible task and fixed model release, use the following arms where the task requires the component:
+
+| Arm | Configuration | Question answered |
+|---|---|---|
+| A0 | Base model + same permitted tools, no Symthaea-specific durable state/orchestration | Matched starting point |
+| A1 | A0 + durable task/event ledger | Does explicit state continuity improve long-horizon execution/recovery? |
+| A2 | A0 + source/temporal reconciliation | Does evidence provenance, revision and conflict handling improve decisions? |
+| A3 | A0 + planning / decision-sensitive information gathering (EVSI) | Does better action-vs-inspection selection improve outcome or cost? |
+| A4 | A0 + independent postcondition/claim verifier | Does independent acceptance reduce false completion? |
+| A5 | Full Symthaea composition of A1–A4 | What is the total system contribution and interaction? |
+| A6 | A5 with one component removed at a time | Which components are necessary or redundant in the full composition? |
+
+Do not include an arm whose tool or permission semantics differ in a way that changes the task. Mark it NotComparable and explain. Where A1–A4 are combined into a factorial design, freeze the factor definitions and test interactions rather than assuming the component effects add linearly.
+
+### Constants and recorded differences
+
+Hold constant, where technically possible:
+- exact foundation model/provider snapshot, system prompt, decoding settings and safety profile;
+- task text, source bytes, evidence frontier, scenario/asset identity and task revision;
+- tool inventory, schemas, response contents, authorization/capability set and side-effect simulator;
+- wall-clock, action, retry, token, context and cost ceilings;
+- operator instructions, training, available runbooks and acceptance oracle;
+- evaluator/grader build, task seed and starting environment state.
+
+Record unavoidable differences rather than concealing them. Symthaea's extra retrieval, verifier or state-store operations count toward its time, tool, compute and economic cost. A higher budget is not a matched architecture win.
+
+### Design and analysis
+
+- Randomize treatment order within task/seed blocks; use the same frozen task inputs and paired seeds where determinism allows.
+- Use scenario-family holdouts. Never split near-duplicate incidents, source families, assets or repeated episodes across development and confirmatory sets.
+- Report intention-to-treat results: failures, timeouts, unsupported cases, abstentions, escalations, missing evidence and unexecuted tasks remain in the assigned denominator.
+- Use paired effect estimates for matched cases and cluster uncertainty at the independent scenario-family level (plus site/team where relevant). Repeated model seeds estimate run variability; they do not create new independent incident families.
+- Determine confirmatory sample size from a blinded pilot estimate of variance, within-family correlation, baseline rate and the preregistered minimum worthwhile effect. Do not infer adequate power from a large number of repeated runs on only three scenario templates.
+- Publish per-family and pooled outcomes, confidence intervals, cost distribution, subgroup failures and complete task disposition counts. Keep binary completion, partial quality and safe-hold dispositions separate.
+- Pre-register the primary endpoint, non-inferiority margins, multiplicity handling, exclusions, cost boundary and stopping rules before opening confirmatory outputs.
+
+### Primary and secondary outcomes
+
+Select exactly one primary endpoint per pilot:
+- cost per independently accepted work unit; or
+- independently accepted output per available labour/robot hour; or
+- time to independently verified terminal state, provided quality and safety are non-inferior.
+
+Keep secondary outcomes separate: first-pass acceptance, false acceptance, false rejection, unsafe/unauthorized effects, false remediation, timeouts, human intervention/rescue, recovery success, compute/energy/capital cost and capability retention. Do not combine them into a weighted score that allows a safety regression to be compensated by throughput.
+
+### Architecture contribution claim
+
+A positive A5-vs-A0 result supports an incremental system contribution only for the exact task families, model, tools, permissions, resource limits, site and evaluator revision tested. Component claims require the corresponding A1–A4 and A6 contrasts. Generalization to other models, domains, countries or physical embodiments requires separate transfer evidence.
+
 ## 11. Qualification ladder
 
 - **E0 — Contract integrity:** schemas, task identity, metric boundaries, comparator and oracle are structurally coherent.
