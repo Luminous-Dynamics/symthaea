@@ -83,7 +83,7 @@ fn expert(
         )?,
         covariate_map: FourierFeatureMap::new(
             1,
-            vec![vec![0.0]],
+            vec![vec![0.5]],
             covariate_map_sha.into(),
         )?,
         target: BoxTarget::new(vec![-0.005; 4], vec![0.005; 4])?,
@@ -147,12 +147,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut shifted_family = new_family()?;
     for sequence in 1..=200u64 {
+        let (covariate, x, y) = if sequence % 2 == 0 {
+            (std::f64::consts::PI, std::f64::consts::TAU, 0.0)
+        } else {
+            (0.0, 0.0, std::f64::consts::TAU)
+        };
         let update = shifted_family.observe_pair(
             sequence,
             &format!("scale-shift-{sequence}"),
-            &[0.0],
-            &[0.0],
-            &[std::f64::consts::TAU],
+            &[covariate],
+            &[x],
+            &[y],
         )?;
         emit("low_frequency_null_space_high_frequency_shift", &update);
         if update.quarantined {
