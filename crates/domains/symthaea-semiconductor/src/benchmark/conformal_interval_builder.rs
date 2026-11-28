@@ -490,6 +490,241 @@ pub fn build_conformal_interval_v1(
     Ok(receipt)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BoundedConformalScoreKindV1 {
+    BoundedAbsoluteResidual,
+    BoundedScaleNormalizedAbsoluteResidual,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BoundedPredictionSetKindV1 {
+    KnownEmpty,
+    Nontrivial,
+    KnownFull,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BoundedConformalScoreContractV1 {
+    pub schema: String,
+    pub contract_id: String,
+    pub revision: u64,
+    pub score_kind: BoundedConformalScoreKindV1,
+    pub score_bound_b: f64,
+    pub scale_floor: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BoundedPredictionSetInputV1 {
+    pub schema: String,
+    pub prediction_id: String,
+    pub sample_id: String,
+    pub measurement_event_id: String,
+    pub round_index: u64,
+    pub global_model_artifact_sha256: String,
+    pub point_prediction: f64,
+    pub prediction_scale: f64,
+    pub threshold: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BoundedPredictionSetReceiptV1 {
+    pub schema: String,
+    pub prediction_id: String,
+    pub sample_id: String,
+    pub measurement_event_id: String,
+    pub round_index: u64,
+    pub global_model_artifact_sha256: String,
+    pub score_contract_sha256: String,
+    pub score_kind: BoundedConformalScoreKindV1,
+    pub score_bound_b: f64,
+    pub point_prediction: f64,
+    pub prediction_scale: f64,
+    pub threshold_used: f64,
+    pub prediction_set_kind: BoundedPredictionSetKindV1,
+    pub lower_bound: Option<f64>,
+    pub upper_bound: Option<f64>,
+    pub receipt_sha256: String,
+}
+
+/// Hashes the bounded score definition independently from the online policy,
+/// calibration window or current threshold.
+pub fn bounded_conformal_score_contract_sha256_v1(
+    contract: &BoundedConformalScoreContractV1,
+) -> Result<String, ConformalSetBuilderErrorV1> {
+    if contract.schema != "luminous.semi-bench.bounded-score-contract.v1"
+        || contract.revision == 0
+        || contract.contract_id.trim().is_empty()
+        || !contract.score_bound_b.is_finite()
+        || contract.score_bound_b <= 0.0
+        || !contract.scale_floor.is_finite()
+        || contract.scale_floor <= 0.0
+    {
+        return Err(ConformalSetBuilderErrorV1(
+            "bounded score contract is invalid".into(),
+        ));
+    }
+    json_sha256(contract)
+}
+
+/// Constructs C_t={y:S_t(x,y)<=r_t} for a bounded absolute-residual score.
+///
+/// For r<0 the set is empty; for 0<=r<B it is an interval; for r>=B it is
+/// the full outcome space. The receipt binds the exact score-contract digest,
+/// threshold and resulting set bounds used at this prediction.
+pub fn build_bounded_score_prediction_set_v1(
+    contract: &BoundedConformalScoreContractV1,
+    input: &BoundedPredictionSetInputV1,
+) -> Result<BoundedPredictionSetReceiptV1, ConformalSetBuilderErrorV1> {
+    let score_contract_sha256 = bounded_conformal_score_contract_sha256_v1(contract)?;
+    if input.schema != "luminous.semi-bench.bounded-prediction-set-input.v1" {
+        return Err(ConformalSetBuilderErrorV1(
+            "bounded prediction-set input schema is unsupported".into(),
+        ));
+    }
+    require_text(&input.prediction_id, "input.prediction_id")?;
+    require_text(&input.sample_id, "input.sample_id")?;
+    require_text(&input.measurement_event_id, "input.measurement_event_id")?;
+    if !valid_sha256(&input.global_model_artifact_sha256)
+        || !input.point_prediction.is_finite()
+        || !input.prediction_scale.is_finite()
+        || input.prediction_scale < contract.scale_floor
+        || !input.threshold.is_finite()
+    {
+        return Err(ConformalSetBuilderErrorV1(
+            "bounded prediction-set input contains invalid numeric or identity fields".into(),
+        ));
+    }
+
+    let (prediction_set_kind, lower_bound, upper_bound) = if input.threshold < 0.0 {
+        (BoundedPredictionSetKindV1::KnownEmpty, None, None)
+    } else if input.threshold >= contract.score_bound_b {
+        (BoundedPredictionSetKindV1::KnownFull, None, None)
+    } else {
+        let radius = match contract.score_kind {
+            BoundedConformalScoreKindV1::BoundedAbsoluteResidual => input.threshold,
+            BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual => {
+                input.threshold * input.prediction_scale
+            }
+        };
+        let lower = input.point_prediction - radius;
+        let upper = input.point_prediction + radius;
+        if !radius.is_finite() || !lower.is_finite() || !upper.is_finite() {
+            return Err(ConformalSetBuilderErrorV1(
+                "bounded prediction-set interval overflowed".into(),
+            ));
+        }
+        (BoundedPredictionSetKindV1::Nontrivial, Some(lower), Some(upper))
+    };
+
+    let mut receipt = BoundedPredictionSetReceiptV1 {
+        schema: "luminous.semi-bench.bounded-prediction-set-receipt.v1".into(),
+        prediction_id: input.prediction_id.clone(),
+        sample_id: input.sample_id.clone(),
+        measurement_event_id: input.measurement_event_id.clone(),
+        round_index: input.round_index,
+        global_model_artifact_sha256: input.global_model_artifact_sha256.clone(),
+        score_contract_sha256,
+        score_kind: contract.score_kind,
+        score_bound_b: contract.score_bound_b,
+        point_prediction: input.point_prediction,
+        prediction_scale: input.prediction_scale,
+        threshold_used: input.threshold,
+        prediction_set_kind,
+        lower_bound,
+        upper_bound,
+        receipt_sha256: String::new(),
+    };
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    receipt.receipt_sha256 = json_sha256(&canonical)?;
+    Ok(receipt)
+}
+
+/// Independently verifies a bounded prediction-set receipt by rebuilding it
+/// from the supplied score contract and frozen prediction input.
+pub fn verify_bounded_score_prediction_set_v1(
+    contract: &BoundedConformalScoreContractV1,
+    input: &BoundedPredictionSetInputV1,
+    receipt: &BoundedPredictionSetReceiptV1,
+) -> Result<bool, ConformalSetBuilderErrorV1> {
+    let expected = build_bounded_score_prediction_set_v1(contract, input)?;
+    Ok(&expected == receipt)
+}
+
+#[cfg(test)]
+mod bounded_score_set_tests {
+    use super::*;
+
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn contract(kind: BoundedConformalScoreKindV1) -> BoundedConformalScoreContractV1 {
+        BoundedConformalScoreContractV1 {
+            schema: "luminous.semi-bench.bounded-score-contract.v1".into(),
+            contract_id: "semiconductor-bounded-residual.v1".into(),
+            revision: 1,
+            score_kind: kind,
+            score_bound_b: 1.0,
+            scale_floor: 1.0e-6,
+        }
+    }
+
+    fn input(threshold: f64) -> BoundedPredictionSetInputV1 {
+        BoundedPredictionSetInputV1 {
+            schema: "luminous.semi-bench.bounded-prediction-set-input.v1".into(),
+            prediction_id: "prediction-1".into(),
+            sample_id: "sample-1".into(),
+            measurement_event_id: "event-1".into(),
+            round_index: 1,
+            global_model_artifact_sha256: digest('a'),
+            point_prediction: 100.0,
+            prediction_scale: 2.0,
+            threshold,
+        }
+    }
+
+    #[test]
+    fn bounded_score_threshold_maps_exactly_to_empty_interval_and_full_sets() {
+        let contract = contract(BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual);
+        let empty = build_bounded_score_prediction_set_v1(&contract, &input(-0.01)).unwrap();
+        assert_eq!(empty.prediction_set_kind, BoundedPredictionSetKindV1::KnownEmpty);
+        assert!(empty.lower_bound.is_none());
+
+        let interval = build_bounded_score_prediction_set_v1(&contract, &input(0.5)).unwrap();
+        assert_eq!(interval.prediction_set_kind, BoundedPredictionSetKindV1::Nontrivial);
+        assert_eq!(interval.lower_bound, Some(99.0));
+        assert_eq!(interval.upper_bound, Some(101.0));
+
+        let full = build_bounded_score_prediction_set_v1(&contract, &input(1.0)).unwrap();
+        assert_eq!(full.prediction_set_kind, BoundedPredictionSetKindV1::KnownFull);
+        assert!(full.upper_bound.is_none());
+    }
+
+    #[test]
+    fn bounded_set_receipt_verifies_and_tampering_is_detected() {
+        let contract = contract(BoundedConformalScoreKindV1::BoundedAbsoluteResidual);
+        let input = input(0.25);
+        let receipt = build_bounded_score_prediction_set_v1(&contract, &input).unwrap();
+        assert!(verify_bounded_score_prediction_set_v1(&contract, &input, &receipt).unwrap());
+        let mut changed = receipt;
+        changed.threshold_used = 0.5;
+        assert!(!verify_bounded_score_prediction_set_v1(&contract, &input, &changed).unwrap());
+    }
+
+    #[test]
+    fn score_contract_change_changes_contract_digest() {
+        let first = contract(BoundedConformalScoreKindV1::BoundedAbsoluteResidual);
+        let second = contract(BoundedConformalScoreKindV1::BoundedScaleNormalizedAbsoluteResidual);
+        assert_ne!(
+            bounded_conformal_score_contract_sha256_v1(&first).unwrap(),
+            bounded_conformal_score_contract_sha256_v1(&second).unwrap()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
