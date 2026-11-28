@@ -16,7 +16,10 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::transition::{AnalysisEvidenceRef, AudioSourceRef};
+use crate::transition::{
+    validate_transition_contract, AnalysisEvidenceRef, AudioSourceRef, TrackWindowRef,
+    TransitionContract,
+};
 
 /// Current beat-grid report schema understood by this crate.
 pub const BEAT_GRID_SCHEMA_VERSION: u16 = 1;
@@ -501,6 +504,211 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
     violations
 }
 
+
+/// Stable failures when binding an alignment to its exact source/target grid reports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionGridBindingViolationCode {
+    InvalidTransitionContract,
+    InvalidSourceBeatGridReport,
+    InvalidTargetBeatGridReport,
+    SourceAudioReferenceMismatch,
+    TargetAudioReferenceMismatch,
+    SourceAnalysisReferenceMismatch,
+    TargetAnalysisReferenceMismatch,
+    SourceHypothesisNotFound,
+    TargetHypothesisNotFound,
+    SourceAnchorOutsidePulseSupport,
+    TargetAnchorOutsidePulseSupport,
+    BeatPhaseMismatch,
+}
+
+/// A typed, stable result from transition-to-beat-grid evidence binding.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransitionGridBindingViolation {
+    pub code: TransitionGridBindingViolationCode,
+    pub path: String,
+}
+
+/// Verify that an explicit transition alignment is bound to the exact source and
+/// target audio, analysis manifests, and selected pulse hypotheses.
+///
+/// This is stronger than checking that hypothesis ID strings are non-empty.
+/// It also verifies that both frame anchors are bracketed by pulse anchors in
+/// their respective hypotheses and that their circular beat-phase error is no
+/// greater than the transition's declared tolerance.
+///
+/// This function does not establish probability calibration, musical quality,
+/// detector accuracy, or execution authority. The caller must retain the
+/// validator report and these source documents as evidence.
+pub fn verify_transition_grid_binding(
+    contract: &TransitionContract,
+    source_report: &BeatGridReportV1,
+    target_report: &BeatGridReportV1,
+) -> Vec<TransitionGridBindingViolation> {
+    let Some(alignment) = contract.alignment.as_ref() else {
+        return Vec::new();
+    };
+    let mut violations = Vec::new();
+
+    if !validate_transition_contract(contract).is_empty() {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::InvalidTransitionContract,
+            "contract",
+        );
+        return violations;
+    }
+    if !validate_beat_grid_report(source_report).is_empty() {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::InvalidSourceBeatGridReport,
+            "source_report",
+        );
+    }
+    if !validate_beat_grid_report(target_report).is_empty() {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::InvalidTargetBeatGridReport,
+            "target_report",
+        );
+    }
+    if !violations.is_empty() {
+        return violations;
+    }
+
+    if source_report.source != contract.source.audio {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::SourceAudioReferenceMismatch,
+            "source_report.source",
+        );
+    }
+    if source_report.evidence != contract.source.evidence {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::SourceAnalysisReferenceMismatch,
+            "source_report.evidence",
+        );
+    }
+    if target_report.source != contract.target.audio {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::TargetAudioReferenceMismatch,
+            "target_report.source",
+        );
+    }
+    if target_report.evidence != contract.target.evidence {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::TargetAnalysisReferenceMismatch,
+            "target_report.evidence",
+        );
+    }
+    if !violations.is_empty() {
+        return violations;
+    }
+
+    let source_hypothesis = source_report
+        .hypotheses
+        .iter()
+        .find(|hypothesis| hypothesis.hypothesis_id == alignment.source_grid_hypothesis_id);
+    let target_hypothesis = target_report
+        .hypotheses
+        .iter()
+        .find(|hypothesis| hypothesis.hypothesis_id == alignment.target_grid_hypothesis_id);
+
+    let Some(source_hypothesis) = source_hypothesis else {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::SourceHypothesisNotFound,
+            "alignment.source_grid_hypothesis_id",
+        );
+        return violations;
+    };
+    let Some(target_hypothesis) = target_hypothesis else {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::TargetHypothesisNotFound,
+            "alignment.target_grid_hypothesis_id",
+        );
+        return violations;
+    };
+
+    let Some(source_position_milli) = beat_position_milli(
+        source_hypothesis,
+        alignment.source_anchor_frame,
+    ) else {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::SourceAnchorOutsidePulseSupport,
+            "alignment.source_anchor_frame",
+        );
+        return violations;
+    };
+    let Some(target_position_milli) = beat_position_milli(
+        target_hypothesis,
+        alignment.target_anchor_frame,
+    ) else {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::TargetAnchorOutsidePulseSupport,
+            "alignment.target_anchor_frame",
+        );
+        return violations;
+    };
+
+    let source_phase = source_position_milli.rem_euclid(1_000);
+    let target_phase = target_position_milli.rem_euclid(1_000);
+    let raw_error = (source_phase - target_phase).abs();
+    let circular_error = raw_error.min(1_000 - raw_error);
+    if circular_error > i128::from(alignment.max_phase_error_milli) {
+        push_binding(
+            &mut violations,
+            TransitionGridBindingViolationCode::BeatPhaseMismatch,
+            "alignment.max_phase_error_milli",
+        );
+    }
+
+    violations
+}
+
+/// Estimate a source-local beat position in milli-beats using the two
+/// neighboring pulse anchors. Linear interpolation is only used inside a
+/// bracketed interval; extrapolation beyond observed pulse support abstains.
+fn beat_position_milli(hypothesis: &BeatGridHypothesis, frame: u64) -> Option<i128> {
+    for pair in hypothesis.pulse_anchors.windows(2) {
+        let left = pair[0];
+        let right = pair[1];
+        if frame < left.frame || frame > right.frame {
+            continue;
+        }
+        let frame_span = i128::from(right.frame) - i128::from(left.frame);
+        let beat_span = i128::from(right.beat_index) - i128::from(left.beat_index);
+        if frame_span <= 0 || beat_span <= 0 {
+            return None;
+        }
+        let elapsed_frames = i128::from(frame) - i128::from(left.frame);
+        return Some(
+            i128::from(left.beat_index) * 1_000
+                + elapsed_frames * beat_span * 1_000 / frame_span,
+        );
+    }
+    None
+}
+
+fn push_binding(
+    violations: &mut Vec<TransitionGridBindingViolation>,
+    code: TransitionGridBindingViolationCode,
+    path: impl Into<String>,
+) {
+    violations.push(TransitionGridBindingViolation {
+        code,
+        path: path.into(),
+    });
+}
+
 fn is_lowercase_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -740,6 +948,188 @@ mod tests {
         report.hypotheses.clear();
         report.abstention_reason = None;
         assert!(codes(&report).contains(&BeatGridViolationCode::MissingAbstentionReason));
+    }
+
+    fn track(side: crate::transition::TrackSide) -> TrackWindowRef {
+        let (sha, manifest_sha, sample_rate, total_frames) = match side {
+            crate::transition::TrackSide::Source => ("1".repeat(64), "a".repeat(64), 44_100, 10_000),
+            crate::transition::TrackSide::Target => ("2".repeat(64), "b".repeat(64), 48_000, 20_000),
+        };
+        TrackWindowRef {
+            audio: AudioSourceRef {
+                sha256: sha.clone(),
+                sample_rate_hz: sample_rate,
+                channels: 2,
+                total_frames,
+            },
+            window: crate::transition::SampleWindow {
+                start_frame: 100,
+                end_frame: 900,
+            },
+            evidence: AnalysisEvidenceRef {
+                manifest_sha256: manifest_sha,
+                source_audio_sha256: sha,
+                analysis_version: "auditory-scene-v0.1/config-17".to_string(),
+                covered_window: crate::transition::SampleWindow {
+                    start_frame: 0,
+                    end_frame: total_frames,
+                },
+            },
+        }
+    }
+
+    fn transition_contract() -> TransitionContract {
+        TransitionContract {
+            schema_version: crate::transition::TRANSITION_CONTRACT_SCHEMA_VERSION,
+            transition_id: "transition-0001".to_string(),
+            kind: crate::transition::TransitionKind::BeatmatchedBlend,
+            source: track(crate::transition::TrackSide::Source),
+            target: track(crate::transition::TrackSide::Target),
+            evidence: crate::transition::TransitionEvidenceAssessment {
+                timing: crate::transition::EvidenceDisposition::Supported,
+                structure: crate::transition::EvidenceDisposition::Ambiguous,
+                source_roles: crate::transition::EvidenceDisposition::NotEvaluated,
+                target_roles: crate::transition::EvidenceDisposition::NotEvaluated,
+                perceptual_fit: crate::transition::EvidenceDisposition::NotEvaluated,
+            },
+            alignment: Some(crate::transition::TransitionAlignment {
+                source_anchor_frame: 400,
+                target_anchor_frame: 600,
+                source_grid_hypothesis_id: "source-grid".to_string(),
+                target_grid_hypothesis_id: "target-grid".to_string(),
+                beat_ordinal_milli: 16_000,
+                max_phase_error_milli: 100,
+                confidence_ppm: 850_000,
+            }),
+            protected_regions: Vec::new(),
+            gain_envelopes: Vec::new(),
+        }
+    }
+
+    fn report_for_track(
+        track: &TrackWindowRef,
+        hypothesis_id: &str,
+        first_frame: u64,
+        second_frame: u64,
+    ) -> BeatGridReportV1 {
+        BeatGridReportV1 {
+            schema_version: BEAT_GRID_SCHEMA_VERSION,
+            source: track.audio.clone(),
+            evidence: track.evidence.clone(),
+            disposition: BeatGridDisposition::Resolved,
+            hypotheses: vec![BeatGridHypothesis {
+                hypothesis_id: hypothesis_id.to_string(),
+                confidence_ppm: 900_000,
+                pulse_anchors: vec![
+                    PulseAnchor {
+                        frame: first_frame,
+                        beat_index: 0,
+                        confidence_ppm: 900_000,
+                    },
+                    PulseAnchor {
+                        frame: second_frame,
+                        beat_index: 1,
+                        confidence_ppm: 900_000,
+                    },
+                ],
+                downbeat_anchors: Vec::new(),
+                tempo_interpolation: None,
+                tempo_map: Vec::new(),
+                meter_map: Vec::new(),
+            }],
+            abstention_reason: None,
+        }
+    }
+
+    #[test]
+    fn verifies_transition_against_exact_source_target_reports_and_phase() {
+        let contract = transition_contract();
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        assert!(verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn rejects_transition_when_selected_hypothesis_is_missing() {
+        let mut contract = transition_contract();
+        contract.alignment.as_mut().unwrap().source_grid_hypothesis_id =
+            "missing-grid".to_string();
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceHypothesisNotFound
+        );
+    }
+
+    #[test]
+    fn rejects_transition_when_analysis_manifest_does_not_match() {
+        let contract = transition_contract();
+        let mut source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        source_report.evidence.manifest_sha256 = "c".repeat(64);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceAnalysisReferenceMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_transition_when_source_and_target_beat_phases_exceed_tolerance() {
+        let contract = transition_contract();
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 900);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::BeatPhaseMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_alignment_outside_selected_grid_pulse_support() {
+        let mut contract = transition_contract();
+        contract.alignment.as_mut().unwrap().source_anchor_frame = 800;
+        let source_report =
+            report_for_track(&contract.source, "source-grid", 100, 500);
+        let target_report =
+            report_for_track(&contract.target, "target-grid", 300, 700);
+        let found = verify_transition_grid_binding(
+            &contract,
+            &source_report,
+            &target_report,
+        );
+        assert_eq!(
+            found[0].code,
+            TransitionGridBindingViolationCode::SourceAnchorOutsidePulseSupport
+        );
     }
 
     #[test]
