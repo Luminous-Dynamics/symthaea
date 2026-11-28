@@ -11,7 +11,7 @@ MON-040 computes a one-sided Clopper–Pearson interval over replay observations
 ## Estimand
 
 A declared execution unit represents one deployment-level experimental unit with:
-- a stable unit ID and one preregistered stratum;
+- a stable unit ID and one preregistered stratum;\n- the same trial, scenario digest, recovery-boundary digest, fault-set digest and exact code revision as every other unit;\n- a fixed seed schedule shared across all execution units, with unique replay IDs globally and unique seeds within each unit;
 - a complete dependency-domain inventory;
 - an exact replay count;
 - one outcome receipt per replay.
@@ -49,7 +49,7 @@ If a control plane or external service is shared across all units, the graph int
 7. Apply one-sided Clopper–Pearson to the cluster-success count only when the declared cluster count and unit frame match preregistration.
 8. Report the exact cluster membership, shared domain IDs, cluster outcome, denominator and confidence bound.
 
-Mixed strata are rejected by this v1 single-cohort evaluator; analyze each preregistered stratum separately. Do not pool heterogeneous strata into one iid binomial estimate.
+Mixed strata are rejected by this v1 single-cohort evaluator; analyze each preregistered stratum separately. V1 also requires equal numbers of execution units in every dependency cluster before pooling a single binomial confidence interval. Unequal cluster sizes may have different all-runs-success probabilities and are held for a future stratified analysis. Do not pool heterogeneous strata into one iid binomial estimate.
 
 ## Verdicts and limitations
 
