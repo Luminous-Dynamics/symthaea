@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/mel-hear-012-intervention-manifest-v0-1.schema.json",
+  "title": "MEL-HEAR-012 causal acoustic intervention manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_version",
+    "case_id",
+    "pair_id",
+    "split",
+    "source_work_lineage_sha256",
+    "performer_session_cluster_sha256",
+    "baseline_audio_sha256",
+    "target_property",
+    "factor",
+    "intervention_family",
+    "parameter_manifest_sha256",
+    "implementation_sha256",
+    "seed",
+    "deterministic",
+    "expected_effect",
+    "reference_annotation_sha256",
+    "rights_manifest_sha256",
+    "reference_hidden_from_model",
+    "source_support"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-hear-012-intervention-manifest-v0.1"
+    },
+    "benchmark_id": {
+      "const": "MEL-CAUSAL-ACOUSTIC-INTERVENTION"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "source_work_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "performer_session_cluster_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "baseline_audio_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_property": {
+      "type": "string",
+      "minLength": 1
+    },
+    "factor": {
+      "enum": [
+        "musical_content",
+        "performance",
+        "instrument_source",
+        "room_channel",
+        "production_processing",
+        "corruption",
+        "sham_control"
+      ]
+    },
+    "intervention_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parameter_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "deterministic": {
+      "const": true
+    },
+    "expected_effect": {
+      "enum": [
+        "invariant",
+        "equivariant",
+        "non_invariant",
+        "not_estimable"
+      ]
+    },
+    "reference_annotation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rights_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reference_hidden_from_model": {
+      "const": true
+    },
+    "source_support": {
+      "$ref": "#/$defs/support"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_sample",
+        "end_sample"
+      ],
+      "properties": {
+        "start_sample": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_sample": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
