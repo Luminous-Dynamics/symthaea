@@ -287,6 +287,10 @@ fn arbitrary_se3_actions_preserve_distances_angles_and_incidence() {
             dot(transformed_a, transformed_b) / (norm(transformed_a) * norm(transformed_b));
         assert!((transformed_cosine - original_cosine).abs() < EPS);
 
+        let transformed_vector = transform.transform_vector(vector_a);
+        assert_vec_close(transformed_vector, transformed_a, EPS);
+        assert!((norm(transformed_vector) - norm(vector_a)).abs() < EPS);
+
         // Collinearity is an incidence property and must survive a common SE(3) action.
         let line_start = [0.0, 0.0, 0.0];
         let line_mid = [1.0, 2.0, 3.0];
