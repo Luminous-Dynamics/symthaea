@@ -15,3 +15,4 @@ resolver = "2"
 [dependencies]
 symthaea-gamebench = { path = "../symthaea-gamebench-v0-1" }
 symthaea-fep = { path = "../../crates/core/symthaea-fep" }
+symthaea-core = { path = "../../crates/core/symthaea-core" }
