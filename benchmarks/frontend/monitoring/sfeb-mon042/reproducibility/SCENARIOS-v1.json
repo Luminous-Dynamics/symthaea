@@ -1,0 +1,85 @@
+{
+  "profile": "mon042-dependence-aware-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON042-P001",
+      "classification": "positive_control",
+      "name": "independent_units",
+      "expected": "29 clusters from 29 non-overlapping dependency-domain inventories"
+    },
+    {
+      "id": "MON042-N001",
+      "classification": "negative_control",
+      "name": "shared_host",
+      "expected": "two units sharing a host are one dependency cluster"
+    },
+    {
+      "id": "MON042-N002",
+      "classification": "negative_control",
+      "name": "shared_control_plane",
+      "expected": "all units sharing one control-plane identity collapse into one cluster"
+    },
+    {
+      "id": "MON042-N003",
+      "classification": "negative_control",
+      "name": "transitive_overlap",
+      "expected": "A-B and B-C dependencies form one A-B-C cluster"
+    },
+    {
+      "id": "MON042-N004",
+      "classification": "negative_control",
+      "name": "missing_domain",
+      "expected": "missing critical dependency domain holds design indeterminate"
+    },
+    {
+      "id": "MON042-N005",
+      "classification": "negative_control",
+      "name": "incomplete_observation",
+      "expected": "unit remains in denominator and its cluster becomes non-success"
+    },
+    {
+      "id": "MON042-N006",
+      "classification": "negative_control",
+      "name": "mixed_strata",
+      "expected": "v1 rejects pooled heterogeneous strata"
+    },
+    {
+      "id": "MON042-N007",
+      "classification": "negative_control",
+      "name": "tampered_domain_manifest",
+      "expected": "mutated domain map fails manifest digest"
+    },
+    {
+      "id": "MON042-N008",
+      "classification": "negative_control",
+      "name": "duplicate_unit_id",
+      "expected": "duplicate unit identity blocks"
+    },
+    {
+      "id": "MON042-N009",
+      "classification": "negative_control",
+      "name": "extra_unit_after_preregistration",
+      "expected": "unpreregistered unit expansion blocks"
+    },
+    {
+      "id": "MON042-N010",
+      "classification": "negative_control",
+      "name": "wrong_failure_signature",
+      "expected": "non-identical blocked signature is cluster non-success"
+    },
+    {
+      "id": "MON042-N011",
+      "classification": "negative_control",
+      "name": "insufficient_independent_clusters",
+      "expected": "overlapping units reduce N and hold statistical qualification"
+    },
+    {
+      "id": "MON042-N012",
+      "classification": "negative_control",
+      "name": "hash_only_domain_provenance",
+      "expected": "campaign verdict remains indeterminate and production action false"
+    }
+  ]
+}

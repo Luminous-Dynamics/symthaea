@@ -1,0 +1,32 @@
+{
+  "profile": "mon042-dependence-aware-input-v1",
+  "version": "1.0.0",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-28T10:00:00Z",
+  "trial_id": "mon042-incomplete-example",
+  "target_failure_signature_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "required_domain_classes": [
+    "executor",
+    "host",
+    "storage",
+    "network",
+    "clock",
+    "identity",
+    "control_plane"
+  ],
+  "expected_unit_count": 2,
+  "required_runs_per_unit": 1,
+  "required_independent_clusters": 2,
+  "minimum_reliability": 0.9,
+  "confidence_level": 0.95,
+  "units": [],
+  "scenario_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "recovery_boundary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "fault_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "code_revision": "0123456789abcdef0123456789abcdef01234567",
+  "required_seeds": [
+    1000
+  ],
+  "sampling_frame_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "selection_protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}
