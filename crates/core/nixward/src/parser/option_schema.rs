@@ -32,7 +32,7 @@ pub struct NixOptionSchema {
     /// Packages related to this option, extracted heuristically for retrieval.
     pub related_packages: Vec<String>,
     /// Original relatedPackages documentation field, when supplied.
-    pub related_packages_markdown: Option<String>,
+    pub related_packages_documentation: Option<serde_json::Value>,
     /// Module declaration file paths.
     pub declarations: Vec<String>,
 }
@@ -49,7 +49,7 @@ struct RawOptionEntry {
     #[serde(rename = "loc")]
     location: Option<Vec<String>>,
     #[serde(rename = "relatedPackages")]
-    related_packages_markdown: Option<String>,
+    related_packages_documentation: Option<serde_json::Value>,
     #[serde(rename = "readOnly")]
     read_only: Option<bool>,
 }
@@ -116,7 +116,7 @@ pub fn parse_nixos_options(json: &str) -> Result<Vec<NixOptionSchema>, String> {
             location: entry.location,
             description,
             related_packages,
-            related_packages_markdown: entry.related_packages_markdown,
+            related_packages_documentation: entry.related_packages_documentation,
             declarations: entry.declarations.unwrap_or_default(),
         });
     }
@@ -172,14 +172,13 @@ pub enum OptionSchemaSource {
 /// bundled reference set. This is deliberately not called TargetBound.
 fn load_options_with_provenance(
 ) -> (Vec<NixOptionSchema>, OptionSchemaSource, Option<Instant>) {
-    let observed_at = Instant::now();
     match load_nixos_options() {
         Ok(schemas) if !schemas.is_empty() => {
             tracing::info!(count = schemas.len(), "Loaded controller-local NixOS options");
             (
                 schemas,
                 OptionSchemaSource::ControllerLocalLive,
-                Some(observed_at),
+                Some(Instant::now()),
             )
         }
         Ok(_) => {
@@ -469,8 +468,8 @@ mod tests {
             Some("literalExpression")
         );
         assert_eq!(
-            schema.related_packages_markdown.as_deref(),
-            Some("pkgs.example")
+            schema.related_packages_documentation.as_ref(),
+            Some(&serde_json::json!("pkgs.example"))
         );
     }
 
