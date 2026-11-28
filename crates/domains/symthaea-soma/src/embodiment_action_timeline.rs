@@ -122,6 +122,10 @@ pub enum ActionTimelineError {
     CancellationOutsideLifetime,
     MissingReplacementPlan,
     UnexpectedReplacementPlan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionExecutionError {
     WrongExecutionClockDomain,
     ExecutionClockRegression,
     ExecutionBeforeTimeline,
@@ -296,7 +300,7 @@ pub struct ActionExecutionTick {
 /// It does not send commands to an output device. It makes one-shot dispatch,
 /// stale-segment suppression, monotonic-clock checks, and cancellation/expiry
 /// decisions that an audio/visual/haptic adapter can consume.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ActionExecutionGate {
     timeline: ActionTimelineV1,
     clock_domain_id: String,
@@ -404,16 +408,19 @@ impl ActionExecutionGate {
         }
 
         let mut elapsed_segment_ids = Vec::new();
-        self.active_segment_ids.retain(|id| {
+        let mut still_active_segment_ids = HashSet::new();
+        for id in self.active_segment_ids.drain() {
             let still_active = self.timeline.segments.iter().any(|segment| {
-                segment.segment_id == *id
+                segment.segment_id == id
                     && segment.ends_at_monotonic_ns > now_monotonic_ns
             });
-            if !still_active {
-                elapsed_segment_ids.push(id.clone());
+            if still_active {
+                still_active_segment_ids.insert(id);
+            } else {
+                elapsed_segment_ids.push(id);
             }
-            still_active
-        });
+        }
+        self.active_segment_ids = still_active_segment_ids;
 
         let mut dispatch_segment_ids = Vec::new();
         let mut missed_segment_ids = Vec::new();
