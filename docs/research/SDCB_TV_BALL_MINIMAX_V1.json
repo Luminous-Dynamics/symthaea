@@ -219,9 +219,9 @@
     "interpretation": "Valid conservative p_sup comparator loses power due discrete tail resolution; the exact randomized minimax test uses boundary randomization."
   },
   "validation": {
-    "independent_python_fraction_replay": "passed",
+    "independent_python_fraction_replay": "passed; exact radius frontier, phase boundary, primal sizes/powers, overlap witnesses and dual objectives checked",
     "rust_tests": {
-      "authored": 8,
+      "authored": 12,
       "compiled": false,
       "executed": false
     },
@@ -232,5 +232,49 @@
     "physical_validation": false,
     "sota_claim": false
   },
-  "claim_boundary": "Exact result for a two-outcome Bernoulli TV-ball problem under the stated half-L1 convention and asymmetric radii. Does not solve general finite-alphabet TV-polytope vertex enumeration, continuous-density TV/band uncertainty, Huber contamination, or physical sensor qualification."
+  "claim_boundary": "Exact result for a two-outcome Bernoulli TV-ball problem under the stated half-L1 convention and asymmetric radii. Does not solve general finite-alphabet TV-polytope vertex enumeration, continuous-density TV/band uncertainty, Huber contamination, or physical sensor qualification.",
+  "radius_frontier": {
+    "exact_value": "if 4/5 - epsilon_A > 1/5 + epsilon_B: alpha*(4/5-epsilon_A)/(1/5+epsilon_B); otherwise alpha",
+    "phase_boundary": "epsilon_A + epsilon_B = 3/5",
+    "separation_condition": "epsilon_A + epsilon_B < 3/5",
+    "overlap_condition": "epsilon_A + epsilon_B >= 3/5",
+    "separation_primal_test": "phi(0)=0; phi(1)=alpha/(1/5+epsilon_B)",
+    "separation_dual_certificate": "alternative endpoint p=4/5-epsilon_A, null endpoint q=1/5+epsilon_B, lambda=1, w=p/q, z=(0,0)",
+    "overlap_primal_test": "phi(0)=phi(1)=alpha",
+    "overlap_dual_certificate": "lambda=1 and w=1 on any exact common Bernoulli law in the interval intersection"
+  },
+  "radius_sweep": [
+    {
+      "epsilon_A": "0",
+      "epsilon_B": "0",
+      "maximin_power": "2/5"
+    },
+    {
+      "epsilon_A": "1/10",
+      "epsilon_B": "1/10",
+      "maximin_power": "7/30"
+    },
+    {
+      "epsilon_A": "3/20",
+      "epsilon_B": "1/20",
+      "maximin_power": "13/50"
+    },
+    {
+      "epsilon_A": "3/10",
+      "epsilon_B": "1/5",
+      "maximin_power": "1/8"
+    },
+    {
+      "epsilon_A": "2/5",
+      "epsilon_B": "1/5",
+      "maximin_power": "1/10",
+      "status": "EXACT_OVERLAP_BOUNDARY"
+    },
+    {
+      "epsilon_A": "9/20",
+      "epsilon_B": "1/5",
+      "maximin_power": "1/10",
+      "status": "OVERLAPPING_FAMILIES"
+    }
+  ]
 }
