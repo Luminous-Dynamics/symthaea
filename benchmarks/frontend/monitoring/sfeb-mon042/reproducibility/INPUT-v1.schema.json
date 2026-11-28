@@ -22,7 +22,9 @@
     "recovery_boundary_sha256",
     "fault_set_sha256",
     "code_revision",
-    "required_seeds"
+    "required_seeds",
+    "sampling_frame_sha256",
+    "selection_protocol_sha256"
   ],
   "properties": {
     "profile": {
@@ -110,6 +112,12 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "sampling_frame_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "selection_protocol_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
@@ -194,7 +202,9 @@
         "dependency_domains",
         "domain_manifest_sha256",
         "required_runs",
-        "observations"
+        "observations",
+        "selection_ordinal",
+        "selection_receipt_sha256"
       ],
       "properties": {
         "unit_id": {
@@ -228,6 +238,14 @@
           "items": {
             "$ref": "#/$defs/observation"
           }
+        },
+        "selection_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "selection_receipt_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     }
