@@ -19,3 +19,5 @@ pub mod music_listen_bench;
 pub mod music_performance_identity;
 
 pub mod music_performance_identity_inference;
+
+pub mod music_performance_identity_sampling_design;

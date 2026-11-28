@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-performance-identity-sampling-design-v1.schema.json",
+  "title": "Melothaea property-relative identity sampling design v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sampling_frame_id",
+    "target_population",
+    "inclusion_exclusion_policy",
+    "pseudonymization_scope",
+    "independent_source_work_sampling_claimed",
+    "independence_basis",
+    "observations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mel-music-performance-identity-sampling-design-v1"
+    },
+    "sampling_frame_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_population": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inclusion_exclusion_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pseudonymization_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_source_work_sampling_claimed": {
+      "type": "boolean"
+    },
+    "independence_basis": {
+      "type": "string"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performer_identity_sha256",
+        "performer_membership_sha256",
+        "session_identity_sha256",
+        "take_identity_sha256",
+        "performance_identity_sha256"
+      ],
+      "properties": {
+        "performer_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "performer_membership_sha256": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/digest"
+          },
+          "minItems": 1
+        },
+        "session_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "take_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "performance_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "pair_id",
+        "source_work_lineage_sha256",
+        "clean",
+        "performance_stay",
+        "musical_flip"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_work_lineage_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "clean": {
+          "$ref": "#/$defs/arm"
+        },
+        "performance_stay": {
+          "$ref": "#/$defs/arm"
+        },
+        "musical_flip": {
+          "$ref": "#/$defs/arm"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "independent_source_work_sampling_claimed": {
+            "const": true
+          }
+        },
+        "required": [
+          "independent_source_work_sampling_claimed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independence_basis": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}
