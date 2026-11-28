@@ -54,6 +54,14 @@
       "units": "relative_log_frequency_energy",
       "frequency_scale": "log_frequency",
       "phase_policy": "not_applicable"
+    },
+    {
+      "view_id": "constant-q",
+      "kind": "constant_q",
+      "status": "planned",
+      "units": "relative_complex_amplitude",
+      "frequency_scale": "log_frequency",
+      "phase_policy": "complex_retained"
     }
   ],
   "event_hypotheses": [],

@@ -161,11 +161,20 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
             {
                 return Err("log-frequency views must declare log-frequency scale".to_owned());
             }
+            "constant_q" if string(view, "phase_policy")? != "complex_retained" => {
+                return Err("constant-Q view must declare complex phase retention".to_owned());
+            }
             _ => {}
         }
     }
 
-    for required in ["waveform", "complex_stft", "erb_band_energy", "log_frequency_energy"] {
+    for required in [
+        "waveform",
+        "complex_stft",
+        "erb_band_energy",
+        "log_frequency_energy",
+        "constant_q",
+    ] {
         if !kinds.contains(required) {
             return Err(format!(
                 "required representation view is absent: {required}"

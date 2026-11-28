@@ -60,6 +60,7 @@ pub enum DspError {
     NonFiniteSample(usize),
     SourceTooShort,
     NoFrames,
+    ComputeBudgetExceeded,
 }
 
 impl fmt::Display for DspError {
@@ -73,6 +74,9 @@ impl fmt::Display for DspError {
             }
             Self::SourceTooShort => write!(formatter, "source is shorter than the analysis window"),
             Self::NoFrames => write!(formatter, "analysis produced no complete frames"),
+            Self::ComputeBudgetExceeded => {
+                write!(formatter, "CQT reference operation budget exceeded")
+            }
         }
     }
 }
@@ -472,6 +476,7 @@ pub struct MultiViewConfig {
     pub stft: StftConfig,
     pub erb: ErbConfig,
     pub log_frequency: LogFrequencyConfig,
+    pub constant_q: CqtConfig,
 }
 
 /// Joint output. Each view retains its own numerical representation while
@@ -481,6 +486,7 @@ pub struct MultiViewAnalysis {
     pub complex_stft: ComplexStft,
     pub erb_energy: ErbEnergy,
     pub log_frequency_energy: LogFrequencyEnergy,
+    pub constant_q: ConstantQTransform,
 }
 
 /// Compute phase-preserving STFT, ERB-axis power and log-frequency power views.
@@ -488,23 +494,253 @@ pub fn analyze_multi_view(
     samples: &[f32],
     config: MultiViewConfig,
 ) -> Result<MultiViewAnalysis, DspError> {
+    if config.constant_q.sample_rate_hz != config.stft.sample_rate_hz {
+        return Err(DspError::InvalidConfiguration(
+            "STFT and CQT sample rates must match in a multi-view analysis",
+        ));
+    }
     let complex_stft = extract_complex_stft(samples, config.stft)?;
     let erb_energy = compute_erb_energy(&complex_stft, config.erb)?;
     let log_frequency_energy =
         compute_log_frequency_energy(&complex_stft, config.log_frequency)?;
+    let constant_q = compute_constant_q(samples, config.constant_q)?;
     Ok(MultiViewAnalysis {
         complex_stft,
         erb_energy,
         log_frequency_energy,
+        constant_q,
+    })
+}
+
+/// Configuration for a variable-window, logarithmically spaced CQT.
+///
+/// The CQT uses the conventional constant-Q factor
+/// `Q = 1 / (2^(1 / bins_per_octave) - 1)`. Every bin receives its own
+/// odd-length Hann window, nearest positive integer support and complex
+/// demodulation. Only fully supported frames are emitted.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CqtConfig {
+    pub sample_rate_hz: u32,
+    pub hop_size: usize,
+    pub bins_per_octave: usize,
+    pub min_frequency_hz: f64,
+    pub max_frequency_hz: f64,
+}
+
+/// One constant-Q bin with its own physical analysis support.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CqtBin {
+    pub center_frequency_hz: f64,
+    pub window_size_samples: usize,
+    pub support: FrameSupport,
+    pub coefficient: Complex64,
+}
+
+/// One CQT frame at a shared sample-clock centre. Each frequency bin retains
+/// its own variable analysis window and half-open source support.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CqtFrame {
+    pub center_sample: usize,
+    pub support: FrameSupport,
+    pub bins: Vec<CqtBin>,
+}
+
+/// Variable-window constant-Q transform retaining complex coefficients.
+///
+/// This is a direct CPU reference implementation. Its purpose is a clear
+/// known-answer baseline, not a fast production kernel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstantQTransform {
+    pub config: CqtConfig,
+    pub q_factor: f64,
+    pub frames: Vec<CqtFrame>,
+}
+
+/// Compute a phase-preserving, variable-window constant-Q transform.
+///
+/// Frequency centres are logarithmically spaced. Window lengths vary inversely
+/// with frequency; the lowest-frequency bin therefore determines the valid
+/// frame-centre region. No padding or synthetic edge samples are introduced.
+/// A frame and every bin retain exact source-sample support.
+///
+/// This direct reference computes a windowed complex sinusoidal projection
+/// per bin. Its cost is O(frames × bins × average_window_length); faster FFT
+/// kernels may replace it only when they reproduce the same declared semantics.
+pub fn compute_constant_q(
+    samples: &[f32],
+    config: CqtConfig,
+) -> Result<ConstantQTransform, DspError> {
+    if config.sample_rate_hz == 0 {
+        return Err(DspError::InvalidConfiguration("CQT sample rate must be positive"));
+    }
+    if config.hop_size == 0 {
+        return Err(DspError::InvalidConfiguration("CQT hop size must be positive"));
+    }
+    if !(1..=96).contains(&config.bins_per_octave) {
+        return Err(DspError::InvalidConfiguration(
+            "CQT bins per octave must be in 1..=96",
+        ));
+    }
+
+    let nyquist = f64::from(config.sample_rate_hz) / 2.0;
+    if !config.min_frequency_hz.is_finite()
+        || !config.max_frequency_hz.is_finite()
+        || config.min_frequency_hz <= 0.0
+        || config.max_frequency_hz <= config.min_frequency_hz
+        || config.max_frequency_hz > nyquist
+    {
+        return Err(DspError::InvalidConfiguration(
+            "CQT frequency range must be finite, positive, ordered and below Nyquist",
+        ));
+    }
+    if let Some((index, _)) = samples.iter().enumerate().find(|(_, value)| !value.is_finite()) {
+        return Err(DspError::NonFiniteSample(index));
+    }
+
+    let frequency_ratio = config.max_frequency_hz / config.min_frequency_hz;
+    if !frequency_ratio.is_finite() || frequency_ratio <= 1.0 {
+        return Err(DspError::InvalidConfiguration("CQT frequency ratio is invalid"));
+    }
+    let octave_span = frequency_ratio.log2();
+    let bin_steps_float = octave_span * config.bins_per_octave as f64;
+    if !bin_steps_float.is_finite() || bin_steps_float > 4095.0 {
+        return Err(DspError::InvalidConfiguration("CQT produces too many frequency bins"));
+    }
+    let bin_count = bin_steps_float.floor() as usize + 1;
+
+    let q_factor = 1.0 / (2.0f64.powf(1.0 / config.bins_per_octave as f64) - 1.0);
+    if !q_factor.is_finite() || q_factor <= 0.0 {
+        return Err(DspError::InvalidConfiguration("CQT quality factor is invalid"));
+    }
+
+    let mut bin_specs = Vec::with_capacity(bin_count);
+    let mut largest_window = 0usize;
+    for bin_index in 0..bin_count {
+        let center_frequency_hz = config.min_frequency_hz
+            * 2.0f64.powf(bin_index as f64 / config.bins_per_octave as f64);
+        if !center_frequency_hz.is_finite() || center_frequency_hz > nyquist {
+            return Err(DspError::InvalidConfiguration("CQT bin exceeds Nyquist"));
+        }
+
+        let window_float = q_factor * f64::from(config.sample_rate_hz) / center_frequency_hz;
+        if !window_float.is_finite() || window_float.ceil() > usize::MAX as f64 {
+            return Err(DspError::InvalidConfiguration("CQT window length is unrepresentable"));
+        }
+        let mut window_size_samples = (window_float.ceil() as usize).max(3);
+        // Odd lengths put the discrete window's centre on an exact source sample.
+        if window_size_samples % 2 == 0 {
+            window_size_samples = window_size_samples
+                .checked_add(1)
+                .ok_or(DspError::InvalidConfiguration("CQT window length overflow"))?;
+        }
+        if window_size_samples > samples.len() {
+            return Err(DspError::SourceTooShort);
+        }
+
+        largest_window = largest_window.max(window_size_samples);
+        bin_specs.push((center_frequency_hz, window_size_samples));
+    }
+
+    let half_largest_window = largest_window / 2;
+    if samples.len() < largest_window {
+        return Err(DspError::SourceTooShort);
+    }
+
+    const MAX_CQT_SAMPLE_ACCUMULATIONS: u128 = 100_000_000;
+    let valid_center_count = samples.len() - largest_window + 1;
+    let frame_count = valid_center_count
+        .checked_add(config.hop_size - 1)
+        .ok_or(DspError::ComputeBudgetExceeded)?
+        / config.hop_size;
+    let per_frame_accumulations = bin_specs.iter().try_fold(0usize, |total, (_, window_size)| {
+        total.checked_add(*window_size)
+    }).ok_or(DspError::ComputeBudgetExceeded)?;
+    let estimated_accumulations =
+        (frame_count as u128) * (per_frame_accumulations as u128);
+    if estimated_accumulations > MAX_CQT_SAMPLE_ACCUMULATIONS {
+        return Err(DspError::ComputeBudgetExceeded);
+    }
+
+    let mut frames = Vec::with_capacity(frame_count);
+    // The half-open range includes a final centre whose largest window ends
+    // exactly at samples.len(); no frame is padded at either boundary.
+    let final_center_exclusive = samples.len() - half_largest_window;
+    for center_sample in (half_largest_window..final_center_exclusive)
+        .step_by(config.hop_size)
+    {
+        let mut bins = Vec::with_capacity(bin_specs.len());
+
+        for &(center_frequency_hz, window_size_samples) in &bin_specs {
+            let half_window = window_size_samples / 2;
+            let start_sample = center_sample - half_window;
+            let end_sample = start_sample + window_size_samples;
+            let angular_step = TAU * center_frequency_hz / f64::from(config.sample_rate_hz);
+            let mut real_sum = 0.0f64;
+            let mut imaginary_sum = 0.0f64;
+            let mut coherent_gain = 0.0f64;
+
+            for window_index in 0..window_size_samples {
+                let window_weight = 0.5
+                    * (1.0
+                        - (TAU * window_index as f64
+                            / (window_size_samples - 1) as f64)
+                            .cos());
+                let sample = f64::from(samples[start_sample + window_index]);
+                let relative_sample = window_index as f64 - half_window as f64;
+                let angle = angular_step * relative_sample;
+                real_sum += sample * window_weight * angle.cos();
+                imaginary_sum -= sample * window_weight * angle.sin();
+                coherent_gain += window_weight;
+            }
+
+            if !coherent_gain.is_finite() || coherent_gain <= f64::EPSILON {
+                return Err(DspError::InvalidConfiguration(
+                    "CQT analysis window has zero coherent gain",
+                ));
+            }
+
+            let coefficient = Complex64::new(
+                2.0 * real_sum / coherent_gain,
+                2.0 * imaginary_sum / coherent_gain,
+            );
+            bins.push(CqtBin {
+                center_frequency_hz,
+                window_size_samples,
+                support: FrameSupport {
+                    start_sample,
+                    end_sample,
+                },
+                coefficient,
+            });
+        }
+
+        frames.push(CqtFrame {
+            center_sample,
+            support: FrameSupport {
+                start_sample: center_sample - half_largest_window,
+                end_sample: center_sample + half_largest_window + 1,
+            },
+            bins,
+        });
+    }
+
+    if frames.is_empty() {
+        return Err(DspError::NoFrames);
+    }
+
+    Ok(ConstantQTransform {
+        config,
+        q_factor,
+        frames,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        analyze_multi_view, compute_erb_energy, compute_log_frequency_energy,
-        extract_complex_stft, ComplexStft, DspError, ErbConfig, LogFrequencyConfig,
-        MultiViewConfig, StftConfig,
+        analyze_multi_view, compute_constant_q, compute_erb_energy,
+        compute_log_frequency_energy, extract_complex_stft, ComplexStft, CqtConfig,
+        DspError, ErbConfig, LogFrequencyConfig, MultiViewConfig, StftConfig,
     };
 
     fn tone(sample_rate_hz: u32, frequency_hz: f64, sample_count: usize) -> Vec<f32> {
@@ -629,6 +865,121 @@ mod tests {
     }
 
     #[test]
+    fn true_cqt_resolves_bin_centered_tone_with_variable_windows_and_phase() {
+        let samples = tone(8192, 1000.0, 8192 * 3);
+        let cqt = compute_constant_q(
+            &samples,
+            CqtConfig {
+                sample_rate_hz: 8192,
+                hop_size: 256,
+                bins_per_octave: 12,
+                min_frequency_hz: 125.0,
+                max_frequency_hz: 4000.0,
+            },
+        )
+        .unwrap();
+
+        let frame = &cqt.frames[0];
+        let bin = &frame.bins[36];
+        assert!((bin.center_frequency_hz - 1000.0).abs() < 1.0e-9);
+        assert!((bin.coefficient.magnitude() - 1.0).abs() < 1.0e-3);
+        assert!(bin.window_size_samples < frame.bins[0].window_size_samples);
+        assert!(bin.support.start_sample <= frame.center_sample);
+        assert!(bin.support.end_sample > frame.center_sample);
+        assert_eq!(
+            bin.support.end_sample - bin.support.start_sample,
+            bin.window_size_samples
+        );
+    }
+
+    #[test]
+    fn true_cqt_frequency_centres_preserve_octave_and_semitone_geometry() {
+        let samples = tone(8192, 1000.0, 8192 * 3);
+        let cqt = compute_constant_q(
+            &samples,
+            CqtConfig {
+                sample_rate_hz: 8192,
+                hop_size: 512,
+                bins_per_octave: 12,
+                min_frequency_hz: 125.0,
+                max_frequency_hz: 4000.0,
+            },
+        )
+        .unwrap();
+        let bins = &cqt.frames[0].bins;
+
+        assert!((bins[48].center_frequency_hz / bins[36].center_frequency_hz - 2.0).abs() < 1.0e-12);
+        assert!((bins[37].center_frequency_hz / bins[36].center_frequency_hz
+            - 2.0f64.powf(1.0 / 12.0))
+            .abs()
+            < 1.0e-12);
+    }
+
+    #[test]
+    fn true_cqt_uses_valid_only_boundaries_without_padding() {
+        let samples = tone(8192, 1000.0, 1103);
+        let cqt = compute_constant_q(
+            &samples,
+            CqtConfig {
+                sample_rate_hz: 8192,
+                hop_size: 256,
+                bins_per_octave: 12,
+                min_frequency_hz: 125.0,
+                max_frequency_hz: 4000.0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(cqt.frames.len(), 1);
+        let frame = &cqt.frames[0];
+        assert_eq!(frame.support.start_sample, 0);
+        assert_eq!(frame.support.end_sample, samples.len());
+        assert!(frame.bins.iter().all(|bin| bin.support.start_sample < bin.support.end_sample));
+        assert!(matches!(
+            compute_constant_q(
+                &samples[..1102],
+                CqtConfig {
+                    sample_rate_hz: 8192,
+                    hop_size: 256,
+                    bins_per_octave: 12,
+                    min_frequency_hz: 125.0,
+                    max_frequency_hz: 4000.0,
+                }
+            ),
+            Err(DspError::SourceTooShort)
+        ));
+    }
+
+    #[test]
+    fn true_cqt_rejects_non_finite_samples_and_invalid_frequency_ranges() {
+        let mut samples = tone(8192, 1000.0, 8192 * 2);
+        samples[7] = f32::INFINITY;
+        let config = CqtConfig {
+            sample_rate_hz: 8192,
+            hop_size: 256,
+            bins_per_octave: 12,
+            min_frequency_hz: 125.0,
+            max_frequency_hz: 4000.0,
+        };
+        assert_eq!(
+            compute_constant_q(&samples, config),
+            Err(DspError::NonFiniteSample(7))
+        );
+
+        let clean = tone(8192, 1000.0, 8192 * 2);
+        assert!(matches!(
+            compute_constant_q(
+                &clean,
+                CqtConfig {
+                    max_frequency_hz: 5000.0,
+                    ..config
+                }
+            ),
+            Err(DspError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
     fn multiview_outputs_share_exact_source_frame_support() {
         let samples = tone(8192, 1000.0, 8192);
         let analysis = analyze_multi_view(
@@ -649,6 +1000,13 @@ mod tests {
                     bins_per_octave: 12,
                     min_hz: 125.0,
                     max_hz: 4000.0,
+                },
+                constant_q: CqtConfig {
+                    sample_rate_hz: 8192,
+                    hop_size: 256,
+                    bins_per_octave: 12,
+                    min_frequency_hz: 125.0,
+                    max_frequency_hz: 4000.0,
                 },
             },
         )
@@ -672,5 +1030,58 @@ mod tests {
             assert_eq!(erb_frame.support, stft_frame.support);
             assert_eq!(log_frame.support, stft_frame.support);
         }
+        assert!(!analysis.constant_q.frames.is_empty());
+        for frame in &analysis.constant_q.frames {
+            assert!(frame.support.end_sample <= samples.len());
+            for bin in &frame.bins {
+                assert!(bin.support.start_sample < bin.support.end_sample);
+                assert!(bin.support.end_sample <= samples.len());
+                assert!(bin.support.start_sample <= frame.center_sample);
+                assert!(bin.support.end_sample > frame.center_sample);
+            }
+        }
+    }
+
+    #[test]
+    fn true_cqt_complex_phase_tracks_quadrature_input() {
+        let config = CqtConfig {
+            sample_rate_hz: 8192,
+            hop_size: 256,
+            bins_per_octave: 12,
+            min_frequency_hz: 125.0,
+            max_frequency_hz: 4000.0,
+        };
+        let sine = compute_constant_q(&tone(8192, 1000.0, 8192 * 3), config).unwrap();
+        let cosine: Vec<f32> = (0..8192 * 3)
+            .map(|index| {
+                (std::f64::consts::TAU * 1000.0 * index as f64 / 8192.0).cos() as f32
+            })
+            .collect();
+        let cosine = compute_constant_q(&cosine, config).unwrap();
+        let sine_bin = sine.frames[0].bins[36].coefficient;
+        let cosine_bin = cosine.frames[0].bins[36].coefficient;
+        let denominator = cosine_bin.power();
+        let relative_real = (sine_bin.re * cosine_bin.re + sine_bin.im * cosine_bin.im)
+            / denominator;
+        let relative_imaginary = (sine_bin.im * cosine_bin.re - sine_bin.re * cosine_bin.im)
+            / denominator;
+        assert!(relative_real.abs() < 1.0e-3);
+        assert!((relative_imaginary + 1.0).abs() < 1.0e-3);
+    }
+
+    #[test]
+    fn cqt_reference_rejects_excessive_compute_budget() {
+        let samples = vec![0.0f32; 2_000_000];
+        let result = compute_constant_q(
+            &samples,
+            CqtConfig {
+                sample_rate_hz: 8192,
+                hop_size: 1,
+                bins_per_octave: 12,
+                min_frequency_hz: 125.0,
+                max_frequency_hz: 4000.0,
+            },
+        );
+        assert_eq!(result, Err(DspError::ComputeBudgetExceeded));
     }
 }
