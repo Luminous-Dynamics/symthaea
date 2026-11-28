@@ -127,6 +127,8 @@ pub struct PreQueryContextItemV1 {
     /// SHA-256 of UTF-8 text bytes or image file bytes, not an image path.
     pub context_item_sha256: String,
     pub evidence_use_receipt_sha256: String,
+    /// Canonical #13973 DecisionEvidenceUseLinkV1 digest for this selected item.
+    pub decision_evidence_use_link_sha256: String,
     pub source_lineage_receipt_sha256: String,
 }
 
@@ -211,6 +213,7 @@ pub struct ExposedEvidenceItemV1 {
     pub kind: ContextItemKindV1,
     pub context_item_sha256: String,
     pub evidence_use_receipt_sha256: String,
+    pub decision_evidence_use_link_sha256: String,
     pub source_lineage_receipt_sha256: String,
     /// Digest of the exact post-truncation reader request containing this item.
     pub reader_request_sha256: String,
@@ -394,6 +397,7 @@ pub fn seal_pre_query_selection_v1(
         if item.ordinal != index as u32 { return Err(AdapterRejectV1::InvalidContextOrdinal); }
         if !valid_digest(&item.context_item_sha256)
             || !valid_digest(&item.evidence_use_receipt_sha256)
+            || !valid_digest(&item.decision_evidence_use_link_sha256)
             || !valid_digest(&item.source_lineage_receipt_sha256) {
             return Err(AdapterRejectV1::InvalidDigest);
         }
@@ -401,6 +405,7 @@ pub fn seal_pre_query_selection_v1(
             item.kind,
             item.context_item_sha256.as_str(),
             item.evidence_use_receipt_sha256.as_str(),
+            item.decision_evidence_use_link_sha256.as_str(),
             item.source_lineage_receipt_sha256.as_str(),
         )) {
             return Err(AdapterRejectV1::DuplicateContextItem);
@@ -512,6 +517,7 @@ pub fn finalize_reader_exposure_v1(
             kind: item.kind,
             context_item_sha256: item.context_item_sha256.clone(),
             evidence_use_receipt_sha256: selected.evidence_use_receipt_sha256.clone(),
+            decision_evidence_use_link_sha256: selected.decision_evidence_use_link_sha256.clone(),
             source_lineage_receipt_sha256: selected.source_lineage_receipt_sha256.clone(),
             reader_request_sha256: reader_request_sha256.clone(),
         });
@@ -587,6 +593,7 @@ mod tests {
             kind: ContextItemKindV1::Text,
             context_item_sha256: digest(&format!("context-{label}")),
             evidence_use_receipt_sha256: digest(&format!("use-{label}")),
+            decision_evidence_use_link_sha256: digest(&format!("link-{label}")),
             source_lineage_receipt_sha256: digest(&format!("lineage-{label}")),
         }
     }
@@ -780,6 +787,7 @@ mod tests {
                     kind: ContextItemKindV1::Text,
                     context_item_sha256: same_content.clone(),
                     evidence_use_receipt_sha256: digest("use-source-a"),
+                    decision_evidence_use_link_sha256: digest("link-source-a"),
                     source_lineage_receipt_sha256: digest("lineage-source-a"),
                 },
                 PreQueryContextItemV1 {
@@ -787,6 +795,7 @@ mod tests {
                     kind: ContextItemKindV1::Text,
                     context_item_sha256: same_content.clone(),
                     evidence_use_receipt_sha256: digest("use-source-b"),
+                    decision_evidence_use_link_sha256: digest("link-source-b"),
                     source_lineage_receipt_sha256: digest("lineage-source-b"),
                 },
             ],
@@ -866,6 +875,18 @@ mod tests {
         let mut binding=run_binding();
         binding.harness_commit_sha="a".repeat(40);
         assert!(binding.seal().is_ok());
+    }
+
+
+    #[test]
+    fn prequery_selection_requires_a_canonical_decision_exposure_link() {
+        let query=query();
+        let mut selected=item(0,"bad-link");
+        selected.decision_evidence_use_link_sha256="not-a-sha256".into();
+        assert_eq!(
+            seal_pre_query_selection_v1(&query,digest("policy"),vec![selected]),
+            Err(AdapterRejectV1::InvalidDigest)
+        );
     }
 
 }
