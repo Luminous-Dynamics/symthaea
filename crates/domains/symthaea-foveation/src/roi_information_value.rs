@@ -378,11 +378,11 @@ mod tests {
     fn source_frame_future_and_staleness_are_rejected() {
         let value = estimate("roi-1", 0.8, 0.5, 10_000);
         assert_eq!(
-            evaluate_roi_information_value(&value, 999, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 999, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::FutureSourceTimestamp)
         );
         assert_eq!(
-            evaluate_roi_information_value(&value, 600_001, RoiInformationValueConfig::default()),
+            evaluate_roi_information_value(&value, 600_001, "clock:camera-1", RoiInformationValueConfig::default()),
             Err(RoiInformationValueError::StaleSourceFrame)
         );
     }
