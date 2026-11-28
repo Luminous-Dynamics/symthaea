@@ -8,11 +8,18 @@ use std::fmt::Display;
 use std::time::Instant;
 
 use crate::{
-    Action, CandidateFeedback, CandidateInput, Game, GridSpec, InteractiveCandidate, Observation,
+    Action, CandidateFeedback, CandidateInput, FeatureForecast, Game, GridSpec, InteractiveCandidate, Observation,
     ObservationMode, State, TerminalStatus, Trace, validate_decision,
 };
 
 const F1_ACTIONS: [Action; 4] = [Action::North, Action::East, Action::South, Action::West];
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct F1DecisionRecord {
+    pub action: Action,
+    pub confidence: Option<f64>,
+    pub forecasts: Vec<FeatureForecast>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct F1EpisodeReport {
@@ -25,6 +32,8 @@ pub struct F1EpisodeReport {
     /// Wall-clock duration of each candidate decide() call, in nanoseconds.
     /// Evaluator validation and environment transition time are excluded.
     pub decision_latency_ns: Vec<u128>,
+    /// Candidate forecasts/confidence paired by order with executed transitions.
+    pub decisions: Vec<F1DecisionRecord>,
     pub optimal_actions: Option<u32>,
     /// Present only for successful episodes with a reachable exact optimum.
     pub excess_actions: Option<i64>,
@@ -53,6 +62,7 @@ where
     let mut candidate_error = None;
     let mut actions_attempted = 0_u32;
     let mut decision_latency_ns = Vec::new();
+    let mut decisions = Vec::new();
 
     if let Err(error) = candidate.reset() {
         candidate_error = Some(format!("candidate reset failed: {error}"));
@@ -84,6 +94,11 @@ where
         }
 
         let action = decision.action;
+        decisions.push(F1DecisionRecord {
+            action,
+            confidence: decision.confidence,
+            forecasts: decision.forecasts,
+        });
         if let Err(error) = trace.record(&mut game, action) {
             candidate_error = Some(format!("environment trace failed: {error}"));
             break;
@@ -117,6 +132,7 @@ where
         terminal_status,
         actions_attempted,
         decision_latency_ns,
+        decisions,
         optimal_actions,
         excess_actions,
         final_state,
@@ -288,6 +304,17 @@ mod tests {
         assert!(!report.candidate_protocol_valid);
         assert_eq!(report.actions_attempted, 1);
         assert_eq!(report.candidate_error.as_deref(), Some("candidate transition feedback failed: feedback failed after task completion"));
+    }
+
+    #[test]
+    fn evaluator_preserves_candidate_forecasts_for_later_scoring() {
+        let spec = open_fixture();
+        let mut candidate = GreedyManhattanCandidate;
+        let report = evaluate_f1(spec, &mut candidate);
+        assert_eq!(report.decisions.len(), report.actions_attempted as usize);
+        assert_eq!(report.decisions[0].action, report.events[0].action);
+        assert_eq!(report.decisions[0].confidence, None);
+        assert_eq!(report.decisions[0].forecasts.len(), 2);
     }
 
     #[test]
