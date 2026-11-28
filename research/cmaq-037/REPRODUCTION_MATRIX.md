@@ -28,6 +28,7 @@ CMAQ-035 established an internal comparison between fixed and ONS betting. CMAQ-
 | Contextual paired kernel discrepancy | CMAQ-049: one-hot predictable context blocks × paired finite Fourier response differences | Conditional paired-distribution equality within pre-response strata; blocks marginal cancellation, but finite context/feature approximation |
 | Continuous-covariate paired kernel discrepancy | CMAQ-050: continuous covariate Fourier map × paired response Fourier difference | Smooth product-feature conditional comparison without hard bins; finite product feature map and dimension cap |
 | Conditional representation e-portfolio | CMAQ-051: fixed equal-weight mixture of context-block and continuous product-feature paired e-processes | Avoids post-hoc representation selection under a shared conditional paired null; stopped member wealth remains in portfolio |
+| Reference-target uncertainty calibration | CMAQ-052: independent bounded reference split × simultaneous Hoeffding mean box × alpha_test+delta budget | Honest finite-reference target coverage for iid stationary streams; does not cover arbitrary serial dependence |
 | CS-risk | Anytime confidence-sequence monitor of a matched running/rolling average risk | Complementary estimand, not a like-for-like per-instance drift detector |
 
 Do not implement CCTM by multiplying repeated marginal conformal p-values or by using a rolling empirical breach rate. Implement its actual conditional calibration and martingale construction from the reference paper/code.
