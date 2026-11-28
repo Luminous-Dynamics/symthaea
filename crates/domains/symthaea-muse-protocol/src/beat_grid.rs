@@ -1255,10 +1255,14 @@ mod tests {
         );
         assert!(found
             .iter()
-            .any(|violation| violation.code == TransitionGridBindingViolationCode::TempoDeltaExceeded));
+            .any(|violation| {
+                violation.code == TransitionGridBindingViolationCode::TempoDeltaExceeded
+            }));
         assert!(found
             .iter()
-            .any(|violation| violation.code == TransitionGridBindingViolationCode::TempoRatioExceeded));
+            .any(|violation| {
+                violation.code == TransitionGridBindingViolationCode::TempoRatioExceeded
+            }));
     }
 
     #[test]
@@ -1272,7 +1276,7 @@ mod tests {
             point.bpm_milli = 60_000;
         }
         for point in &mut target_report.hypotheses[0].tempo_map {
-            point.bpm_milli = 61_000;
+            point.bpm_milli = 60_500;
         }
         let found = verify_transition_grid_binding(
             &contract,
