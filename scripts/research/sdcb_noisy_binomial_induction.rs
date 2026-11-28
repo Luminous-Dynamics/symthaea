@@ -235,9 +235,11 @@ fn minimum_sample_frontier(
 ) -> Exact<FrontierPoint> {
     let p0 = p0_nominal.add(epsilon)?;
     let p1 = p1_nominal.sub(epsilon)?;
-    if p0.cmp(p1)? != Ordering::Less
+    if !epsilon.is_nonnegative()
+        || p0.cmp(p1)? != Ordering::Less
         || p0.cmp(Q::one())? != Ordering::Less
         || !p1.is_nonnegative()
+        || p1.cmp(Q::one())? == Ordering::Greater
     {
         return Err(Error::InvalidInput);
     }
@@ -314,6 +316,12 @@ fn verify_induced_process(terminal: &FixedTest) -> Exact<(Vec<Vec<Q>>, Induction
     let mut terminal_values_match = true;
     for s in 0..=n_max {
         terminal_values_match &= rows[n_max][s] == terminal.rejection_probability_by_success_count[s];
+        if s > 0
+            && terminal.rejection_probability_by_success_count[s]
+                .cmp(terminal.rejection_probability_by_success_count[s - 1])? == Ordering::Less
+        {
+            return Err(Error::InvalidInput);
+        }
     }
     if !terminal_values_match {
         return Err(Error::InvalidInput);
@@ -502,8 +510,16 @@ mod tests {
 
     #[test]
     fn identical_passive_and_upstream_laws_cannot_exceed_alpha() {
-        let common = q(1, 2);
-        assert_eq!(common, common);
+        let common_law = binomial_law(8, q(1, 2)).unwrap();
+        let constant_test = vec![ALPHA; common_law.len()];
+        let mut size = Q::zero();
+        let mut power = Q::zero();
+        for (probability, rejection_probability) in common_law.iter().zip(constant_test.iter()) {
+            size = size.add(probability.mul(*rejection_probability).unwrap()).unwrap();
+            power = power.add(probability.mul(*rejection_probability).unwrap()).unwrap();
+        }
+        assert_eq!(size, ALPHA);
+        assert_eq!(power, ALPHA);
         assert_eq!(overlap_control_power(ALPHA), ALPHA);
     }
 
