@@ -142,7 +142,6 @@ pub fn validate_benchmark_license_manifest(
         return Err(BenchmarkLicenseGateError::InvalidIdentifier);
     }
     if !(manifest.source_uri.starts_with("https://")
-        || manifest.source_uri.starts_with("http://")
         || manifest.source_uri.starts_with("urn:"))
     {
         return Err(BenchmarkLicenseGateError::InvalidSourceUri);
@@ -348,7 +347,8 @@ fn validate_utc_timestamp(value: &str) -> Result<(), BenchmarkLicenseGateError> 
         2 => 28,
         _ => 0,
     };
-    if day == 0
+    if year == 0
+        || day == 0
         || day > days_in_month
         || hour > 23
         || minute > 59
@@ -570,6 +570,37 @@ mod tests {
                 None,
             ),
             Err(BenchmarkLicenseGateError::IntendedUseMismatch)
+        );
+    }
+
+    #[test]
+    fn insecure_http_source_uri_is_rejected() {
+        let mut value = manifest();
+        value.source_uri = "http://example.invalid/dataset".to_owned();
+        assert_eq!(
+            validate_benchmark_license_manifest(
+                &value,
+                "2026-11-28T00:00:00Z",
+                BenchmarkIntendedUse::CommercialDevelopment,
+                BenchmarkOperation::Evaluation,
+                None,
+            ),
+            Err(BenchmarkLicenseGateError::InvalidSourceUri)
+        );
+    }
+
+    #[test]
+    fn year_zero_is_not_accepted_as_a_canonical_utc_timestamp() {
+        let value = manifest();
+        assert_eq!(
+            validate_benchmark_license_manifest(
+                &value,
+                "0000-01-01T00:00:00Z",
+                BenchmarkIntendedUse::CommercialDevelopment,
+                BenchmarkOperation::Evaluation,
+                None,
+            ),
+            Err(BenchmarkLicenseGateError::InvalidUtcTimestamp)
         );
     }
 
