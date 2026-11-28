@@ -490,6 +490,15 @@ fn compute_calibration(trials: &[(f64, bool)], num_bins: usize) -> (f64, f64, f6
 /// Metacognitive Ignition Tracking Benchmark.
 pub struct MetacognitiveIgnitionBenchmark;
 
+fn metric_with_bounds(samples: &[f64], lower: f64, upper: Option<f64>) -> MetricValue {
+    MetricValue::from_samples_with_bounds(
+        samples,
+        crate::registry::MetricBounds { lower, upper },
+    )
+    .expect("theory-probe metric observations must satisfy declared support")
+}
+
+
 impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
     fn name(&self) -> &str {
         "QualiaConfidence::MetacognitiveIgnition"
@@ -697,11 +706,11 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // evidence-bounded name as the preferred metric.
         result.insert(
             "spontaneous_tracking_score",
-            MetricValue::from_samples(&[spontaneous_tracking_score]),
+            metric_with_bounds(&[spontaneous_tracking_score], 0.0, Some(1.0)),
         );
         result.insert(
             "shared_input_alignment_score",
-            MetricValue::from_samples(&[spontaneous_tracking_score]),
+            metric_with_bounds(&[spontaneous_tracking_score], 0.0, Some(1.0)),
         );
         result.insert(
             "gwt_sigmoid_r_squared",
@@ -795,8 +804,8 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
             "The legacy spontaneous_tracking_score is a shared-input HOT/GWT alignment heuristic, not evidence of spontaneous emergence. ROC AUC and calibration ECE use the target activation/confidence value supplied to HOT; it is also the common evidence input to GWT. These are shared-input discrimination/reliability diagnostics, not independent HOT metacognitive readouts."
                 .to_string(),
         );
-        result.insert("roc_auc", MetricValue::from_samples(&[roc_auc]));
-        result.insert("hot_input_score_roc_auc", MetricValue::from_samples(&[roc_auc]));
+        result.insert("roc_auc", metric_with_bounds(&[roc_auc], 0.0, Some(1.0)));
+        result.insert("hot_input_score_roc_auc", metric_with_bounds(&[roc_auc], 0.0, Some(1.0)));
         result.insert(
             "roc_optimal_threshold",
             MetricValue::from_samples(&[roc_optimal_threshold]),
@@ -810,15 +819,15 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // Confidence calibration
         result.insert(
             "calibration_ece",
-            MetricValue::from_samples(&[calibration_ece]),
+            metric_with_bounds(&[calibration_ece], 0.0, Some(1.0)),
         );
         result.insert(
             "hot_input_score_calibration_ece",
-            MetricValue::from_samples(&[calibration_ece]),
+            metric_with_bounds(&[calibration_ece], 0.0, Some(1.0)),
         );
         result.insert(
             "hot_input_score_reliability_error",
-            MetricValue::from_samples(&[calibration_ece]),
+            metric_with_bounds(&[calibration_ece], 0.0, Some(1.0)),
         );
         result.insert(
             "calibration_slope",
