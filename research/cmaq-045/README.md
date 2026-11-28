@@ -59,7 +59,7 @@ Arguments are replication count, horizon, seed and number of pre-change null obs
 
 The probe compares CMAQ-038's histogram spectrum with CMAQ-045's conditional-context spectrum. Both receive identical rank streams:
 - exact Pólya-urn predictive-rank null;
-- a stationary-uniform sticky Markov alternative that repeats its previous rank with probability 0.8 and otherwise redraws uniformly over all rank buckets.
+- a stationary-uniform sticky Markov alternative that starts from a uniform rank at the change point, then repeats its previous rank with probability 0.8 and otherwise redraws uniformly over all rank buckets. This initializes the post-change Markov chain in its exact uniform stationary law rather than inheriting the preceding Pólya-urn state.
 
 The Markov transition matrix has the uniform distribution as a stationary marginal but introduces serial persistence. This is a synthetic diagnostic of a temporal-dependence blind spot; it is not a physical dataset, an ImageNet-C/CCTM reproduction or a general claim that every temporal dependency shift is detected.
 
