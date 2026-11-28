@@ -292,7 +292,7 @@ def validate_subject(bdf_path, events_path):
 def main():
     print()
     print('=' * 72)
-    print(' MEDITATIONSENTINEL VALIDATION'.center(72))
+    print(' EXPLORATORY EEG FEATURE SUMMARY'.center(72))
     print(' OpenNeuro ds001787 - Meditation EEG'.center(72))
     print('=' * 72)
     print()
