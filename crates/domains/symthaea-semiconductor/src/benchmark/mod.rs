@@ -1,10 +1,10 @@
 //! Versioned benchmark protocols and independent scoring primitives.
 
 pub mod binary_metrics;
+pub mod calibration_requalification;
 pub mod capacity_aware_feedback;
 pub mod conformal_interval_builder;
 pub mod delayed_conformal_aci;
-pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
@@ -142,36 +142,32 @@ pub use vm_snapshot_dependency_impact::{
 };
 
 pub use delayed_conformal_aci::{
-    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_ENGINE_SCHEMA_V1,
-    DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1,
-    DELAYED_ACI_PREDICTION_SCHEMA_V1, DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1,
-    DelayToMemoryDiagnosticV1, DelayedAciDispositionV1, DelayedAciEngineV1,
-    DelayedAciErrorV1, DelayedAciGuaranteeStateV1, DelayedAciLabelDeliveryV1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_ENGINE_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
+    DELAYED_ACI_PREDICTION_RECEIPT_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DELAYED_ACI_UPDATE_RECEIPT_SCHEMA_V1, DelayToMemoryDiagnosticV1, DelayedAciDispositionV1,
+    DelayedAciEngineV1, DelayedAciErrorV1, DelayedAciGuaranteeStateV1, DelayedAciLabelDeliveryV1,
     DelayedAciPolicyV1, DelayedAciPredictionInputV1, DelayedAciPredictionReceiptV1,
     DelayedAciReasonV1, DelayedAciUpdateReceiptV1, ResidualMemoryBasisV1,
-    create_delayed_aci_engine_v1, delayed_aci_alpha_for_round_v1,
-    deliver_delayed_aci_label_v1, estimate_delay_to_memory_v1,
-    register_delayed_aci_prediction_v1,
+    create_delayed_aci_engine_v1, delayed_aci_alpha_for_round_v1, deliver_delayed_aci_label_v1,
+    estimate_delay_to_memory_v1, register_delayed_aci_prediction_v1,
 };
 
 pub use capacity_aware_feedback::{
     CA_OCRC_ENGINE_SCHEMA_V1, CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1,
-    CA_OCRC_ROUND_SCHEMA_V1, CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1,
-    CaOcrcEngineV1, CaOcrcErrorV1, CaOcrcFeedbackReceiptV1, CaOcrcFeedbackV1,
-    CaOcrcGuaranteeStateV1, CaOcrcOptimizedProxyPolicyV1, CaOcrcPolicyV1,
-    CaOcrcPredictionKindV1, CaOcrcReasonV1, CaOcrcRiskGapBoundV1,
-    CaOcrcRoundInputV1, CaOcrcTrackedRoundV1, CaOcrcTrackingDecisionV1,
-    CaOcrcTrackingDispositionV1, ca_ocrc_proxy_survival_v1,
-    ca_ocrc_risk_gap_bound_v1, create_ca_ocrc_engine_v1,
-    optimize_ca_ocrc_proxy_policy_v1, receive_ca_ocrc_feedback_v1,
+    CA_OCRC_ROUND_SCHEMA_V1, CA_OCRC_UPDATE_RECEIPT_SCHEMA_V1, CaOcrcEngineV1, CaOcrcErrorV1,
+    CaOcrcFeedbackReceiptV1, CaOcrcFeedbackV1, CaOcrcGuaranteeStateV1,
+    CaOcrcOptimizedProxyPolicyV1, CaOcrcPolicyV1, CaOcrcPredictionKindV1, CaOcrcReasonV1,
+    CaOcrcRiskGapBoundV1, CaOcrcRoundInputV1, CaOcrcTrackedRoundV1, CaOcrcTrackingDecisionV1,
+    CaOcrcTrackingDispositionV1, ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
+    create_ca_ocrc_engine_v1, optimize_ca_ocrc_proxy_policy_v1, receive_ca_ocrc_feedback_v1,
     start_ca_ocrc_round_v1,
 };
 
 pub use conformal_interval_builder::{
+    BoundedConformalScoreContractV1, BoundedConformalScoreKindV1, BoundedPredictionSetInputV1,
+    BoundedPredictionSetKindV1, BoundedPredictionSetReceiptV1,
     CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1, CONFORMAL_INTERVAL_INPUT_SCHEMA_V1,
     CONFORMAL_SCORE_POLICY_SCHEMA_V1, CONFORMAL_SET_RECEIPT_SCHEMA_V1,
-    BoundedConformalScoreContractV1, BoundedConformalScoreKindV1,
-    BoundedPredictionSetInputV1, BoundedPredictionSetKindV1, BoundedPredictionSetReceiptV1,
     ConformalCalibrationSampleV1, ConformalCalibrationScoreV1, ConformalIntervalInputV1,
     ConformalScoreKindV1, ConformalScorePolicyV1, ConformalSetBuildReasonV1,
     ConformalSetBuildStatusV1, ConformalSetBuilderErrorV1, ConformalSetReceiptV1,
