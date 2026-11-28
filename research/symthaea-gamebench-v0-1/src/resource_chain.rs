@@ -502,7 +502,7 @@ pub(crate) fn optimal_crafting_plan(spec: &CraftingSpec) -> Option<Vec<CraftingA
     let start_key = (start, spec.piles.iter().map(|pile| pile.amount).collect::<Vec<_>>());
     let mut path = Vec::new();
     while cursor != start_key {
-        let (previous, action) = *parents.get(&cursor)?;
+        let (previous, action) = parents.get(&cursor)?.clone();
         path.push(action);
         cursor = previous;
     }
