@@ -14,14 +14,14 @@
 //! not-yet-started components. This does not reset the policy at each start.
 
 use cmaq_053_compositional_risk_budget::Rational;
-use cmaq_055_dyadic_start_time_prior::{future_mass_after, weight_for_start, StartPriorError};
+use cmaq_054_evidence_adaptive_kernel_family::KernelExpertConfig;
+use cmaq_055_dyadic_start_time_prior::{StartPriorError, future_mass_after, weight_for_start};
 use cmaq_056_typed_null_manifest::{
     KernelFamilyManifest, ManifestError, NullCalibration, TypedRiskPlan,
 };
 use cmaq_057_predictable_adaptive_kernel_betting::{
     AdaptiveBetError, ExpertFactorUpdate, PredictableAdaptiveKernelMonitor,
 };
-use cmaq_054_evidence_adaptive_kernel_family::KernelExpertConfig;
 use sha2::{Digest, Sha256};
 
 const MAX_RENEWAL_HORIZON: u64 = 1_024;
@@ -289,13 +289,9 @@ impl CapitalRestartRenewalMonitor {
         // Prepare the shared policy without mutating it or cloning its
         // O(T) replay ledger. The parent inspects the emitted factors and
         // stages every renewal/posterior calculation before committing both.
-        let prepared_policy = self.policy.prepare_pair(
-            sequence,
-            pair_id,
-            covariate,
-            x,
-            y,
-        )?;
+        let prepared_policy = self
+            .policy
+            .prepare_pair(sequence, pair_id, covariate, x, y)?;
         let policy_update = prepared_policy.update().clone();
         if policy_update.action.threshold_enforced || policy_update.action.quarantined {
             return Err(RenewalError::PolicyThresholdMustBeExternal);
@@ -305,8 +301,7 @@ impl CapitalRestartRenewalMonitor {
         {
             return Err(RenewalError::PolicyIdentityMismatch);
         }
-        if policy_update.policy_trace_sha256 == self.last_policy_trace_sha256
-        {
+        if policy_update.policy_trace_sha256 == self.last_policy_trace_sha256 {
             return Err(RenewalError::PolicyIdentityMismatch);
         }
         if policy_update.expert_factors.len() != self.kernels.len() {
@@ -342,19 +337,16 @@ impl CapitalRestartRenewalMonitor {
                 return Err(RenewalError::InvalidFactor);
             }
             let expected_log_factor = factor.betting_factor.ln();
-            if (expected_log_factor - factor.log_factor).abs()
-                > FACTOR_CONSISTENCY_TOLERANCE
-            {
+            if (expected_log_factor - factor.log_factor).abs() > FACTOR_CONSISTENCY_TOLERANCE {
                 return Err(RenewalError::FactorMismatch);
             }
 
-            let (cumulative, inverse_prefix, restart_wealth) =
-                advance_kernel_restart(
-                    self.log_cumulative_factor_wealth[index],
-                    self.log_weighted_inverse_prefix_sum[index],
-                    log_start_prior,
-                    factor.log_factor,
-                )?;
+            let (cumulative, inverse_prefix, restart_wealth) = advance_kernel_restart(
+                self.log_cumulative_factor_wealth[index],
+                self.log_weighted_inverse_prefix_sum[index],
+                log_start_prior,
+                factor.log_factor,
+            )?;
             if (cumulative - factor.log_e_value).abs()
                 > FACTOR_CONSISTENCY_TOLERANCE * (1.0 + cumulative.abs())
             {
@@ -366,11 +358,8 @@ impl CapitalRestartRenewalMonitor {
             next_restart_wealth.push(restart_wealth);
         }
 
-        let next_log_mixture = mixture_log_wealth(
-            &self.kernels,
-            &next_restart_wealth,
-            log_future_mass,
-        )?;
+        let next_log_mixture =
+            mixture_log_wealth(&self.kernels, &next_restart_wealth, log_future_mass)?;
         let future_posterior = (log_future_mass - next_log_mixture).exp();
         if !future_posterior.is_finite()
             || !(0.0..=1.0 + POSTERIOR_TOLERANCE).contains(&future_posterior)
@@ -383,9 +372,7 @@ impl CapitalRestartRenewalMonitor {
         for (index, kernel) in self.kernels.iter().enumerate() {
             let log_weighted_wealth = kernel.log_weight + next_restart_wealth[index];
             let posterior = (log_weighted_wealth - next_log_mixture).exp();
-            if !posterior.is_finite()
-                || !(0.0..=1.0 + POSTERIOR_TOLERANCE).contains(&posterior)
-            {
+            if !posterior.is_finite() || !(0.0..=1.0 + POSTERIOR_TOLERANCE).contains(&posterior) {
                 return Err(RenewalError::PosteriorNormalizationFailure);
             }
             posterior_sum += posterior;
@@ -397,9 +384,7 @@ impl CapitalRestartRenewalMonitor {
                 log_cumulative_factor_wealth: next_cumulative[index],
             });
         }
-        if !posterior_sum.is_finite()
-            || (posterior_sum - 1.0).abs() > POSTERIOR_TOLERANCE
-        {
+        if !posterior_sum.is_finite() || (posterior_sum - 1.0).abs() > POSTERIOR_TOLERANCE {
             return Err(RenewalError::PosteriorNormalizationFailure);
         }
 
@@ -587,7 +572,10 @@ fn log_sum_exp(values: &[f64]) -> Result<f64, RenewalError> {
         return Err(RenewalError::ArithmeticOverflow);
     }
     let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let scaled_sum = values.iter().map(|value| (*value - maximum).exp()).sum::<f64>();
+    let scaled_sum = values
+        .iter()
+        .map(|value| (*value - maximum).exp())
+        .sum::<f64>();
     let result = maximum + scaled_sum.ln();
     if result.is_finite() {
         Ok(result)
@@ -658,9 +646,7 @@ mod tests {
     use super::*;
     use cmaq_046_convex_target_approachability::BoxTarget;
     use cmaq_048_fourier_kernel_approachability::FourierFeatureMap;
-    use cmaq_053_compositional_risk_budget::{
-        FleetBudgetPlan, FleetScope, RepresentationWeight,
-    };
+    use cmaq_053_compositional_risk_budget::{FleetBudgetPlan, FleetScope, RepresentationWeight};
 
     const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -678,18 +664,9 @@ mod tests {
     ) -> KernelExpertConfig {
         KernelExpertConfig {
             expert_id: id.into(),
-            response_map: FourierFeatureMap::new(
-                1,
-                vec![vec![frequency]],
-                map_sha.into(),
-            )
-            .unwrap(),
-            covariate_map: FourierFeatureMap::new(
-                1,
-                vec![vec![0.5]],
-                covariate_sha.into(),
-            )
-            .unwrap(),
+            response_map: FourierFeatureMap::new(1, vec![vec![frequency]], map_sha.into()).unwrap(),
+            covariate_map: FourierFeatureMap::new(1, vec![vec![0.5]], covariate_sha.into())
+                .unwrap(),
             target: BoxTarget::new(vec![-0.01; 4], vec![0.01; 4]).unwrap(),
             prior_weight: Rational::new(1, 2).unwrap(),
             target_sha256: target_sha.into(),
@@ -705,14 +682,9 @@ mod tests {
         ]
     }
 
-    fn typed_plan(
-        configurations: &[KernelExpertConfig],
-    ) -> (TypedRiskPlan, KernelFamilyManifest) {
-        let manifest = KernelFamilyManifest::build(
-            configurations,
-            NullCalibration::direct_v1(),
-        )
-        .unwrap();
+    fn typed_plan(configurations: &[KernelExpertConfig]) -> (TypedRiskPlan, KernelFamilyManifest) {
+        let manifest =
+            KernelFamilyManifest::build(configurations, NullCalibration::direct_v1()).unwrap();
         let fleet = FleetBudgetPlan::new(
             Rational::probability(1, 20).unwrap(),
             SHA_A.into(),
@@ -742,14 +714,7 @@ mod tests {
     fn monitor(horizon: u64) -> CapitalRestartRenewalMonitor {
         let configurations = configs();
         let (plan, manifest) = typed_plan(&configurations);
-        CapitalRestartRenewalMonitor::new(
-            &plan,
-            &manifest,
-            &configurations,
-            0.5,
-            horizon,
-        )
-        .unwrap()
+        CapitalRestartRenewalMonitor::new(&plan, &manifest, &configurations, 0.5, horizon).unwrap()
     }
 
     fn naive_restart_logs(factors_by_kernel: &[Vec<f64>]) -> (Vec<f64>, f64) {
@@ -763,7 +728,8 @@ mod tests {
                 for factor in &factors[(start - 1) as usize..] {
                     log_product += factor.ln();
                 }
-                start_terms.push(rational_log(weight_for_start(start).unwrap()).unwrap() + log_product);
+                start_terms
+                    .push(rational_log(weight_for_start(start).unwrap()).unwrap() + log_product);
             }
             kernel_logs.push(log_sum_exp(&start_terms).unwrap());
         }
@@ -784,14 +750,13 @@ mod tests {
             let nu = weight_for_start(time).unwrap();
             let log_nu = rational_log(nu).unwrap();
             for kernel in 0..2 {
-                let (next_cumulative, next_log_a, next_log_restart) =
-                    advance_kernel_restart(
-                        cumulative[kernel],
-                        log_a[kernel],
-                        log_nu,
-                        factors[kernel][(time - 1) as usize].ln(),
-                    )
-                    .unwrap();
+                let (next_cumulative, next_log_a, next_log_restart) = advance_kernel_restart(
+                    cumulative[kernel],
+                    log_a[kernel],
+                    log_nu,
+                    factors[kernel][(time - 1) as usize].ln(),
+                )
+                .unwrap();
                 cumulative[kernel] = next_cumulative;
                 log_a[kernel] = next_log_a;
                 log_restart[kernel] = next_log_restart;
@@ -809,11 +774,8 @@ mod tests {
                 );
             }
 
-            let manifest = KernelFamilyManifest::build(
-                &configs(),
-                NullCalibration::direct_v1(),
-            )
-            .unwrap();
+            let manifest =
+                KernelFamilyManifest::build(&configs(), NullCalibration::direct_v1()).unwrap();
             let weights = manifest.representation_weights().to_vec();
             let log_total = log_sum_exp(&[
                 naive_future,
@@ -834,8 +796,7 @@ mod tests {
     #[test]
     fn renewal_recurrence_matches_naive_enumerator_across_kernel_counts_and_dyadic_horizons() {
         let horizons = [
-            1usize, 2, 3, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 511, 512,
-            1_024,
+            1usize, 2, 3, 7, 8, 15, 16, 31, 32, 63, 64, 127, 128, 255, 256, 511, 512, 1_024,
         ];
 
         for kernel_count in [1usize, 2, 3, 7] {
@@ -893,7 +854,8 @@ mod tests {
                 // Equal rational priors are used here to test the aggregation
                 // independently of the manifest-construction test fixtures.
                 let log_kernel_prior = -(kernel_count as f64).ln();
-                let mut fast_terms = vec![rational_log(future_mass_after(horizon as u64).unwrap()).unwrap()];
+                let mut fast_terms =
+                    vec![rational_log(future_mass_after(horizon as u64).unwrap()).unwrap()];
                 let mut naive_terms = vec![naive_future];
                 for kernel in 0..kernel_count {
                     fast_terms.push(log_kernel_prior + restart_wealth[kernel]);
@@ -954,12 +916,17 @@ mod tests {
                 .unwrap();
             assert!(!update.quarantined);
             assert!(update.log_mixture_e_value.abs() < 1e-10);
-            assert_eq!(update.future_start_mass, future_mass_after(sequence).unwrap());
-            assert!((update.future_start_posterior
-                - update.future_start_mass.numerator() as f64
-                    / update.future_start_mass.denominator() as f64)
-                .abs()
-                < 1e-10);
+            assert_eq!(
+                update.future_start_mass,
+                future_mass_after(sequence).unwrap()
+            );
+            assert!(
+                (update.future_start_posterior
+                    - update.future_start_mass.numerator() as f64
+                        / update.future_start_mass.denominator() as f64)
+                    .abs()
+                    < 1e-10
+            );
         }
         assert_eq!(monitor.observations_seen(), 64);
         assert_eq!(monitor.restart_state_count(), 6);
@@ -996,20 +963,15 @@ mod tests {
                 ([0.0], [0.0], [std::f64::consts::TAU])
             };
             let update = monitor
-                .observe_pair(
-                    sequence,
-                    &format!("shift-{sequence}"),
-                    &covariate,
-                    &x,
-                    &y,
-                )
+                .observe_pair(sequence, &format!("shift-{sequence}"), &covariate, &x, &y)
                 .unwrap();
             if update.quarantined {
                 alarm = Some(update);
                 break;
             }
         }
-        let update = alarm.expect("registered conditional feature shift should accumulate evidence");
+        let update =
+            alarm.expect("registered conditional feature shift should accumulate evidence");
         assert!(update.log_mixture_e_value >= update.log_threshold);
         assert!(!update.expert_factors.is_empty());
         assert!(!update.policy_trace_sha256.is_empty());
