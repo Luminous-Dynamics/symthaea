@@ -420,7 +420,7 @@ fn solve_flow(
             augmentation = augmentation.min(residual[from][cursor]);
             cursor = from;
         }
-        if augmentation == 0 || augmentation == u64::MAX {
+        if augmentation == 0 {
             return Err(format!("{}: invalid augmenting path capacity", case.id));
         }
 
