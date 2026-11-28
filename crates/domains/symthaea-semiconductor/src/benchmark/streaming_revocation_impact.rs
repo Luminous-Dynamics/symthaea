@@ -375,22 +375,24 @@ pub fn assess_streaming_revocation_impact_v1(
     for journal_entry in &input.engine.accepted_update_journal {
         let sequence = journal_entry.update_sequence;
         let own = risks.get(&sequence).copied().unwrap_or(CurrentRisk::Unknown);
+        let earlier_blocked = direct_blocked.iter().any(|value| *value < sequence);
+        let earlier_unknown = direct_unknown.iter().any(|value| *value < sequence);
         let state = match own {
             CurrentRisk::Blocked => StreamingUpdateImpactStateV1::DirectReplayRequired,
+            CurrentRisk::Unknown if earlier_blocked => {
+                inherited.push(sequence);
+                StreamingUpdateImpactStateV1::InheritedReplayRequired
+            }
             CurrentRisk::Unknown => StreamingUpdateImpactStateV1::DirectIndeterminate,
-            CurrentRisk::Clear => {
-                let earlier_blocked = direct_blocked.iter().any(|value| *value < sequence);
-                let earlier_unknown = direct_unknown.iter().any(|value| *value < sequence);
-                if earlier_blocked {
-                    inherited.push(sequence);
-                    StreamingUpdateImpactStateV1::InheritedReplayRequired
-                } else if earlier_unknown {
-                    inherited.push(sequence);
-                    StreamingUpdateImpactStateV1::InheritedIndeterminate
-                } else {
-                    StreamingUpdateImpactStateV1::Unaffected
-                }
-            },
+            CurrentRisk::Clear if earlier_blocked => {
+                inherited.push(sequence);
+                StreamingUpdateImpactStateV1::InheritedReplayRequired
+            }
+            CurrentRisk::Clear if earlier_unknown => {
+                inherited.push(sequence);
+                StreamingUpdateImpactStateV1::InheritedIndeterminate
+            }
+            CurrentRisk::Clear => StreamingUpdateImpactStateV1::Unaffected,
         };
         let inherited_from_label_ids = input.engine.accepted_update_journal
             .iter()
@@ -746,6 +748,24 @@ mod tests {
         reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
         let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
         assert_eq!(report.status, StreamingRevocationImpactStatusV1::Unknown);
+    }
+
+    #[test]
+    fn blocked_evidence_takes_precedence_when_an_earlier_update_is_unknown() {
+        let engine = two_update_engine();
+        let mut reports = latest_reports(&engine);
+        reports[0].eligibility = LabelConsumptionEligibilityV1::Unknown;
+        reports[0].downstream_consumption_allowed = false;
+        reports[0].report_sha256 = label_report_digest(&reports[0]).unwrap();
+        reports[1].eligibility = LabelConsumptionEligibilityV1::Blocked;
+        reports[1].downstream_consumption_allowed = false;
+        reports[1].report_sha256 = label_report_digest(&reports[1]).unwrap();
+
+        let report = assess_streaming_revocation_impact_v1(&input(engine, reports)).unwrap();
+        assert_eq!(report.status, StreamingRevocationImpactStatusV1::RebuildRequired);
+        assert_eq!(report.first_affected_update_sequence, Some(1));
+        assert_eq!(report.directly_indeterminate_update_sequences, vec![1]);
+        assert_eq!(report.directly_invalidated_update_sequences, vec![2]);
     }
 
     #[test]
