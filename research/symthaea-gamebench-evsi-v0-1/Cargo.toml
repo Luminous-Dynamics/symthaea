@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-gamebench-evsi"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+description = "Exact finite decision-value-of-intervention reference for Symthaea GameBench"
+
+[lib]
+path = "src/lib.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
