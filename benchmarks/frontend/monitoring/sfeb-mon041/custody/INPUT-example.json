@@ -1,0 +1,17 @@
+{
+  "profile": "mon041-custody-input-v1",
+  "version": "1.0.0",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-28T08:00:00Z",
+  "claim_id": "claim-example-001",
+  "trial_id": "trial-example-001",
+  "recovery_boundary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "required_evidence_classes": ["postgres_source_truth", "kafka_partition_capture"],
+  "expected_sources": {"postgres_source_truth": "postgres-primary", "kafka_partition_capture": "kafka-cluster-01"},
+  "issued_nonces": [],
+  "used_nonces": [],
+  "trusted_keys": [],
+  "receipts": [],
+  "max_receipt_age_seconds": 3600,
+  "allowed_clock_skew_seconds": 30
+}
