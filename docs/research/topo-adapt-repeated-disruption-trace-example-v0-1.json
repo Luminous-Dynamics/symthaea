@@ -1,0 +1,250 @@
+{
+  "schema_version": "topo_adapt_repeated_disruption_trace_v0_1",
+  "status": "deterministic_contract_example_not_controller_result",
+  "purpose": "Prove state persistence across repeated failures, action persistence, and cumulative edit accounting.",
+  "graph_semantics": {
+    "directed": true,
+    "source": {
+      "node_id": 0,
+      "supply": 4
+    },
+    "sinks": [
+      {
+        "node_id": 3,
+        "demand": 4
+      }
+    ],
+    "capacities": "nonnegative integer flow units",
+    "path_latency": "sum of edge latency units on the delivered source-to-sink path",
+    "cumulative_edit_budget": 2
+  },
+  "initial_state": {
+    "nodes": [
+      {
+        "id": 0,
+        "role": "source",
+        "supply": 4
+      },
+      {
+        "id": 1,
+        "role": "transit"
+      },
+      {
+        "id": 2,
+        "role": "transit"
+      },
+      {
+        "id": 3,
+        "role": "sink",
+        "demand": 4
+      },
+      {
+        "id": 4,
+        "role": "transit"
+      },
+      {
+        "id": 5,
+        "role": "neutral"
+      },
+      {
+        "id": 6,
+        "role": "neutral"
+      },
+      {
+        "id": 7,
+        "role": "neutral"
+      },
+      {
+        "id": 8,
+        "role": "neutral"
+      },
+      {
+        "id": 9,
+        "role": "neutral"
+      },
+      {
+        "id": 10,
+        "role": "neutral"
+      },
+      {
+        "id": 11,
+        "role": "neutral"
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "route_a_in",
+        "from": 0,
+        "to": 1,
+        "capacity": 4,
+        "latency": 1,
+        "state": "active"
+      },
+      {
+        "edge_id": "route_a_out",
+        "from": 1,
+        "to": 3,
+        "capacity": 4,
+        "latency": 1,
+        "state": "active"
+      },
+      {
+        "edge_id": "route_b_in",
+        "from": 0,
+        "to": 2,
+        "capacity": 4,
+        "latency": 1,
+        "state": "active"
+      },
+      {
+        "edge_id": "route_c_in",
+        "from": 0,
+        "to": 4,
+        "capacity": 4,
+        "latency": 1,
+        "state": "active"
+      }
+    ],
+    "candidate_edges": [
+      {
+        "edge_id": "route_b_out",
+        "from": 2,
+        "to": 3,
+        "capacity": 4,
+        "latency": 1,
+        "install_cost": 1
+      },
+      {
+        "edge_id": "route_c_out",
+        "from": 4,
+        "to": 3,
+        "capacity": 4,
+        "latency": 1,
+        "install_cost": 1
+      }
+    ]
+  },
+  "trace": [
+    {
+      "tick": 0,
+      "exogenous_events": [],
+      "observation": {
+        "observed_at": 0,
+        "available_facts": [
+          "route_a_in_active",
+          "route_a_out_active",
+          "sink_3_demand_4"
+        ],
+        "future_information": false
+      },
+      "scripted_action_for_contract_demonstration_only": {
+        "action_id": "a0",
+        "type": "no_op"
+      },
+      "expected": {
+        "flow_before_action": 4,
+        "flow_after_action": 4,
+        "min_cut_after_action": 4,
+        "path_latency_after_action": 2,
+        "cumulative_accepted_edits": 0,
+        "persistent_edge_states": {
+          "route_a_in": "active",
+          "route_a_out": "active",
+          "route_b_in": "active",
+          "route_c_in": "active"
+        }
+      }
+    },
+    {
+      "tick": 1,
+      "exogenous_events": [
+        {
+          "event_id": "e1",
+          "type": "edge_capacity_failure",
+          "edge_id": "route_a_out",
+          "capacity_after": 0
+        }
+      ],
+      "observation": {
+        "observed_at": 1,
+        "available_facts": [
+          "route_a_out_failed",
+          "sink_3_demand_4",
+          "route_b_in_active"
+        ],
+        "future_information": false
+      },
+      "scripted_action_for_contract_demonstration_only": {
+        "action_id": "a1",
+        "type": "add_edge",
+        "candidate_edge_id": "route_b_out",
+        "expected_pre_state_digest": "runtime-computed"
+      },
+      "expected": {
+        "flow_before_action": 0,
+        "flow_after_action": 4,
+        "min_cut_after_action": 4,
+        "path_latency_after_action": 2,
+        "cumulative_accepted_edits": 1,
+        "cumulative_install_cost": 1,
+        "persistent_edge_states": {
+          "route_a_out": "failed",
+          "route_b_out": "active",
+          "route_b_in": "active",
+          "route_c_in": "active"
+        }
+      }
+    },
+    {
+      "tick": 2,
+      "exogenous_events": [
+        {
+          "event_id": "e2",
+          "type": "edge_capacity_failure",
+          "edge_id": "route_b_out",
+          "capacity_after": 0
+        }
+      ],
+      "observation": {
+        "observed_at": 2,
+        "available_facts": [
+          "route_b_out_failed",
+          "sink_3_demand_4",
+          "route_c_in_active"
+        ],
+        "future_information": false
+      },
+      "scripted_action_for_contract_demonstration_only": {
+        "action_id": "a2",
+        "type": "add_edge",
+        "candidate_edge_id": "route_c_out",
+        "expected_pre_state_digest": "runtime-computed"
+      },
+      "expected": {
+        "flow_before_action": 0,
+        "flow_after_action": 4,
+        "min_cut_after_action": 4,
+        "path_latency_after_action": 2,
+        "cumulative_accepted_edits": 2,
+        "cumulative_install_cost": 2,
+        "persistent_edge_states": {
+          "route_a_out": "failed",
+          "route_b_out": "failed",
+          "route_c_out": "active",
+          "route_b_in": "active",
+          "route_c_in": "active"
+        }
+      }
+    }
+  ],
+  "mandatory_assertions": [
+    "the graph state after tick 1 is the pre-event state for tick 2",
+    "route_b_out remains present at tick 2 and can be failed by an exogenous event",
+    "route_a_out and route_b_out remain failed after the second repair",
+    "route_c_out is added only at tick 2",
+    "cumulative accepted edits are 0, 1, then 2; the edit budget is never reset",
+    "a reset-to-initial-state evaluator must fail this trace with a named missing-runtime-edge error",
+    "the scripted actions demonstrate contract semantics only and are not evidence of policy intelligence"
+  ],
+  "claim_limit": "Small deterministic state-persistence fixture only; no trained controller, stochastic robustness, physical repair, biological mechanism, or SOTA result."
+}
