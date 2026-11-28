@@ -85,6 +85,9 @@ pub struct FlowResult {
     pub max_flow: u64,
     pub min_cut: u64,
     pub requested_flow: u64,
+    pub accepted_edge_additions: usize,
+    pub edit_cost_units: u64,
+    pub edge_maintenance_cost_units: u64,
 }
 
 impl Fixture {
@@ -186,6 +189,9 @@ fn validate_episode(case: &Episode, semantics: &GraphSemantics) -> Result<(), St
         }
         if edge.capacity == 0 {
             return Err(format!("{}: candidate edge capacity must be positive", case.id));
+        }
+        if edge.edit_cost != Some(semantics.accounting.accepted_edge_addition_cost_units) {
+            return Err(format!("{}: candidate edit cost must match the declared fixed addition cost", case.id));
         }
         if active_pairs.contains(&(edge.from, edge.to))
             || !candidate_pairs.insert((edge.from, edge.to))
@@ -297,12 +303,19 @@ pub fn evaluate_episode(
         }
     }
 
+    let mut edit_cost_units = 0_u64;
     for id in &accepted {
         let candidate = case
             .candidate_edges
             .iter()
             .find(|e| e.id.as_deref() == Some(*id))
-            .expect("candidate ID validated");
+            .ok_or_else(|| format!("{}: accepted candidate disappeared", case.id))?;
+        let edit_cost = candidate
+            .edit_cost
+            .ok_or_else(|| format!("{}: accepted candidate has no edit cost", case.id))?;
+        edit_cost_units = edit_cost_units
+            .checked_add(edit_cost)
+            .ok_or_else(|| format!("{}: edit-cost overflow", case.id))?;
         active_edges.push(candidate.clone());
     }
 
@@ -310,7 +323,16 @@ pub fn evaluate_episode(
         return Err(format!("{}: maximum active-edge count exceeded", case.id));
     }
 
-    solve_flow(case, &active_edges, &demand_step.sinks)
+    let edge_maintenance_cost_units = active_edges.iter().try_fold(0_u64, |total, edge| {
+        total
+            .checked_add(edge.maintenance_cost)
+            .ok_or_else(|| format!("{}: edge maintenance-cost overflow", case.id))
+    })?;
+    let mut result = solve_flow(case, &active_edges, &demand_step.sinks)?;
+    result.accepted_edge_additions = accepted.len();
+    result.edit_cost_units = edit_cost_units;
+    result.edge_maintenance_cost_units = edge_maintenance_cost_units;
+    Ok(result)
 }
 
 fn solve_flow(
@@ -394,7 +416,7 @@ fn solve_flow(
         let mut augmentation = u64::MAX;
         let mut cursor = super_sink;
         while cursor != super_source {
-            let from = parent[cursor].expect("augmenting path parent exists");
+            let from = parent[cursor].ok_or_else(|| format!("{}: augmenting path parent missing", case.id))?;
             augmentation = augmentation.min(residual[from][cursor]);
             cursor = from;
         }
@@ -404,7 +426,7 @@ fn solve_flow(
 
         cursor = super_sink;
         while cursor != super_source {
-            let from = parent[cursor].expect("augmenting path parent exists");
+            let from = parent[cursor].ok_or_else(|| format!("{}: augmenting path parent missing", case.id))?;
             residual[from][cursor] -= augmentation;
             residual[cursor][from] = residual[cursor][from]
                 .checked_add(augmentation)
