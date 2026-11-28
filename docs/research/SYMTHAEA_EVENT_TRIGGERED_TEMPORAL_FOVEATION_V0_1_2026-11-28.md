@@ -238,9 +238,39 @@ VideoFDB demonstrates why a fixed higher frame rate is not necessarily the best 
 - StreamEval is useful for following and A/V synchronization; a synchronized video is not proof of useful visual information.
 - The new temporal-foveation lane is an internal diagnostic benchmark, not a replacement leaderboard and not a claim of superiority to any of the external systems.
 
-## 10. Qualification status
+## 10. Conservative expected-value ranking prototype (2026-11-28)
 
-The Rust policy module and optional `FoveationManager` integration have been committed on the polyembodiment research branch. Source ROI freshness is checked against the caller's monotonic time; task-specific age limits still require empirical calibration. The implementation is source-level only:
+A separate, pure ranking prototype is now available at `crates/domains/symthaea-foveation/src/roi_information_value.rs`.
+
+For an already-authorized ROI candidate, it consumes:
+- expected task decision loss without the ROI;
+- expected task decision loss with the ROI;
+- a conservative lower confidence bound on loss reduction;
+- confidence level;
+- explicit latency and staleness penalties;
+- source pixel cost before downscaling;
+- source clock domain and timestamp;
+- calibration ID, report digest, model digest, task family, sample count and held-out expected calibration error.
+
+The net value is:
+
+```
+net_benefit = loss_reduction_lower_confidence_bound
+              - latency_penalty
+              - staleness_penalty
+
+value_per_1000_pixels = 1000 * net_benefit / source_pixel_cost
+```
+
+The ranking requires a task-family-matched calibration report, at least 100 calibration samples, expected calibration error <=0.10, confidence level >=0.95, a matching source clock, and a source frame within the configured freshness horizon. Rejected candidates remain in a separate rejection list. Duplicate candidate IDs are rejected as a group; score ties use candidate ID as a deterministic tie-break.
+
+This is deliberately not integrated into `FoveationManager` yet. The manager still uses the urgency threshold and pixel-token budget. The new module only ranks caller-supplied, calibration-backed estimates. It cannot authorize media capture or override privacy/permission checks.
+
+Fourteen Rust tests are authored in the temporal/foveation package (the temporal budget and EVI modules together), and the manager has five new integration tests. They remain uncompiled and unexecuted. No calibration report, held-out ECE result, ROI utility study or EVSI leaderboard result exists.
+
+## 11. Qualification status
+
+The Rust temporal policy, optional `FoveationManager` integration and independent conservative EVI ranking prototype have been committed on the polyembodiment research branch. Source ROI freshness is checked against the caller's monotonic time; task-specific age limits still require empirical calibration. The implementation is source-level only:
 - no cargo build or test run;
 - no camera/stream runtime qualification;
 - no GPU/CPU profiling;
