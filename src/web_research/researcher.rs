@@ -2225,4 +2225,25 @@ mod tests {
         assert_ne!(search.attempt_id, page.attempt_id);
         assert!(search.captured_at_unix_ms > 0);
     }
+
+
+    #[tokio::test]
+    async fn page_fetch_rejects_private_ip_literal_before_transport() {
+        let researcher = WebResearcher::new().expect("researcher initialization");
+        let page = researcher
+            .fetch_and_extract_with_receipt(PageCandidate {
+                query_rank: 0,
+                source_rank: 0,
+                query: "SSRF negative control".to_string(),
+                url: "http://127.0.0.1/latest/meta-data/".to_string(),
+            })
+            .await;
+
+        assert_eq!(page.receipt.outcome, AcquisitionOutcome::UrlPolicyRejected);
+        assert_eq!(
+            page.receipt.reason_code.as_deref(),
+            Some("URL_POLICY_REJECTED")
+        );
+        assert!(page.extraction.is_none());
+    }
 }
