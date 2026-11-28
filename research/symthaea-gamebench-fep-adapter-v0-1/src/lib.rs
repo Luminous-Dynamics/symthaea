@@ -72,7 +72,7 @@ impl FepNavigationCandidate {
     }
 
     fn encode_observation(
-        &self,
+        &mut self,
         observation: &Observation,
     ) -> Result<FepObservation, FepAdapterError> {
         if observation.width != self.width || observation.height != self.height {
@@ -378,8 +378,7 @@ mod tests {
 
     #[test]
     fn terminal_episode_can_still_supply_one_final_transition() {
-        let mut spec = fixture();
-        spec = GridSpec::new(
+        let spec = GridSpec::new(
             2,
             1,
             vec![Cell::Floor, Cell::Goal],
@@ -389,28 +388,18 @@ mod tests {
         )
         .expect("valid terminal fixture");
         let mut game = Game::new(spec);
-        let actions = [Action::North, Action::East, Action::South, Action::West];
-        let mut candidate = FepNavigationCandidate::new(2, 1, 3).expect("candidate");
         let before = game.observe(symthaea_gamebench::ObservationMode::Full);
-        let decision = candidate
-            .decide(CandidateInput {
-                observation: &before,
-                legal_actions: &actions,
-                remaining_actions: 2,
-                episode_step: 0,
-            })
-            .expect("decision");
-        let transition = game.step(decision.action).expect("valid attempt");
+        let mut candidate = FepNavigationCandidate::new(2, 1, 3).expect("candidate");
+        candidate.pending_action = Some(Action::East);
+        game.step(Action::East).expect("goal entry");
+        assert_eq!(game.status(), TerminalStatus::Success);
         let after = game.observe(symthaea_gamebench::ObservationMode::Full);
         candidate
             .observe_transition(CandidateFeedback {
                 previous_observation: &before,
-                action: &decision.action,
+                action: &Action::East,
                 next_observation: &after,
             })
             .expect("final observation feedback");
-        if transition.status == TerminalStatus::Success {
-            assert!(candidate.pending_action.is_none());
-        }
-    }
-}
+        assert!(candidate.pending_action.is_none());
+    }}
