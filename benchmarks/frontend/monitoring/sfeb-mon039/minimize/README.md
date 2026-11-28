@@ -30,3 +30,7 @@ The receipt digest is byte binding, not authenticity. MON-026 or another indepen
 Symthaea may propose fault hypotheses, interactions and a test order. It cannot decide whether a minimized set reproduces the failure. The independent MON-037/MON-038 verifier outcome and its exact signature are the comparison oracle. That separation allows the model to be useful without grading its own explanation.
 
 Both offline_fixture and runtime_candidate outputs remain campaign-indeterminate, and production_action_permitted is always false. The module does not inject faults, mutate infrastructure or promote traffic.
+
+## Multi-order reduction tournament
+
+The additive MON-039 tournament evaluates the same input observation table under up to eight unique deletion permutations. For fault sets above 12, it reports the smallest complete one-minimal set observed across tested orders, with deterministic tie-breaking. It does not claim a global minimum or unique root cause. Missing observations in any declared order keep the tournament incomplete/indeterminate. Run `go run ./cmd/tournament --input TOURNAMENT-INPUT-example.json` to exercise the wrapper CLI.
