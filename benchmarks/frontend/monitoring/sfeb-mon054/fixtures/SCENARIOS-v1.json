@@ -1,0 +1,78 @@
+{
+  "profile": "mon-independent-inventory-scenarios-v1",
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "I01-independent-complete",
+      "mutation": "none",
+      "expected_verdict": "qualified",
+      "expected_scope_status": "fully_covered"
+    },
+    {
+      "id": "I02-single-witness",
+      "mutation": "drop_one_preregistered_witness",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I03-shared-identity",
+      "mutation": "share_identity_root",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I04-missing-domain",
+      "mutation": "remove_time_source",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I05-inventory-disagreement",
+      "mutation": "add_member_to_one_witness",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I06-missing-capture",
+      "mutation": "omit_required_capture_member",
+      "expected_verdict": "blocked",
+      "expected_scope_status": "incomplete_capture"
+    },
+    {
+      "id": "I07-unsupported-capability",
+      "mutation": "mark_capture_unsupported",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I08-authorized-exclusion",
+      "mutation": "authorize_scope_exclusion",
+      "expected_verdict": "qualified",
+      "expected_scope_status": "qualified_with_explicit_exclusions"
+    },
+    {
+      "id": "I09-captured-extra",
+      "mutation": "add_capture_member_outside_inventory",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I10-preregistered-set-mismatch",
+      "mutation": "drop_preregistered_witness",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I11-untrusted-witness",
+      "mutation": "remove_witness_trust_qualification",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    },
+    {
+      "id": "I12-excluded-and-captured",
+      "mutation": "capture_explicitly_excluded_member",
+      "expected_verdict": "indeterminate",
+      "expected_scope_status": "indeterminate"
+    }
+  ]
+}
