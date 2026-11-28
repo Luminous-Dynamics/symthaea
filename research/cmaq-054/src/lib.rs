@@ -333,6 +333,8 @@ impl KernelFamilyPortfolio {
     /// cloned compact CMAQ-046 state; pair identity is consumed and states are
     /// committed only after every transform, update and mixture calculation
     /// succeeds.
+    /// Observes a paired sample while maintaining this family's own replay
+    /// ledger. Use this at the root of a standalone kernel-family process.
     pub fn observe_pair(
         &mut self,
         sequence: u64,
@@ -340,6 +342,35 @@ impl KernelFamilyPortfolio {
         covariate: &[f64],
         x: &[f64],
         y: &[f64],
+    ) -> Result<KernelFamilyUpdate, KernelFamilyError> {
+        self.observe_pair_internal(sequence, pair_id, covariate, x, y, true)
+    }
+
+    /// Observes a paired sample when a parent portfolio owns a shared,
+    /// consume-once pair-ID ledger. The caller MUST validate and atomically
+    /// commit pair identity at the parent level. This method retains local
+    /// sequence validation and transactional expert updates but does not
+    /// duplicate pair IDs in every child family. It exists for restart
+    /// portfolios to avoid O(K*T^2) identity storage.
+    pub fn observe_pair_with_external_replay_guard(
+        &mut self,
+        sequence: u64,
+        pair_id: &str,
+        covariate: &[f64],
+        x: &[f64],
+        y: &[f64],
+    ) -> Result<KernelFamilyUpdate, KernelFamilyError> {
+        self.observe_pair_internal(sequence, pair_id, covariate, x, y, false)
+    }
+
+    fn observe_pair_internal(
+        &mut self,
+        sequence: u64,
+        pair_id: &str,
+        covariate: &[f64],
+        x: &[f64],
+        y: &[f64],
+        maintain_local_replay_ledger: bool,
     ) -> Result<KernelFamilyUpdate, KernelFamilyError> {
         if self.quarantined {
             return Err(KernelFamilyError::AlreadyQuarantined);
@@ -350,10 +381,10 @@ impl KernelFamilyPortfolio {
         if pair_id.len() > MAX_PAIR_ID_BYTES {
             return Err(KernelFamilyError::PairIdTooLong);
         }
-        if self.seen_pair_ids.contains(pair_id) {
+        if maintain_local_replay_ledger && self.seen_pair_ids.contains(pair_id) {
             return Err(KernelFamilyError::DuplicatePairId);
         }
-        if self.seen_pair_ids.len() >= MAX_PAIR_IDS {
+        if maintain_local_replay_ledger && self.seen_pair_ids.len() >= MAX_PAIR_IDS {
             return Err(KernelFamilyError::PairIdInventoryFull);
         }
 
@@ -442,7 +473,9 @@ impl KernelFamilyPortfolio {
         }
 
         self.observations_seen = expected_sequence;
-        self.seen_pair_ids.insert(pair_id.to_string());
+        if maintain_local_replay_ledger {
+            self.seen_pair_ids.insert(pair_id.to_string());
+        }
         self.log_mixture_e_value = next_log_mixture;
         self.quarantined = next_quarantined;
 
