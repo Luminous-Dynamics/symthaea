@@ -121,6 +121,9 @@ pub struct CaOcrcRoundInputV1 {
     pub prediction_kind: CaOcrcPredictionKindV1,
     pub lower_bound: Option<f64>,
     pub upper_bound: Option<f64>,
+    pub threshold_used: f64,
+    pub score_contract_sha256: String,
+    pub prediction_set_sha256: String,
     pub event_time_unix_seconds: i64,
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
@@ -137,6 +140,9 @@ pub struct CaOcrcTrackedRoundV1 {
     pub proxy_delay: u64,
     pub lower_bound: f64,
     pub upper_bound: f64,
+    pub threshold_used: f64,
+    pub score_contract_sha256: String,
+    pub prediction_set_sha256: String,
     pub event_time_unix_seconds: i64,
     pub prediction_at_unix_seconds: i64,
     pub clock_domain_id: String,
@@ -149,6 +155,8 @@ pub struct CaOcrcTrackingDecisionV1 {
     pub prediction_id: String,
     pub prediction_kind: CaOcrcPredictionKindV1,
     pub threshold_used: f64,
+    pub score_contract_sha256: String,
+    pub prediction_set_sha256: String,
     pub sampled_proxy_delay: Option<i64>,
     pub admitted: bool,
     pub expired_rounds: Vec<u64>,
@@ -167,6 +175,7 @@ pub struct CaOcrcFeedbackV1 {
     pub current_round: u64,
     pub origin_round: u64,
     pub actual_delay: u64,
+    pub prediction_set_sha256: String,
     pub prediction_id: String,
     pub sample_id: String,
     pub measurement_event_id: String,
@@ -189,6 +198,7 @@ pub struct CaOcrcFeedbackReceiptV1 {
     pub current_round: u64,
     pub label_id: String,
     pub label_revision: u64,
+    pub prediction_set_sha256: Option<String>,
     pub disposition: CaOcrcTrackingDispositionV1,
     pub reasons: Vec<CaOcrcReasonV1>,
     pub observed_loss: Option<f64>,
@@ -423,6 +433,9 @@ pub fn start_ca_ocrc_round_v1(
     if input.clock_domain_id != engine.clock_domain_id
         || input.round_index != engine.next_round
         || input.event_time_unix_seconds > input.prediction_at_unix_seconds
+        || input.threshold_used != engine.threshold
+        || input.score_contract_sha256 != engine.policy.score_contract_sha256
+        || !valid_sha256(&input.prediction_set_sha256)
     {
         return Err(CaOcrcErrorV1(
             "round order, clock domain or prediction chronology mismatch".into(),
@@ -484,6 +497,9 @@ pub fn start_ca_ocrc_round_v1(
                     proxy_delay: proxy as u64,
                     lower_bound: input.lower_bound.unwrap(),
                     upper_bound: input.upper_bound.unwrap(),
+                    threshold_used: input.threshold_used,
+                    score_contract_sha256: input.score_contract_sha256.clone(),
+                    prediction_set_sha256: input.prediction_set_sha256.clone(),
                     event_time_unix_seconds: input.event_time_unix_seconds,
                     prediction_at_unix_seconds: input.prediction_at_unix_seconds,
                     clock_domain_id: input.clock_domain_id.clone(),
@@ -505,6 +521,8 @@ pub fn start_ca_ocrc_round_v1(
         prediction_id: input.prediction_id.clone(),
         prediction_kind: input.prediction_kind,
         threshold_used,
+        score_contract_sha256: input.score_contract_sha256.clone(),
+        prediction_set_sha256: input.prediction_set_sha256.clone(),
         sampled_proxy_delay,
         admitted,
         expired_rounds: expired,
@@ -630,6 +648,9 @@ pub fn receive_ca_ocrc_feedback_v1(
         || feedback.sample_id != tracked.sample_id
         || feedback.measurement_event_id != tracked.measurement_event_id
     {
+        reasons.push(CaOcrcReasonV1::InvalidPredictionIdentity);
+    }
+    if feedback.prediction_set_sha256 != tracked.prediction_set_sha256 {
         reasons.push(CaOcrcReasonV1::InvalidPredictionIdentity);
     }
     if feedback.clock_domain_id != tracked.clock_domain_id || feedback.clock_domain_id != engine.clock_domain_id {
@@ -790,6 +811,7 @@ pub fn receive_ca_ocrc_feedback_v1(
         current_round: feedback.current_round,
         label_id: feedback.label_id.clone(),
         label_revision: feedback.label_revision,
+        prediction_set_sha256: Some(tracked.prediction_set_sha256.clone()),
         disposition: CaOcrcTrackingDispositionV1::FeedbackUpdated,
         reasons: Vec::new(),
         observed_loss: Some(loss),
