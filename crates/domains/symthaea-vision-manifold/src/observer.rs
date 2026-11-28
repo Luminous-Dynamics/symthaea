@@ -463,8 +463,7 @@ impl ObserverOnlyVisionManifold {
         observer.first_timestamp_us = checkpoint.first_timestamp_us;
         observer.last_identity = checkpoint.last_identity.clone();
         observer.frame_geometry = checkpoint.frame_geometry;
-        observer.seen_frame_id_sha256 =
-            checkpoint.seen_frame_id_sha256.iter().cloned().collect();
+        observer.seen_frame_id_sha256 = checkpoint.seen_frame_id_sha256.iter().cloned().collect();
         observer.seen_source_evidence_id_sha256 = checkpoint
             .seen_source_evidence_id_sha256
             .iter()
@@ -492,7 +491,9 @@ impl ObserverOnlyVisionManifold {
         self.validate_next_identity(&identity, pixels.len(), width, height, channels)?;
         let initial_grid = self.inner.surprise_map().grid();
         if initial_grid.frame_width != width || initial_grid.frame_height != height {
-            return Err("observer input dimensions differ from the fixed manifold patch grid".to_string());
+            return Err(
+                "observer input dimensions differ from the fixed manifold patch grid".to_string(),
+            );
         }
         let patch_cells = initial_grid
             .cols
@@ -557,14 +558,14 @@ impl ObserverOnlyVisionManifold {
             prediction_valid,
             self.cross_scale_enabled,
         ) {
-                Ok(metrics) => metrics,
-                Err(error) => {
-                    self.poisoned = true;
-                    return Err(format!(
-                        "observer telemetry could not be represented: {error}"
-                    ));
-                }
-            };
+            Ok(metrics) => metrics,
+            Err(error) => {
+                self.poisoned = true;
+                return Err(format!(
+                    "observer telemetry could not be represented: {error}"
+                ));
+            }
+        };
 
         self.seen_frame_id_sha256
             .insert(sha256_bytes(identity.frame_id.as_bytes()));
@@ -647,9 +648,7 @@ impl ObserverOnlyVisionManifold {
         }
         let evidence_id_digest = sha256_bytes(identity.source_evidence_id.as_bytes());
         if self.seen_source_evidence_id_sha256.contains(&evidence_id_digest) {
-            return Err(
-                "observer source_evidence_id was already used in this episode".to_string(),
-            );
+            return Err("observer source_evidence_id was already used in this episode".to_string());
         }
         let accepted = self.inner.frame_count();
         if accepted >= self.profile.expected_frame_count {
@@ -709,8 +708,7 @@ impl ObserverOnlyVisionManifold {
             self.frame_geometry,
             manifold_state.frame_count,
         )?;
-        let seen_frame_id_sha256: Vec<_> =
-            self.seen_frame_id_sha256.iter().cloned().collect();
+        let seen_frame_id_sha256: Vec<_> = self.seen_frame_id_sha256.iter().cloned().collect();
         let seen_source_evidence_id_sha256: Vec<_> = self
             .seen_source_evidence_id_sha256
             .iter()
@@ -803,7 +801,9 @@ fn validate_seen_identity_digests(
     let expected = usize::try_from(frame_count)
         .map_err(|_| "observer frame count exceeds addressable memory".to_string())?;
     if frame_ids.len() != expected || evidence_ids.len() != expected {
-        return Err("observer checkpoint identity-digest count does not match frame count".to_string());
+        return Err(
+            "observer checkpoint identity-digest count does not match frame count".to_string(),
+        );
     }
     if frame_ids.windows(2).any(|pair| pair[0] >= pair[1])
         || evidence_ids.windows(2).any(|pair| pair[0] >= pair[1])
@@ -821,7 +821,9 @@ fn validate_seen_identity_digests(
     match (frame_count, last_identity) {
         (0, None) => {}
         (count, Some(last)) if count > 0 => {
-            if !frame_ids.iter().any(|digest| digest == &sha256_bytes(last.frame_id.as_bytes()))
+            if !frame_ids
+                .iter()
+                .any(|digest| digest == &sha256_bytes(last.frame_id.as_bytes()))
                 || !evidence_ids
                     .iter()
                     .any(|digest| digest == &sha256_bytes(last.source_evidence_id.as_bytes()))
@@ -893,7 +895,9 @@ fn quantize_telemetry(
         }
         let scaled = (value * Q16_16_SCALE).round();
         if !scaled.is_finite() || scaled < i32::MIN as f32 || scaled > i32::MAX as f32 {
-            return Err(format!("observer telemetry {name} signed quantization overflow"));
+            return Err(format!(
+                "observer telemetry {name} signed quantization overflow"
+            ));
         }
         Ok(scaled as i32)
     };
@@ -907,8 +911,13 @@ fn quantize_telemetry(
         horizon.dropped_forecasts.len(),
         horizon.expired_forecasts.len(),
     ];
-    if lengths.iter().any(|length| *length != declared_horizons_us.len()) {
-        return Err("delayed-horizon telemetry shape does not match the committed profile".to_string());
+    if lengths
+        .iter()
+        .any(|length| *length != declared_horizons_us.len())
+    {
+        return Err(
+            "delayed-horizon telemetry shape does not match the committed profile".to_string(),
+        );
     }
 
     let mut horizon_prediction_error_q16_16 = Vec::with_capacity(lengths[0]);
@@ -969,7 +978,9 @@ fn quantize_telemetry(
         || attention.values.len() != expected_patch_cells
         || patch_size_pixels == 0
     {
-        return Err("observer attention map dimensions violate the patch-grid contract".to_string());
+        return Err(
+            "observer attention map dimensions violate the patch-grid contract".to_string(),
+        );
     }
     let mut patch_values = Vec::new();
     let mut nonzero_count = 0usize;
@@ -1121,7 +1132,10 @@ mod tests {
             .unwrap();
         let value = serde_json::to_value(&witness).unwrap();
 
-        assert_eq!(value["schema_version"], TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1);
+        assert_eq!(
+            value["schema_version"],
+            TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1
+        );
         assert_eq!(value["producer"], "symthaea-vision-manifold");
         assert_eq!(
             value["observer_profile_id"],
@@ -1130,12 +1144,18 @@ mod tests {
         assert_eq!(value["identity"]["modality"], "Visible");
         assert_eq!(value["status"], "warming_up");
         assert!(value["metrics"]["prediction_error_q16_16"].is_null());
-        assert_eq!(value["metrics"]["horizon_sample_counts"], serde_json::json!([0, 0, 0, 0]));
+        assert_eq!(
+            value["metrics"]["horizon_sample_counts"],
+            serde_json::json!([0, 0, 0, 0])
+        );
         assert_eq!(value["metrics"]["patch_grid_rows"], 4);
         assert_eq!(value["metrics"]["patch_grid_cols"], 4);
         assert_eq!(value["metrics"]["patch_size_pixels"], 8);
         assert_eq!(value["metrics"]["patch_surprise_nonzero_count"], 0);
-        assert_eq!(value["metrics"]["patch_surprise_top_k"], serde_json::json!([]));
+        assert_eq!(
+            value["metrics"]["patch_surprise_top_k"],
+            serde_json::json!([])
+        );
         assert_eq!(
             value["metrics"]["horizon_prediction_error_q16_16"],
             serde_json::json!([null, null, null, null])
@@ -1173,17 +1193,17 @@ mod tests {
         assert!(witness.metrics.patch_surprise_nonzero_count > 0);
         assert!(!witness.metrics.patch_surprise_top_k.is_empty());
         assert!(witness.metrics.patch_surprise_top_k.len() <= DEFAULT_PATCH_SURPRISE_TOP_K);
+        assert!(witness.metrics.patch_surprise_top_k.iter().all(|patch| {
+            patch.row < witness.metrics.patch_grid_rows
+                && patch.col < witness.metrics.patch_grid_cols
+                && patch.value_q16_16 > 0
+        }));
         assert!(
-            witness.metrics.patch_surprise_top_k.iter().all(|patch| {
-                patch.row < witness.metrics.patch_grid_rows
-                    && patch.col < witness.metrics.patch_grid_cols
-                    && patch.value_q16_16 > 0
-            })
-        );
-        assert!(
-            witness.metrics.patch_surprise_top_k.windows(2).all(|pair| {
-                pair[0].value_q16_16 >= pair[1].value_q16_16
-            }),
+            witness
+                .metrics
+                .patch_surprise_top_k
+                .windows(2)
+                .all(|pair| { pair[0].value_q16_16 >= pair[1].value_q16_16 }),
             "patch surprise top-k must be sorted in descending quantized value"
         );
         assert!(
@@ -1204,18 +1224,18 @@ mod tests {
         );
         assert_eq!(witness.raw_frame_retained, false);
         assert_eq!(
-            observer.save_checkpoint().unwrap().manifold_state.last_observed_frame,
+            observer
+                .save_checkpoint()
+                .unwrap()
+                .manifold_state
+                .last_observed_frame,
             None
         );
     }
 
     #[test]
     fn patch_grid_budget_rejects_large_geometry_before_manifold_allocation() {
-        let result = ObserverOnlyVisionManifold::try_new(
-            VisionConfig::default(),
-            8192,
-            8200,
-        );
+        let result = ObserverOnlyVisionManifold::try_new(VisionConfig::default(), 8192, 8200);
         assert!(result.is_err());
     }
 
@@ -1396,14 +1416,8 @@ mod tests {
             second.metrics.horizon_prediction_error_q16_16.len()
         );
         assert_eq!(second.metrics.horizon_sample_counts[0], 0);
-        assert_eq!(
-            second.metrics.horizon_prediction_error_q16_16[0],
-            None
-        );
-        assert_eq!(
-            second.metrics.horizon_prediction_error_q16_16[1],
-            None
-        );
+        assert_eq!(second.metrics.horizon_prediction_error_q16_16[0], None);
+        assert_eq!(second.metrics.horizon_prediction_error_q16_16[1], None);
         assert!(
             second.metrics.horizon_prediction_error_q16_16[2].is_none()
                 && second.metrics.horizon_prediction_error_q16_16[3].is_none()
