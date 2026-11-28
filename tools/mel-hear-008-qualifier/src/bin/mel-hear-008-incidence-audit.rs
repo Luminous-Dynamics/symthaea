@@ -26,7 +26,11 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("incidence fixture JSON is invalid: {error}"))?;
     let report = audit_panel(&panel)?;
     let digest = Sha256::digest(&bytes);
-    let fixture_sha256 = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    let fixture_sha256 = digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("");
 
     let output = ReplayOutput {
         schema: "mel-hear-008-incidence-replay-v0",
