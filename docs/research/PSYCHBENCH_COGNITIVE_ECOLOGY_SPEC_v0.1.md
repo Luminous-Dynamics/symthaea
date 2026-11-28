@@ -211,6 +211,7 @@ A PCE release is not qualified for confirmatory comparison until:
 
 - Scenario generator, state machine, event oracle, and replay are versioned and hashed.
 - Every scenario has an executable state-transition test.
+- Rejected/invalid actions are recorded and charged by the runner so action probing cannot be free.
 - Positive/negative/sham controls demonstrate expected selectivity.
 - Independent scorer mutation tests pass.
 - At least one hidden split is untouched during design/tuning.
@@ -230,7 +231,9 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 - Manifest and state digests using BLAKE3; manifest mismatch is rejected.
 - Deterministic replay of ordered agent/evaluator commands.
 - A first hidden-resource delivery path with inspection budget, valve-key dependency, locked crossing, persistent delivery goal, and injected gate failure/recovery.
-- Unit tests for hidden-resource disclosure, delivery gating, intervention/recovery, failed-action non-mutation, replay determinism, manifest mismatch, and receipt determinism. **These tests are added but have not been executed.**
+- Unit tests for hidden-resource disclosure, delivery gating, intervention/recovery, failed-action non-mutation, replay determinism, manifest mismatch, receipt determinism, observation budget, and step budget. **These tests are added but have not been executed.**
+
+**Known protocol gap:** rejected actions currently return a transactional error without advancing the world. This is suitable for fail-closed evaluator APIs, but an agent-facing runner must record and charge invalid attempts separately (or replace this API with a receipt-bearing rejected-action outcome) before confirmatory use. Otherwise invalid-action probing could become a free side channel. The current fixed scenario also uses `seed` as manifest metadata only; the scenario generator is not yet implemented.
 
 **Still to implement/validate:**
 1. JSONL event artifact export and external receipt verifier.
