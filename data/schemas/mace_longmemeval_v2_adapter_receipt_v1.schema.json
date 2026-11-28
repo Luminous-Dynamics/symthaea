@@ -142,7 +142,8 @@
         "kind",
         "context_item_sha256",
         "evidence_use_receipt_sha256",
-        "source_lineage_receipt_sha256"
+        "source_lineage_receipt_sha256",
+        "decision_evidence_use_link_sha256"
       ],
       "properties": {
         "ordinal": {
@@ -159,6 +160,9 @@
           "$ref": "#/$defs/sha"
         },
         "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "decision_evidence_use_link_sha256": {
           "$ref": "#/$defs/sha"
         }
       }
@@ -237,7 +241,8 @@
         "context_item_sha256",
         "evidence_use_receipt_sha256",
         "source_lineage_receipt_sha256",
-        "reader_request_sha256"
+        "reader_request_sha256",
+        "decision_evidence_use_link_sha256"
       ],
       "properties": {
         "ordinal": {
@@ -257,6 +262,9 @@
           "$ref": "#/$defs/sha"
         },
         "reader_request_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "decision_evidence_use_link_sha256": {
           "$ref": "#/$defs/sha"
         }
       }
