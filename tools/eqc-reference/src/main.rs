@@ -95,7 +95,11 @@ fn write_nonce_ledger(
     Ok(())
 }
 
-fn write_output_or_stdout(output: Option<PathBuf>, repository_root: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+fn write_output_or_stdout(
+    output: Option<PathBuf>,
+    repository_root: &Path,
+    bytes: &[u8],
+) -> anyhow::Result<()> {
     if let Some(output) = output {
         let output_path = if output.is_absolute() {
             output
@@ -158,8 +162,9 @@ fn main() -> anyhow::Result<()> {
             }
             "--observer-trust-policy" => {
                 observer_trust_policy = Some(PathBuf::from(
-                    args.next()
-                        .ok_or_else(|| anyhow::anyhow!("--observer-trust-policy requires a path"))?,
+                    args.next().ok_or_else(|| {
+                        anyhow::anyhow!("--observer-trust-policy requires a path")
+                    })?,
                 ));
             }
             "--observer-expectation" => {
@@ -175,12 +180,15 @@ fn main() -> anyhow::Result<()> {
                 ));
             }
             "--help" | "-h" => {
-                println!(
-                    "eqc-reference [--corpus PATH] [--out PATH] [--observation PATH --task-id ID]\n\
-                     or --observer-envelope PATH --observer-trust-policy PATH --observer-expectation PATH --nonce-ledger PATH\n\
-                     Validates the synthetic seed, an adapter observation, or a signed observer envelope.\n\
-                     Observer trust policy and run expectation must be supplied independently of the envelope. Observer verification does not qualify a system until the host measurement runtime is independently audited."
-                );
+                println!(concat!(
+                    "eqc-reference [--corpus PATH] [--out PATH] [--observation PATH --task-id ID]\n",
+                    "or --observer-envelope PATH --observer-trust-policy PATH\n",
+                    "--observer-expectation PATH --nonce-ledger PATH\n",
+                    "Validates the synthetic seed, an adapter observation, or a signed observer envelope.\n",
+                    "Observer trust policy and run expectation are supplied independently.\n",
+                    "Observer verification does not qualify a system until the host\n",
+                    "measurement runtime is independently audited."
+                ));
                 return Ok(());
             }
             unknown => anyhow::bail!("unknown argument: {unknown}"),
@@ -202,7 +210,9 @@ fn main() -> anyhow::Result<()> {
         || nonce_ledger.is_some()
     {
         if observation.is_some() || task_id.is_some() {
-            anyhow::bail!("signed observer verification cannot be combined with --observation or --task-id");
+            anyhow::bail!(
+                "signed observer verification cannot be combined with --observation or --task-id"
+            );
         }
         let envelope_path = observer_envelope
             .ok_or_else(|| anyhow::anyhow!("--observer-envelope is required"))?;
