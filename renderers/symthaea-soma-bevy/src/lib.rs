@@ -25,6 +25,11 @@ use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
 
 mod visual_grammar;
+mod scene_graph_layout;
+pub use scene_graph_layout::{
+    layout_scene_graph_v2, GraphNodePlacementV2, GraphRelationPathV2,
+    SceneGraphLayoutError, SceneGraphLayoutV2,
+};
 use visual_grammar::layout_scene_elements;
 use symthaea_soma::embodiment_policy::{
     DenialReason, OutputChannel, PresentationPermit, PresentationPolicy,
