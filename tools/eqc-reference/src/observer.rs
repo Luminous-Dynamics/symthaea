@@ -198,6 +198,13 @@ pub fn canonical_payload_bytes(payload: &ObserverPayload) -> anyhow::Result<Vec<
         .context("canonicalize observer payload using RFC 8785 JCS")
 }
 
+fn canonical_json_sha256<T: Serialize>(value: &T) -> anyhow::Result<String> {
+    let value = serde_json::to_value(value).context("serialize canonical JSON value")?;
+    let bytes = serde_json_canonicalizer::to_vec(&value)
+        .context("canonicalize JSON using RFC 8785 JCS")?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 /// Sign the exact canonical payload bytes. The signing key is never serialized
 /// into the envelope; the verifier gets accepted public keys out-of-band.
 pub fn sign_payload(
