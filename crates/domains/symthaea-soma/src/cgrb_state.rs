@@ -20,7 +20,7 @@ fn is_content_digest(value: &str) -> bool {
     };
     matches!(algorithm, "sha256" | "blake3")
         && hex.len() == 64
-        && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -588,6 +588,19 @@ mod tests {
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::UntrustedOracle)
+        );
+    }
+
+    #[test]
+    fn uppercase_digest_is_rejected_to_match_the_schema() {
+        let mut observed = observation();
+        observed.evidence_digest = format!("sha256:{}", "A".repeat(64));
+        let result = assess_task_outcome_v1(
+            &attempt(), &profile(), Some(&observed), "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::IncompleteObservation)
         );
     }
 
