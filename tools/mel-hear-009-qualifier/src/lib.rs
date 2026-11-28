@@ -93,6 +93,7 @@ pub struct Condition {
     pub system_prompt_sha256: String,
     pub adapter_identity_sha256: String,
     pub decoding_config_sha256: String,
+    pub question_sha256: String,
     pub reasoner_model_identity_sha256: Option<String>,
     pub budget_profile_sha256: String,
     pub execution_receipt_sha256: String,
