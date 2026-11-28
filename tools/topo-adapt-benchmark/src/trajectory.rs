@@ -1010,6 +1010,98 @@ mod tests {
     }
 
     #[test]
+    fn exogenous_demand_change_persists_until_a_new_schedule_entry() {
+        let (episode, semantics) = episode();
+        let mut runtime = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+
+        let empty: Vec<ExogenousEvent> = Vec::new();
+        let first_action = PolicyAction::NoOp {
+            action_id: "initial".to_string(),
+            expected_pre_state_digest: expected_digest(&runtime, 0, &empty),
+        };
+        runtime.apply_tick(0, &empty, Some(first_action)).unwrap();
+
+        let demand_change = vec![ExogenousEvent {
+            event_id: "raise-demand".to_string(),
+            kind: ExogenousEventKind::SinkDemandChange {
+                node: 3,
+                demand_after: 2,
+            },
+        }];
+        let change_action = PolicyAction::NoOp {
+            action_id: "demand-tick".to_string(),
+            expected_pre_state_digest: expected_digest(&runtime, 1, &demand_change),
+        };
+        let changed = runtime
+            .apply_tick(1, &demand_change, Some(change_action))
+            .unwrap();
+        assert_eq!(changed.flow_after_action.requested_flow, 2);
+        assert_eq!(runtime.current_demands(), &[SinkDemand { node: 3, demand: 2 }]);
+
+        let next_empty: Vec<ExogenousEvent> = Vec::new();
+        let next_action = PolicyAction::NoOp {
+            action_id: "next-tick".to_string(),
+            expected_pre_state_digest: expected_digest(&runtime, 2, &next_empty),
+        };
+        let next = runtime.apply_tick(2, &next_empty, Some(next_action)).unwrap();
+        assert_eq!(next.flow_after_action.requested_flow, 2);
+        assert_eq!(runtime.current_demands(), &[SinkDemand { node: 3, demand: 2 }]);
+    }
+
+    #[test]
+    fn state_digest_binds_candidate_catalog_and_episode_context() {
+        let (episode, semantics) = episode();
+        let first = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+
+        let mut changed_episode = episode.clone();
+        changed_episode.candidate_edges[0].capacity = 3;
+        let second = EpisodeRuntimeState::new(&changed_episode, &semantics).unwrap();
+
+        assert_ne!(first.state_digest(), second.state_digest());
+    }
+
+    #[test]
+    fn event_array_order_does_not_change_full_tick_receipt() {
+        let (episode, semantics) = episode();
+        let mut left = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+        let mut right = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+
+        let mut events = vec![
+            ExogenousEvent {
+                event_id: "change-route-a".to_string(),
+                kind: ExogenousEventKind::EdgeCapacityChange {
+                    from: 1,
+                    to: 3,
+                    capacity_after: 0,
+                },
+            },
+            ExogenousEvent {
+                event_id: "change-demand".to_string(),
+                kind: ExogenousEventKind::SinkDemandChange {
+                    node: 3,
+                    demand_after: 3,
+                },
+            },
+        ];
+        let mut reversed = events.clone();
+        reversed.reverse();
+
+        let left_action = PolicyAction::NoOp {
+            action_id: "same-action".to_string(),
+            expected_pre_state_digest: expected_digest(&left, 0, &events),
+        };
+        let right_action = PolicyAction::NoOp {
+            action_id: "same-action".to_string(),
+            expected_pre_state_digest: expected_digest(&right, 0, &reversed),
+        };
+
+        let left_receipt = left.apply_tick(0, &events, Some(left_action)).unwrap();
+        let right_receipt = right.apply_tick(0, &reversed, Some(right_action)).unwrap();
+        assert_eq!(left_receipt, right_receipt);
+        assert_eq!(left.state_digest(), right.state_digest());
+    }
+
+    #[test]
     fn edit_budget_is_cumulative_across_ticks() {
         let (episode, mut semantics) = episode();
         semantics.edit_budget = 1;
