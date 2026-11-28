@@ -166,9 +166,10 @@ impl std::fmt::Display for StratifiedRiskError {
             Self::ZeroMinimumSampleSize => {
                 write!(formatter, "minimum audit sample size must be positive")
             }
-            Self::DecisionCostsNotSupported => {
-                write!(formatter, "decision costs are not implemented in this design-based risk report")
-            }
+            Self::DecisionCostsNotSupported => write!(
+                formatter,
+                "decision costs are not implemented in this design-based risk report"
+            ),
         }
     }
 }
@@ -1043,6 +1044,27 @@ mod tests {
         assert_eq!(first.aurc, second.aurc);
         assert_eq!(first.operating_points[0].achieved_coverage, 0.5);
         assert_eq!(first.operating_points[0].estimate.accepted_population_count, 2);
+    }
+
+    #[test]
+    fn unsupported_decision_costs_fail_closed_instead_of_being_ignored() {
+        let plan = four_unit_plan();
+        let rows = vec![
+            prediction("a", 0.9, true, Some(false)),
+            prediction("b", 0.8, true, Some(true)),
+            prediction("c", 0.4, true, None),
+            prediction("d", 0.2, true, None),
+        ];
+        let mut configured = config();
+        configured.decision_costs = Some(super::super::selective_prediction::DecisionCosts {
+            false_positive: 2.0,
+            false_negative: 3.0,
+            abstention: 0.5,
+        });
+        assert_eq!(
+            evaluate_stratified_audit_risk(&rows, &plan, &configured).unwrap_err(),
+            StratifiedRiskError::DecisionCostsNotSupported
+        );
     }
 
     #[test]
