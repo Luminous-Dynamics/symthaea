@@ -154,7 +154,7 @@ pub use sowrc::{SowrcConfig, SowrcError, SowrcObservation, SowrcReport, evaluate
 pub use predictable_audit::{
     build_predictable_audit_receipt, DyadicInclusionProbability,
     PredictableAuditDesign, PredictableAuditError, PredictableAuditEvent,
-    PredictableAuditReceipt,
+    PredictableAuditQPolicy, PredictableAuditReceipt, PredictableAuditSelection,
 };
 pub use types::*;
 pub use verifier::{
