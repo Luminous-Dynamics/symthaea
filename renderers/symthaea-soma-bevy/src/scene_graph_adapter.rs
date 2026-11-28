@@ -19,7 +19,7 @@ use bevy::color::Alpha;
 use bevy::sprite_render::AlphaMode2d;
 use bevy::prelude::*;
 use symthaea_soma::embodiment_policy::{
-    OutputChannel, PresentationPermit, PresentationPolicy,
+    DenialReason, OutputChannel, PresentationPermit,
 };
 use symthaea_soma::embodiment_projection::CanonicalCue;
 use symthaea_soma::embodiment_receipt::{
@@ -392,7 +392,7 @@ fn recheck_graph_submission(
         .parse::<u64>().map_err(|_| AdapterError::ClockUnavailable)?;
     if !is_before_expiry(now, expires) {
         return Err(AdapterError::PolicyDenied(
-            super::DenialReason::ExpiredPermit,
+            DenialReason::PermitExpired,
         ));
     }
     let refreshed = policy.policy()
