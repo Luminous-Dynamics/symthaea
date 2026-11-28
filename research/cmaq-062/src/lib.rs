@@ -199,6 +199,7 @@ struct StagedNode {
     factor: f64,
     log_factor: f64,
     feature_coordinates: usize,
+    next_selected_count: u64,
 }
 
 /// A finite frozen context tree with one fixed prior mixture over all nodes.
@@ -442,9 +443,16 @@ impl ContextTreePortfolio {
             let coordinates = phi_x.len() + phi_y.len() + psi.len() + difference.len();
             total_coordinates = total_coordinates.checked_add(coordinates)
                 .ok_or(ContextError::ArithmeticOverflow)?;
+            let next_selected_count = node.selected_count.checked_add(1)
+                .ok_or(ContextError::ArithmeticOverflow)?;
             staged.push(StagedNode {
-                index: *index, feature_sum, log_e_value, factor, log_factor,
+                index: *index,
+                feature_sum,
+                log_e_value,
+                factor,
+                log_factor,
                 feature_coordinates: coordinates,
+                next_selected_count,
             });
         }
 
@@ -490,8 +498,7 @@ impl ContextTreePortfolio {
             let node = &mut self.nodes[item.index];
             node.feature_sum = item.feature_sum;
             node.log_e_value = item.log_e_value;
-            node.selected_count = node.selected_count.checked_add(1)
-                .ok_or(ContextError::ArithmeticOverflow)?;
+            node.selected_count = item.next_selected_count;
         }
         self.observations_seen = sequence;
         self.pair_ids.insert(pair_id.to_string());
@@ -568,8 +575,8 @@ fn policy_digest(nodes: &[ContextNode], alpha: Rational, lambda: f64) -> String 
     for node in nodes {
         h.update((node.node_id.len() as u64).to_be_bytes());
         h.update(node.node_id.as_bytes());
-        h.update(node.depth.to_be_bytes());
-        h.update(node.parent_index.unwrap_or(usize::MAX).to_be_bytes());
+        h.update((node.depth as u64).to_be_bytes());
+        h.update((node.parent_index.map_or(u64::MAX, |x| x as u64)).to_be_bytes());
         h.update(node.prior_weight.numerator().to_be_bytes());
         h.update(node.prior_weight.denominator().to_be_bytes());
         node.region.encode(&mut h);
