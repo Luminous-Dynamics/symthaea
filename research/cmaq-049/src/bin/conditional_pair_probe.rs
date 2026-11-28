@@ -97,12 +97,8 @@ fn parse_config() -> Result<Config, String> {
 }
 
 fn monitor() -> Result<ContextualPairedKernelMonitor, String> {
-    let feature_map = FourierFeatureMap::new(
-        1,
-        vec![vec![1.0], vec![3.0]],
-        MAP_SHA.into(),
-    )
-    .map_err(|error| format!("feature map invalid: {error:?}"))?;
+    let feature_map = FourierFeatureMap::new(1, vec![vec![1.0], vec![3.0]], MAP_SHA.into())
+        .map_err(|error| format!("feature map invalid: {error:?}"))?;
     let target = BoxTarget::new(vec![-0.005; CONTEXTS * 4], vec![0.005; CONTEXTS * 4])
         .map_err(|error| format!("paired target invalid: {error:?}"))?;
     ContextualPairedKernelMonitor::new(
@@ -118,16 +114,9 @@ fn monitor() -> Result<ContextualPairedKernelMonitor, String> {
     .map_err(|error| format!("paired monitor invalid: {error:?}"))
 }
 
-fn pair_values(
-    scenario: Scenario,
-    context: usize,
-    rng: &mut SplitMix64,
-) -> (f64, f64) {
+fn pair_values(scenario: Scenario, context: usize, rng: &mut SplitMix64) -> (f64, f64) {
     match scenario {
-        Scenario::ConditionalPairNull => (
-            INPUT_SCALE * rng.sign(),
-            INPUT_SCALE * rng.sign(),
-        ),
+        Scenario::ConditionalPairNull => (INPUT_SCALE * rng.sign(), INPUT_SCALE * rng.sign()),
         Scenario::MarginallyEqualConditionalShift if context == 0 => (0.2, 0.8),
         Scenario::MarginallyEqualConditionalShift => (0.8, 0.2),
     }
@@ -148,7 +137,8 @@ fn run_replication(
     config: Config,
     csv: &mut String,
 ) -> Result<Option<usize>, String> {
-    let seed = config.seed
+    let seed = config
+        .seed
         .wrapping_add((replication as u64).wrapping_mul(0x9E37_79B9))
         .wrapping_add(match scenario {
             Scenario::ConditionalPairNull => 0x0490_0001,
@@ -160,11 +150,17 @@ fn run_replication(
 
     for sequence in 1..=config.horizon {
         let context = (sequence - 1) % CONTEXTS;
-        let sequence_u64 = u64::try_from(sequence)
-            .map_err(|_| "sequence exceeds u64".to_string())?;
+        let sequence_u64 =
+            u64::try_from(sequence).map_err(|_| "sequence exceeds u64".to_string())?;
         let (x, y) = pair_values(scenario, context, &mut rng);
         let update = monitor
-            .observe_pair(sequence_u64, &format!("{}-{replication}-{sequence}", scenario.name()), context, &[x], &[y])
+            .observe_pair(
+                sequence_u64,
+                &format!("{}-{replication}-{sequence}", scenario.name()),
+                context,
+                &[x],
+                &[y],
+            )
             .map_err(|error| format!("paired monitor update failed: {error:?}"))?;
         writeln!(
             csv,
@@ -188,9 +184,7 @@ fn run_replication(
 
 fn main() -> Result<(), String> {
     let config = parse_config()?;
-    let mut csv = String::from(
-        "scenario,replication,sequence,context,x,y,log_e_value\n",
-    );
+    let mut csv = String::from("scenario,replication,sequence,context,x,y,log_e_value\n");
     for scenario in [
         Scenario::ConditionalPairNull,
         Scenario::MarginallyEqualConditionalShift,
