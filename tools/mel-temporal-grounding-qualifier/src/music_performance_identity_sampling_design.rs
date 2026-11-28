@@ -99,6 +99,10 @@ pub struct PerformanceIdentitySamplingDesignReportV1 {
     pub work_cluster_bootstrap_permitted_under_declared_assumption: bool,
     pub crossed_inference_required: bool,
     pub performer_identity_authenticated: bool,
+    pub performer_membership_authenticated: bool,
+    pub session_identity_authenticated: bool,
+    pub take_identity_authenticated: bool,
+    pub performance_identity_authenticated: bool,
     pub source_work_identity_authenticated: bool,
     pub sampling_independence_authenticated: bool,
     pub population_generalization_established: bool,
@@ -399,6 +403,10 @@ pub fn audit_performance_identity_sampling_design(
         work_cluster_bootstrap_permitted_under_declared_assumption,
         crossed_inference_required,
         performer_identity_authenticated: false,
+        performer_membership_authenticated: false,
+        session_identity_authenticated: false,
+        take_identity_authenticated: false,
+        performance_identity_authenticated: false,
         source_work_identity_authenticated: false,
         sampling_independence_authenticated: false,
         population_generalization_established: false,
@@ -736,6 +744,12 @@ mod tests {
         assert!(report.crossed_inference_required);
         assert!(!report.work_cluster_bootstrap_permitted_under_declared_assumption);
         assert!(!report.performer_identity_authenticated);
+        assert!(!report.performer_membership_authenticated);
+        assert!(!report.session_identity_authenticated);
+        assert!(!report.take_identity_authenticated);
+        assert!(!report.performance_identity_authenticated);
+        assert!(!report.source_work_identity_authenticated);
+        assert!(!report.sampling_independence_authenticated);
         assert!(!report.population_generalization_established);
     }
 
