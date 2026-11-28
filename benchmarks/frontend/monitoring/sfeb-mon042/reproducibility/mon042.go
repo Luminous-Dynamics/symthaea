@@ -38,6 +38,8 @@ type Observation struct {
  UnitID string `json:"unit_id"`
  ReplayID string `json:"replay_id"`
  TrialID string `json:"trial_id"`
+ SamplingFrameSHA256 string `json:"sampling_frame_sha256"`
+ SelectionProtocolSHA256 string `json:"selection_protocol_sha256"`
  ScenarioSHA256 string `json:"scenario_sha256"`
  RecoveryBoundarySHA256 string `json:"recovery_boundary_sha256"`
  FaultSetSHA256 string `json:"fault_set_sha256"`
@@ -51,6 +53,8 @@ type Observation struct {
 type ExecutionUnit struct {
  UnitID string `json:"unit_id"`
  StratumID string `json:"stratum_id"`
+ SelectionOrdinal int `json:"selection_ordinal"`
+ SelectionReceiptSHA256 string `json:"selection_receipt_sha256"`
  DomainInventoryComplete bool `json:"domain_inventory_complete"`
  DependencyDomains map[string]string `json:"dependency_domains"`
  DomainManifestSHA256 string `json:"domain_manifest_sha256"`
@@ -122,6 +126,7 @@ func validDigest(s string)bool{if len(s)!=64||s!=strings.ToLower(s){return false
 func digestJSON(v any)string{b,e:=json.Marshal(v);if e!=nil{return ""};h:=sha256.Sum256(b);return hex.EncodeToString(h[:])}
 func ObservationReceiptDigest(o Observation)string{o.OutcomeReceiptSHA256="";return digestJSON(o)}
 func DomainManifestDigest(unitID string,domains map[string]string)string{return digestJSON(struct{UnitID string `json:"unit_id"`;Domains map[string]string `json:"domains"`}{unitID,domains})}
+func SelectionReceiptDigest(unitID,stratum string,ordinal int,frame,protocol string)string{return digestJSON(struct{UnitID string `json:"unit_id"`;StratumID string `json:"stratum_id"`;Ordinal int `json:"selection_ordinal"`;SamplingFrameSHA256 string `json:"sampling_frame_sha256"`;SelectionProtocolSHA256 string `json:"selection_protocol_sha256"`}{unitID,stratum,ordinal,frame,protocol})}
 func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};if s!=strings.ToLower(s){return false};_,e:=hex.DecodeString(s);return e==nil}
 
 type disjointSet struct{ parent, rank []int }
@@ -158,6 +163,8 @@ func Evaluate(in Input)Result{
  if in.Mode!=OfflineFixture&&in.Mode!=RuntimeCandidate{f.block("mode_invalid")}
  if !validID(in.TrialID){f.block("trial_id_invalid")}
  if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
+ if !validDigest(in.SamplingFrameSHA256){f.block("sampling_frame_digest_invalid")}
+ if !validDigest(in.SelectionProtocolSHA256){f.block("selection_protocol_digest_invalid")}
  if !validDigest(in.TargetFailureSignatureSHA256){f.block("target_signature_digest_invalid")}
  if !validDigest(in.ScenarioSHA256){f.block("scenario_digest_invalid")}
  if !validDigest(in.RecoveryBoundarySHA256){f.block("recovery_boundary_digest_invalid")}
@@ -182,12 +189,15 @@ func Evaluate(in Input)Result{
  if f.blocked{out.DesignVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
  if len(in.Units)==0{f.hold("execution_units_missing");out.DesignVerdict=f.verdict();out.ReasonCodes=f.sorted();return out}
 
- seenUnits:=map[string]struct{}{};globalReplayIDs:=map[string]struct{}{};stratum:=""
+ seenUnits:=map[string]struct{}{};globalReplayIDs:=map[string]struct{}{};selectionOrdinals:=map[int]struct{}{};stratum:=""
  for i:=range in.Units{
   u:=&in.Units[i]
   if !validID(u.UnitID)||!validID(u.StratumID){f.block("unit_identity_invalid")}
   if _,ok:=seenUnits[u.UnitID];ok{f.block("unit_id_duplicated")};seenUnits[u.UnitID]=struct{}{}
   if i==0{stratum=u.StratumID}else if u.StratumID!=stratum{f.block("mixed_strata_require_separate_analysis")}
+  if u.SelectionOrdinal<1||u.SelectionOrdinal>in.ExpectedUnitCount{f.block("selection_ordinal_out_of_range:"+u.UnitID)}
+  if _,ok:=selectionOrdinals[u.SelectionOrdinal];ok{f.block("selection_ordinal_duplicated")};selectionOrdinals[u.SelectionOrdinal]=struct{}{}
+  if !validDigest(u.SelectionReceiptSHA256){f.hold("selection_receipt_digest_missing:"+u.UnitID)}else if u.SelectionReceiptSHA256!=SelectionReceiptDigest(u.UnitID,u.StratumID,u.SelectionOrdinal,in.SamplingFrameSHA256,in.SelectionProtocolSHA256){f.block("selection_receipt_digest_mismatch:"+u.UnitID)}
   if !u.DomainInventoryComplete{f.hold("domain_inventory_incomplete:"+u.UnitID)}
   if len(u.DependencyDomains)>MaxDomains{f.block("unit_domain_limit_exceeded:"+u.UnitID)}
   for name:=range required{value,ok:=u.DependencyDomains[name];if !ok||!validID(value){f.hold("required_domain_missing:"+u.UnitID+":"+name)}}
@@ -208,6 +218,7 @@ func Evaluate(in Input)Result{
   }
   if len(seeds)!=len(requiredSeeds){f.hold("unit_seed_schedule_incomplete:"+u.UnitID)}
  }
+ for ordinal:=1;ordinal<=in.ExpectedUnitCount;ordinal++{if _,ok:=selectionOrdinals[ordinal];!ok{f.hold("selection_frame_ordinal_missing")}}
  if f.blocked{out.DesignVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
  domainComplete:=true
  for _,u:=range in.Units{if !u.DomainInventoryComplete||!validDigest(u.DomainManifestSHA256){domainComplete=false};for name:=range required{if !validID(u.DependencyDomains[name]){domainComplete=false}}}
