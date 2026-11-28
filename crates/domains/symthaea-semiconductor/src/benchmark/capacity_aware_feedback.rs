@@ -594,7 +594,7 @@ pub fn receive_ca_ocrc_feedback_v1(
     if feedback.clock_domain_id != tracked.clock_domain_id || feedback.clock_domain_id != engine.clock_domain_id {
         reasons.push(CaOcrcReasonV1::ClockDomainMismatch);
     }
-    if feedback.label_available_at_unix_seconds < tracked.event_time_unix_seconds {
+    if feedback.label_available_at_unix_seconds < tracked.prediction_at_unix_seconds {
         reasons.push(CaOcrcReasonV1::LabelAvailabilityBeforePrediction);
     }
     if feedback.eligibility_report_available_at_unix_seconds < feedback.label_available_at_unix_seconds {
@@ -936,7 +936,7 @@ mod tests {
         empty.lower_bound = None; empty.upper_bound = None;
         let decision = start_ca_ocrc_round_v1(&mut engine, &empty).unwrap();
         assert_eq!(decision.immediate_loss, Some(1.0));
-        assert_eq!(decision.threshold_after_round, 0.5 + 0.1 * 0.95);
+        assert!((decision.threshold_after_round - 0.085).abs() < 1e-12);
 
         engine.threshold = 1.01;
         let mut full = round(1, 0.0);
@@ -944,7 +944,7 @@ mod tests {
         full.lower_bound = None; full.upper_bound = None;
         let decision = start_ca_ocrc_round_v1(&mut engine, &full).unwrap();
         assert_eq!(decision.immediate_loss, Some(0.0));
-        assert!((decision.threshold_after_round - (0.5 + 0.095 - 0.005)).abs() < 1e-12);
+        assert!((decision.threshold_after_round - 1.005).abs() < 1e-12);
     }
 
     #[test]
