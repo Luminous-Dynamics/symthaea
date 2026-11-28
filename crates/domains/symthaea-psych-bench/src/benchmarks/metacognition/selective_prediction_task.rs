@@ -633,6 +633,57 @@ mod tests {
     }
 
     #[test]
+    fn external_policy_adapter_receives_observations_and_returns_replayable_report() {
+        let items = fixture_items();
+        let report = evaluate_policy_with(
+            &items,
+            "external_observation_policy",
+            |observation| SelectivePredictionBaseline::PremiseAndFreshnessAware.decide(observation),
+            SelectivePredictionCostModel::default(),
+        )
+        .expect("custom observation-only policy should score");
+
+        assert_eq!(report.policy, "external_observation_policy");
+        assert_eq!(report.items, 14);
+        assert_eq!(report.resolved_clarifications, 4);
+        assert_eq!(report.post_clarification_accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn external_policy_adapter_rejects_untyped_information_requests() {
+        let items = fixture_items();
+        let result = evaluate_policy_with(
+            &items,
+            "invalid_request_policy",
+            |_| SelectivePolicyDecision {
+                action: DecisionAction::RequestInformation,
+                confidence: 0.5,
+                clarification_target: None,
+            },
+            SelectivePredictionCostModel::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(SelectivePredictionTaskError::InvalidPolicyDecision { index: 0 })
+        ));
+
+        let empty_name = evaluate_policy_with(
+            &items,
+            " ",
+            |_| SelectivePolicyDecision {
+                action: DecisionAction::Abstain,
+                confidence: 0.0,
+                clarification_target: None,
+            },
+            SelectivePredictionCostModel::default(),
+        );
+        assert!(matches!(
+            empty_name,
+            Err(SelectivePredictionTaskError::EmptyPolicyName)
+        ));
+    }
+
+    #[test]
     fn clarification_requires_the_right_target_and_a_valid_updated_observation() {
         let mut wrong_target = fixture_items();
         wrong_target[7].clarification_target = Some(ClarificationTarget::RefreshSource);
