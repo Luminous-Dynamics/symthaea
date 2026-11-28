@@ -1,0 +1,243 @@
+{
+  "schema_version": "sdcb-pole-swap-sequential-policy-bridge-v1",
+  "title": "Decision-sufficiency pole-swap challenge mapped into the exact prior-free sequential policy oracle",
+  "status": "authored-rust-integration-fixture;not-compiled-not-ci-qualified;synthetic-support-model-only",
+  "provenance": {
+    "policy_oracle_issue": 13567,
+    "policy_oracle_pr": 13571,
+    "policy_oracle_branch": "research/sequential-policy-oracle-implementation-v1",
+    "policy_oracle_base_head": "7ed8f823ef1c5bcf4a3e2d7e01d5f95320f3cda7",
+    "decision_sufficiency_issue": 14242,
+    "decision_sufficiency_pr": 14243,
+    "decision_sufficiency_branch": "research/sdcb-pole-swap-decision-sufficiency-v1",
+    "decision_sufficiency_head": "f24b754f2a0a27398ff6c3fee65705e1a3c02d22",
+    "decision_sufficiency_manifest_path": "docs/research/SDCB_POLE_SWAP_DECISION_SUFFICIENCY_V1.json",
+    "decision_sufficiency_manifest_blob_sha": "d09d8b9c2acd4d2c3ee392f19d4a1e25aacfad17",
+    "physical_response_issue": 14002,
+    "physical_response_fixture_pr": 14003,
+    "physical_response_source_commit": "32ed97333ce383ab4c604ee558bb642341872f3e",
+    "physical_response_source_blob_sha": "edf6da2ec4e4e5effb4638d76fcdcaffa16ff218",
+    "action_probability_enclosure_issue": 14000,
+    "evidence_transition_authority_issue": 13805
+  },
+  "worlds": [
+    {
+      "id": "world_a_physical_slow_sensor_fast",
+      "physical_decay_lambda": "0.25",
+      "sensor_response_mu": "4.0",
+      "process_variance": "9.0"
+    },
+    {
+      "id": "world_b_physical_fast_sensor_slow",
+      "physical_decay_lambda": "4.0",
+      "sensor_response_mu": "0.25",
+      "process_variance": "144.0"
+    }
+  ],
+  "resource_dimensions": [
+    "elapsed_slots",
+    "reference_units",
+    "actuator_energy_units",
+    "compute_units"
+  ],
+  "default_resource_budget": {
+    "elapsed_slots": 2,
+    "reference_units": 2,
+    "actuator_energy_units": 2,
+    "compute_units": 0
+  },
+  "maximum_actions": 1,
+  "decision_deadline_step": 2,
+  "maximum_worst_case_loss": 0.0,
+  "probe_actions": [
+    {
+      "id": "passive_sensor_output_autocovariance",
+      "delay_steps": 0,
+      "resource_cost": {
+        "elapsed_slots": 0,
+        "reference_units": 0,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "same_passive_law", "possible_worlds": ["world_a_physical_slow_sensor_fast", "world_b_physical_fast_sensor_slow"]}
+      ],
+      "expected_decision_value": 0.0,
+      "mechanism_status": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS"
+    },
+    {
+      "id": "upstream_command_first_order_relaxation_cascade",
+      "delay_steps": 1,
+      "resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 0,
+        "actuator_energy_units": 1,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "same_cascade_response", "possible_worlds": ["world_a_physical_slow_sensor_fast", "world_b_physical_fast_sensor_slow"]}
+      ],
+      "expected_decision_value": 0.0,
+      "mechanism_status": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS"
+    },
+    {
+      "id": "traceable_sensor_inlet_step",
+      "delay_steps": 1,
+      "resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 1,
+        "actuator_energy_units": 1,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "sensor_inlet_response_world_a", "possible_worlds": ["world_a_physical_slow_sensor_fast"]},
+        {"id": "sensor_inlet_response_world_b", "possible_worlds": ["world_b_physical_fast_sensor_slow"]}
+      ],
+      "expected_decision_value": 1.0,
+      "mechanism_status": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL"
+    },
+    {
+      "id": "traceable_sensor_inlet_frequency_sweep",
+      "delay_steps": 2,
+      "resource_cost": {
+        "elapsed_slots": 2,
+        "reference_units": 1,
+        "actuator_energy_units": 2,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "frequency_response_world_a", "possible_worlds": ["world_a_physical_slow_sensor_fast"]},
+        {"id": "frequency_response_world_b", "possible_worlds": ["world_b_physical_fast_sensor_slow"]}
+      ],
+      "expected_decision_value": 1.0,
+      "mechanism_status": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL"
+    },
+    {
+      "id": "independent_reference_of_latent_process",
+      "delay_steps": 1,
+      "resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 2,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "latent_reference_world_a", "possible_worlds": ["world_a_physical_slow_sensor_fast"]},
+        {"id": "latent_reference_world_b", "possible_worlds": ["world_b_physical_fast_sensor_slow"]}
+      ],
+      "expected_decision_value": 1.0,
+      "mechanism_status": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL"
+    },
+    {
+      "id": "high_entropy_world_independent_nuisance_control",
+      "delay_steps": 1,
+      "resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 0,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      },
+      "outcomes": [
+        {"id": "nuisance_outcome_0", "possible_worlds": ["world_a_physical_slow_sensor_fast", "world_b_physical_fast_sensor_slow"]},
+        {"id": "nuisance_outcome_1", "possible_worlds": ["world_a_physical_slow_sensor_fast", "world_b_physical_fast_sensor_slow"]}
+      ],
+      "outcome_entropy_bits": 1,
+      "world_mutual_information_bits": 0,
+      "expected_decision_value": 0.0,
+      "mechanism_status": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK_INV_DECISION_INVARIANT",
+      "decision_loss": {
+        "maintain_safe_configuration": {
+          "world_a_physical_slow_sensor_fast": 0,
+          "world_b_physical_fast_sensor_slow": 0
+        },
+        "replace_sensor": {
+          "world_a_physical_slow_sensor_fast": 1,
+          "world_b_physical_fast_sensor_slow": 1
+        }
+      },
+      "known_answer": {
+        "current_minimax_loss": 0,
+        "selected_policy": "STOP",
+        "selected_terminal_decision": "maintain_safe_configuration",
+        "worst_case_terminal_loss": 0,
+        "unnecessary_acquisition_count": 0,
+        "current_risk_gate_passed": true,
+        "policy_terminal_risk_gate_passed": true
+      }
+    },
+    {
+      "id": "TASK_SENS_DECISION_SENSITIVE",
+      "decision_loss": {
+        "select_fast_sensor_path": {
+          "world_a_physical_slow_sensor_fast": 0,
+          "world_b_physical_fast_sensor_slow": 1
+        },
+        "select_slow_sensor_path": {
+          "world_a_physical_slow_sensor_fast": 1,
+          "world_b_physical_fast_sensor_slow": 0
+        }
+      },
+      "known_answer": {
+        "current_minimax_loss": 1,
+        "selected_policy": "PROBE",
+        "one_step_worst_case_terminal_loss": 0,
+        "current_risk_gate_passed": false,
+        "policy_terminal_risk_gate_passed": true,
+        "terminal_decision_by_world": {
+          "world_a_physical_slow_sensor_fast": "select_fast_sensor_path",
+          "world_b_physical_fast_sensor_slow": "select_slow_sensor_path"
+        },
+        "default_tie_break_selected_probe": "independent_reference_of_latent_process",
+        "tie_break_semantics": "lexicographic_action_id;not cost optimization",
+        "selected_probe_resource_vector": {
+          "elapsed_slots": 1,
+          "reference_units": 2,
+          "actuator_energy_units": 0,
+          "compute_units": 0
+        }
+      }
+    }
+  ],
+  "tournament_arms_to_implement_and_compare": [
+    "no_acquisition",
+    "passive_only",
+    "upstream_response_gap_greedy",
+    "outcome_entropy_greedy",
+    "sensor_inlet_response_gap_greedy",
+    "decision_value_greedy",
+    "fixed_sensor_inlet_step",
+    "fixed_independent_reference",
+    "exact_prior_free_sequential_oracle"
+  ],
+  "metrics": [
+    "worst_case_terminal_loss",
+    "decision_regret_against_exact_oracle",
+    "false_mechanism_resolution_rate",
+    "unnecessary_acquisition_rate_on_invariant_task",
+    "failure_to_acquire_rate_on_sensitive_task",
+    "risk_gate_status_before_and_after_policy",
+    "componentwise_resource_usage_per_terminal_path",
+    "missed_deadline_and_over_budget_denominators",
+    "unresolved_and_abstention_denominators",
+    "exact_replay_agreement"
+  ],
+  "validation": {
+    "new_rust_module": "research/decision-predictability-benchmark/src/sdcb_pole_swap.rs",
+    "module_export": "research/decision-predictability-benchmark/src/lib.rs::sdcb_pole_swap",
+    "authored_tests": 7,
+    "dp_and_exhaustive_oracles_compared": true,
+    "rust_compiled": false,
+    "rust_tests_executed": false,
+    "cargo_and_hosted_ci_qualified": false,
+    "physical_sensor_validation": false,
+    "continuous_noisy_likelihood_model": false,
+    "metrological_traceability": false,
+    "policy_execution_authority": false
+  },
+  "claim_boundary": "This is a synthetic two-world support-set integration fixture. It validates composition of the existing #13567 prior-free policy oracle with the #14243 decision-sufficiency task. It does not establish physical sensor performance, noisy-measurement statistical power, global optimality outside the frozen finite problem, industry superiority, or authorization to execute an experiment."
+}
