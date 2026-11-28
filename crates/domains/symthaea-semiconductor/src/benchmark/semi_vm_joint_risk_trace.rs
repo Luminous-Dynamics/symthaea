@@ -75,6 +75,7 @@ pub struct JointPopulationRowV1 {
 pub struct JointTauAciArmEvidenceV1 {
     pub policy: DelayedAciPolicyV1,
     pub interval_method_sha256: String,
+    pub prediction_stream_closed: bool,
     pub predictions: Vec<DelayedAciPredictionReceiptV1>,
     pub deliveries: Vec<DelayedAciLabelDeliveryV1>,
     pub updates: Vec<DelayedAciUpdateReceiptV1>,
@@ -88,6 +89,8 @@ pub struct JointCaOcrcArmEvidenceV1 {
     pub policy: CaOcrcPolicyV1,
     pub round_inputs: Vec<CaOcrcRoundInputV1>,
     pub round_reports: Vec<CaOcrcRoundReportV1>,
+    pub feedback_horizon_closed: bool,
+    pub unresolved_tracking_rounds: Vec<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -665,6 +668,12 @@ fn validate_aci_arm(
     evidence: &JointTauAciArmEvidenceV1,
     population: &BTreeMap<u64, &JointPopulationRowV1>,
 ) -> Result<Option<(usize, usize, usize, usize, usize)>, JointRiskTraceErrorV1> {
+    if !evidence.prediction_stream_closed {
+        return Err(JointRiskTraceErrorV1(format!(
+            "tau-ACI arm {} prediction stream is not explicitly closed",
+            arm.arm_id
+        )));
+    }
     if evidence.predictions.len() != population.len() {
         return Err(JointRiskTraceErrorV1(format!(
             "tau-ACI arm {} must issue exactly one prediction per population row",
@@ -1057,6 +1066,12 @@ fn validate_ca_arm(
     evidence: &JointCaOcrcArmEvidenceV1,
     population: &BTreeMap<u64, &JointPopulationRowV1>,
 ) -> Result<(Option<f64>, usize, usize, bool), JointRiskTraceErrorV1> {
+    if !evidence.feedback_horizon_closed {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} feedback horizon is not explicitly closed",
+            arm.arm_id
+        )));
+    }
     if evidence.round_reports.len() != population.len()
         || evidence.round_inputs.len() != population.len()
     {
@@ -1073,6 +1088,19 @@ fn validate_ca_arm(
     if inputs_by_round.len() != evidence.round_inputs.len() {
         return Err(JointRiskTraceErrorV1(format!(
             "CA-OCRC arm {} repeats a round input",
+            arm.arm_id
+        )));
+    }
+    let unresolved: BTreeSet<u64> = evidence
+        .unresolved_tracking_rounds
+        .iter()
+        .copied()
+        .collect();
+    if unresolved.len() != evidence.unresolved_tracking_rounds.len()
+        || unresolved.iter().any(|round| !population.contains_key(round))
+    {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} unresolved tracking rounds are duplicated or outside population",
             arm.arm_id
         )));
     }
@@ -1187,14 +1215,15 @@ fn validate_ca_arm(
                 )));
             };
             let result_key = (
-                result.originating_round.unwrap_or(u64::MAX),
+                report.round,
                 result.sample_id.as_str(),
                 result.label_id.as_str(),
                 result.label_revision,
             );
             if !seen_feedback_results.insert(result_key)
-                || result.originating_round.is_none()
-                || result.actual_delay_steps.is_none()
+                || result.originating_round != Some(outcome_row.round_id)
+                || result.actual_delay_steps
+                    != Some(report.round.saturating_sub(outcome_row.round_id))
                 || ca_feedback_digest(result)? != result.feedback_receipt_sha256
             {
                 return Err(JointRiskTraceErrorV1(format!(
@@ -1273,13 +1302,19 @@ fn validate_ca_arm(
             arm.arm_id
         )));
     }
-    if population
-        .values()
-        .any(|row| !row.physical_measurement_selected)
-        && theorem_intact
-    {
+    let incomplete_physical_feedback = population.values().any(|row| {
+        !row.physical_measurement_selected
+            || row.outcome_state != PopulationOutcomeStateV1::Qualified
+    });
+    if incomplete_physical_feedback && theorem_intact {
         return Err(JointRiskTraceErrorV1(format!(
-            "CA-OCRC arm {} final theorem status ignores incomplete physical feedback",
+            "CA-OCRC arm {} claims theorem assumptions intact despite unselected/unqualified physical feedback",
+            arm.arm_id
+        )));
+    }
+    if !unresolved.is_empty() && theorem_intact {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} claims theorem assumptions intact with unresolved feedback at horizon close",
             arm.arm_id
         )));
     }
