@@ -358,3 +358,107 @@ This programme must not create another generic benchmark manifest, task-sealing 
 ---
 
 **Qualification statement:** This file is a research specification. It does not contain a completed Rust implementation, executed task campaign, local external-benchmark reproduction, CI pass, or Symthaea performance result.
+
+## 13. Updated industry snapshot — 28 November 2026
+
+This addendum supersedes the earlier BALROG example in §1.1 where it described Claude Opus 5 Max as the top visible result. A fresh read of the **official BALROG leaderboard** now shows:
+
+| BALROG LLM entry | Overall progress | BabyAI | Crafter | TextWorld | Baba Is AI | MiniHack | NetHack | Result date |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| **GPT-6-Astra-Max** | **68.3 ± 2.0** | 100.0 | 76.8 | 54.5 | 100.0 | 65.0 | 13.2 | 2026-09-18 |
+| Claude-Opus-5-Max | 63.4 ± 1.8 | 100.0 | 68.2 | 71.6 | 95.8 | 37.5 | 7.3 | 2026-09-20 |
+| GPT-5.6-Terra-Max | 53.2 ± 2.0 | 98.0 | 55.0 | 27.8 | 97.5 | 37.5 | 3.3 | 2026-09-20 |
+
+Source: official [BALROG leaderboard](https://balrogai.com/), read 2026-11-28. The environment-level pattern matters: the overall leader still scores 13.2 on NetHack, while achieving 100 on BabyAI and Baba Is AI. Do not convert progress into success probability or claim broad game competence from the aggregate.
+
+A third-party result page is unnecessary for this snapshot: GPT-6-Astra-Max appears directly on the official leaderboard. The dated leaderboard remains a snapshot, not a locally reproduced Symthaea baseline.
+
+### 13.1 GameWorld: keep standard and fine-control protocols separate
+
+The GameWorld project page currently describes 34 browser games and 170 tasks, with five genres and direct state-derived success/progress metrics. Its visible generalist podium lists Gemini-3-Flash-Preview at **41.9% progress / 21.2% success**, GPT-5.2 at **40.6% / 20.6%**, and Claude-Sonnet-4.6 at **39.3% / 20.6%**. The visible novice-human progress baseline is **64.1%**, and expert-human progress is **82.6%**.
+
+A November 27, 2026 Benchmark Almanac read of the **GameWorld official leaderboard** reports a newer **Fine-Control Protocol, 400-step** result: GPT-6.1 Terra at **76.8%**, Gemini 3.8 Flash at **63.5%**, and Qwen3.8-Flash-Next at **61.5%**. The new score is protocol-specific; it must not be compared as though it were the same run as the standard-protocol public podium. The Almanac is a secondary snapshot of the official leaderboard, so preserve its provenance as such until a raw official result capsule is downloaded and independently inspected.
+
+Sources:
+- GameWorld project results and human baselines: https://gameworld-project.github.io/
+- Benchmark Almanac, retrieved 2026-11-27: https://www.benchmarkalmanac.com/benchmarks/gameworld/
+
+The programme should record at least four distinct columns when reproducing GameWorld:
+1. standard paused protocol progress and success;
+2. fine-control paused protocol progress and success;
+3. GameWorld-RT progress and success (real-time, separate);
+4. human novice/expert reference, with the exact interface and action budget.
+
+### 13.2 SIMA 2: compare training-environment and held-out-environment capability
+
+Google DeepMind's SIMA 2 technical report (2025-12-05) reports training-environment average success of **65% human-evaluated / 66% automatically evaluated**, compared with human **76% / 78%** under the same timeout and human-no-timeout **86%**. However, its entirely held-out environment success is much lower: roughly **14% on ASKA** and **13% on MineDojo** (versus approximately 2.5% and 0% for SIMA 1). It completed tasks in 26 of 50 MineDojo task categories.
+
+This is an important methodological lesson: report familiar-environment skill, held-out task generalization, and truly held-out environment generalization separately. A system can approach the human baseline on familiar environments while retaining a large gap under more severe distribution shift.
+
+Source: SIMA 2 technical report, https://arxiv.org/abs/2512.04797 ; downloadable report: https://storage.googleapis.com/deepmind-media/DeepMind.com/Blog/sima-2-an-agent-that-plays-reasons-and-learns-with-you-in-virtual-3d-worlds/SIMA_Tech_Report_2025.pdf
+
+### 13.3 Revised SOTA strategy
+
+Do not set a single cross-benchmark target. Use protocol-matched goals:
+
+| Track | Current external reference | Symthaea target sequence |
+|---|---|---|
+| BALROG LLM | GPT-6-Astra-Max 68.3 ± 2.0 overall progress | First reproduce a small, exact BALROG slice; then aim to exceed 68.3 only under the same benchmark release, interface, model/tool budget, and episode protocol |
+| GameWorld standard | Gemini-3-Flash-Preview 41.9 progress / 21.2 success on visible podium | First reproduce one puzzle and one platformer family; report progress and success separately |
+| GameWorld fine-control | GPT-6.1 Terra 76.8 progress, 400-step Fine-Control Protocol (secondary snapshot of official board) | Protocol-match the exact fine-control action rate and 400-step boundary before claiming a challenge; target >76.8 only after official raw result and local baseline are verified |
+| SIMA 2 held-out environments | About 14% ASKA / 13% MineDojo | Build a genuinely unseen mechanics/world split and compare success, adaptation cost, and skill transfer; do not compare unlike games directly |
+| Rust-native GameBench | Exact oracle exists only for small deterministic fixtures | 100% on frozen known-answer controls; then test held-out maps, rules and compositions with statistical uncertainty |
+
+For a GameWorld or BALROG SOTA claim, Symthaea will eventually require a real visual/action route. The current F1–F4 structured environment fixtures do not qualify pixel perception, computer-use, browser interaction, or multimodal performance.
+
+## 14. New research direction: skill contracts and cognitive control
+
+The strongest next paradigm shift is not another monolithic policy. It is a **composable skill system with independently verifiable contracts**.
+
+A reusable skill should have:
+- a typed precondition (what must be true before execution);
+- an action policy or planner;
+- a postcondition (what the skill guarantees when it reports success);
+- invariants (what it must never violate);
+- an uncertainty / failure condition;
+- an interaction and compute budget;
+- a trace proving what actions occurred.
+
+For example, a `collect_key` skill would not report success merely because the agent moved near a key. It would report success only when the evaluator verifies the inventory transition. An `unlock_door` skill would require possession of the matching key and return a proof that the correct door state changed.
+
+Compose these contracts into a hierarchical task graph. Measure:
+1. primitive skill success;
+2. composition success on unseen task graphs;
+3. recovery when a skill postcondition fails;
+4. transfer savings versus matched from-scratch planning;
+5. invalid or falsely reported skill successes.
+
+This creates a possible bridge to robotics and Symtropy: the same skill contract can later describe a physical action, with different evidence and safety requirements. Game success alone never qualifies a physical capability.
+
+### 14.1 Surprise-triggered model revision
+
+Add a second explicit mechanism test. Before an action, the candidate predicts a distribution over the next state. After the evaluator returns the observed state, compute an independently defined prediction residual / surprise event. The agent may propose a local model revision, but must:
+- identify which transition rule changed;
+- distinguish sensor noise from a mechanics change;
+- update only the affected skill/model component;
+- demonstrate improved held-out prediction and action quality;
+- preserve unaffected skills.
+
+Report false alarms, missed changes, detection delay, model-revision cost, post-change regret, and forgetting. This is more informative than reporting only the final score after a game changes its rules.
+
+### 14.2 Active sensing under a decision budget
+
+The F4 scan fixture creates the first explicit sensing-cost experiment. Extend this across tasks by comparing:
+- no scan / passive observation;
+- fixed scan schedule;
+- matched-cost random scan;
+- greedy entropy reduction;
+- decision-value / EVSI probe choice;
+- exact evaluator-only probe oracle on small worlds.
+
+A scan that reduces uncertainty but cannot change any optimal decision should not be called useful exploration. The primary quantity should be decision regret avoided per sensing cost, accompanied by coverage and failure severity.
+
+### 14.3 Self-improvement without self-certification
+
+Permit Symthaea to propose new levels, skill candidates and adversarial counterexamples. Freeze generated tasks before the candidate sees evaluation outcomes. Have an independent generator/evaluator select the final hidden cohort. Score the improvement *process* on new tasks created after the system's proposal policy is frozen. This composes with the existing sealed-evaluator work; it does not grant the agent authority over its own score.
+
