@@ -40,6 +40,8 @@ pub mod adaptive_prediction;
 pub mod analysis_crosscheck;
 #[cfg(feature = "theory")]
 pub mod analyst;
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
 pub mod audio_analyzer;
 #[cfg(feature = "theory")]
 pub mod blinded_study;
@@ -200,6 +202,8 @@ pub mod study_orchestration;
 pub mod study_release;
 #[cfg(feature = "theory")]
 pub mod study_runner;
+#[cfg(feature = "studio")]
+pub mod teaching_corpus;
 pub mod synth;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;

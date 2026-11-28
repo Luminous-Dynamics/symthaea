@@ -1,0 +1,34 @@
+name: Cargo Workspace Glob Integrity
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/check_workspace_glob_members.py"
+      - ".github/workflows/workspace-glob-integrity.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/check_workspace_glob_members.py"
+      - ".github/workflows/workspace-glob-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-glob-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check workspace glob members
+        run: python3 scripts/check_workspace_glob_members.py
+      - name: Resolve Cargo workspace and verify the committed lockfile
+        run: cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+      - name: Verify STT formatting resolves from the root workspace
+        run: cargo fmt --manifest-path Cargo.toml -p symthaea-stt -- --check

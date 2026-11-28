@@ -1,0 +1,70 @@
+name: Cargo Workspace Lockfile Refresh Report
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/workspace-glob-integrity.yml"
+      - ".github/workflows/workspace-lockfile-refresh-report.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-report:
+    name: Preview Cargo.lock workspace refresh
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up repository-pinned Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+      - name: Preserve current lockfile
+        run: |
+          mkdir -p "$RUNNER_TEMP/lockfile-report"
+          cp Cargo.lock "$RUNNER_TEMP/lockfile-report/Cargo.lock.before"
+      - name: Regenerate workspace lock graph without changing the branch
+        id: refresh
+        shell: bash
+        run: |
+          set +e
+          cargo update --workspace > "$RUNNER_TEMP/lockfile-report/cargo-update.log" 2>&1
+          update_exit=$?
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/lockfile-report/metadata.json" 2> "$RUNNER_TEMP/lockfile-report/metadata.stderr"
+          metadata_exit=$?
+          cp Cargo.lock "$RUNNER_TEMP/lockfile-report/Cargo.lock.after"
+          diff -u "$RUNNER_TEMP/lockfile-report/Cargo.lock.before" "$RUNNER_TEMP/lockfile-report/Cargo.lock.after" > "$RUNNER_TEMP/lockfile-report/Cargo.lock.diff"
+          diff_exit=$?
+          printf 'cargo_update_exit=%s\nmetadata_exit=%s\ndiff_exit=%s\n' "$update_exit" "$metadata_exit" "$diff_exit" > "$RUNNER_TEMP/lockfile-report/status.txt"
+          echo "update_exit=$update_exit" >> "$GITHUB_OUTPUT"
+          echo "metadata_exit=$metadata_exit" >> "$GITHUB_OUTPUT"
+          # The next step uploads the exact proposal even when resolution fails.
+          exit 0
+      - name: Upload lockfile proposal and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lockfile-refresh-report
+          path: "${{ runner.temp }}/lockfile-report/"
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require successful lockfile resolution
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.refresh.outputs.update_exit }}" != "0" ]]; then
+            echo "cargo update --workspace failed; inspect the uploaded diagnostic artifact."
+            exit 1
+          fi
+          if [[ "${{ steps.refresh.outputs.metadata_exit }}" != "0" ]]; then
+            echo "cargo metadata --locked failed after refresh; inspect the uploaded diagnostic artifact."
+            exit 1
+          fi
