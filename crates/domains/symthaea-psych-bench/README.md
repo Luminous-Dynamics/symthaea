@@ -121,7 +121,7 @@ workflow is not validation.
 
 ## Evidence-qualified benchmark registry (pilot v0.1)
 
-The initial pilot registry covers seven selected tasks/environments and 28
+The initial pilot registry covers seven selected tasks/environments and 30
 metric definitions. It records stable IDs, implementation paths, construct
 cards, evidence classes, stimulus provenance, metric units/bounds/directions,
 validation status and comparison eligibility.
