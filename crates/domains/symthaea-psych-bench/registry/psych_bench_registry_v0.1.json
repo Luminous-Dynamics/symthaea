@@ -836,7 +836,8 @@
           "The fixture is hand-authored and synthetic; it is not a validated psychometric instrument or human norm.",
           "The baseline policies are transparent controls, not trained Symthaea agents or external foundation-model competitors.",
           "The initial version scores clarification requests against evaluator-known opportunities but does not yet execute multi-turn clarification exchanges.",
-          "Relative action-cost units are not wall-clock latency, tokens, energy or monetary cost."
+          "Relative action-cost units are not wall-clock latency, tokens, energy or monetary cost.",
+          "The expected-value-of-information control uses hand-authored probability estimates and a normalized decision-risk request burden; it is not calibrated empirical EVSI."
         ]
       },
       "implementation_path": "crates/domains/symthaea-psych-bench/src/benchmarks/metacognition/selective_prediction_task.rs",
@@ -846,7 +847,7 @@
       "validation_status": "unvalidated",
       "stimulus_provenance": {
         "kind": "frozen_synthetic_policy_fixture",
-        "generator": "selective-control-fixture-0.1.0; 14 hand-authored cases across supported evidence, difficult answerable, missing constraint, false premise, stale evidence and unavailable source.",
+        "generator": "selective-control-fixture-0.1.0; 14 hand-authored cases across supported evidence, difficult answerable, missing constraint, false premise, stale evidence and unavailable source. Observation-only expected-value control receives synthetic estimates (0.75 resolution probability when clarification is available; 0.94 post-clarification correctness), not hidden evaluator labels.",
         "external_dataset": null,
         "licence": "Original Luminous Dynamics synthetic fixture."
       },
@@ -1003,7 +1004,8 @@
       "controls": {
         "status": "smoke_controls_only",
         "positive_controls": [
-          "premise-and-freshness-aware policy on the fixture's false-premise, stale-source and resolvable-clarification cases"
+          "premise-and-freshness-aware policy on the fixture's false-premise, stale-source and resolvable-clarification cases",
+          "expected-value-of-information heuristic using observation-visible resolution and post-clarification estimates"
         ],
         "negative_controls": [
           "always-answer policy",
