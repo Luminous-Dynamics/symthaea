@@ -107,7 +107,9 @@ pub struct RoiInformationValueScore {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum RoiInformationValueError {
+    WrongSchema,
     InvalidConfig,
     InvalidIdentifier,
     InvalidDigest,
@@ -232,6 +234,35 @@ pub struct RoiInformationRanking {
     pub ranked: Vec<RoiInformationValueScore>,
     /// Rejections are retained rather than silently omitted.
     pub rejected: Vec<RoiCandidateRejection>,
+}
+
+/// Replayable input manifest for one calibrated ROI-ranking decision.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RoiInformationValueManifestV1 {
+    pub schema: String,
+    pub now_us: u64,
+    pub now_clock_domain_id: String,
+    pub config: RoiInformationValueConfig,
+    pub candidates: Vec<RoiValueEstimate>,
+}
+
+pub const ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1: &str =
+    "symthaea.roi-information-value-manifest.v1";
+
+/// Validate and rank a replayable manifest. The output is deterministic for
+/// equivalent inputs and does not dispatch or authorize any work.
+pub fn rank_roi_information_value_manifest(
+    manifest: &RoiInformationValueManifestV1,
+) -> Result<RoiInformationRanking, RoiInformationValueError> {
+    if manifest.schema != ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1 {
+        return Err(RoiInformationValueError::WrongSchema);
+    }
+    rank_roi_information_value(
+        &manifest.candidates,
+        manifest.now_us,
+        &manifest.now_clock_domain_id,
+        manifest.config,
+    )
 }
 
 pub fn rank_roi_information_value(
@@ -494,6 +525,41 @@ mod tests {
                 RoiInformationValueConfig::default()
             ),
             Err(RoiInformationValueError::ClockDomainMismatch)
+        );
+    }
+
+    #[test]
+    fn manifest_replay_produces_stable_ranking_and_rejections() {
+        let base = estimate("roi-good", 0.8, 0.5, 10_000);
+        let mut stale = estimate("roi-stale", 0.7, 0.4, 10_000);
+        stale.source_timestamp_us = 0;
+        let manifest = RoiInformationValueManifestV1 {
+            schema: ROI_INFORMATION_VALUE_MANIFEST_SCHEMA_V1.to_owned(),
+            now_us: 1_100,
+            now_clock_domain_id: "clock:camera-1".to_owned(),
+            config: RoiInformationValueConfig::default(),
+            candidates: vec![base, stale],
+        };
+        let first = rank_roi_information_value_manifest(&manifest).unwrap();
+        let second = rank_roi_information_value_manifest(&manifest).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.ranked.len(), 1);
+        assert_eq!(first.rejected.len(), 1);
+        assert_eq!(first.rejected[0].reason, RoiInformationValueError::StaleSourceFrame);
+    }
+
+    #[test]
+    fn manifest_schema_version_is_required() {
+        let manifest = RoiInformationValueManifestV1 {
+            schema: "symthaea.roi-information-value-manifest.v0".to_owned(),
+            now_us: 1_100,
+            now_clock_domain_id: "clock:camera-1".to_owned(),
+            config: RoiInformationValueConfig::default(),
+            candidates: Vec::new(),
+        };
+        assert_eq!(
+            rank_roi_information_value_manifest(&manifest),
+            Err(RoiInformationValueError::WrongSchema)
         );
     }
 
