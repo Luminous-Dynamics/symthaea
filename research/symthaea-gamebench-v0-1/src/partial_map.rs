@@ -571,7 +571,8 @@ mod tests {
         memory.remember(&first).expect("remember first view");
         let after_scan = game.step(ExploreAction::Scan).expect("scan");
         memory.remember(&after_scan.observation).expect("remember scan view");
-        game.step(ExploreAction::Move(Action::East)).expect("move east");
+        game.step(ExploreAction::Move(Action::East)).expect("move to x=1");
+        game.step(ExploreAction::Move(Action::East)).expect("move to x=2");
         let later = game.observe();
         memory.remember(&later).expect("remember later view");
 
