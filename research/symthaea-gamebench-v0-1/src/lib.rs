@@ -7,6 +7,12 @@
 //! It is a benchmark substrate, not an agent,
 //! game-playing result, or production runtime component.
 
+mod candidate;
+pub use candidate::{
+    CandidateDecision, CandidateFeedback, CandidateInput, DecisionValidationError,
+    FeatureForecast, ForecastMass, ForecastValue, InteractiveCandidate, validate_decision,
+};
+
 mod hidden_mechanics;
 pub use hidden_mechanics::{
     HiddenAction, HiddenMechanicsError, HiddenMechanicsGame, HiddenMechanicsObservation,
