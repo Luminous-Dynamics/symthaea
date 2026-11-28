@@ -185,12 +185,14 @@ Do not set numeric human-performance targets before a rights-cleared pilot estim
 
 The industry strategy in #10678 and the instrumental preference programme in #9453 remain the owners for commercial frontier snapshots. This tranche does not reproduce their leaderboard data.
 
-## Validation performed for this documentation tranche
+## Validation and admission contract
 
-- JSON parsing and required-key/schema-marker checks are performed before repository publication.
-- Source URLs, DOI identifiers, profile IDs and catalogue references are recorded in the files.
-- The package is documentation/research metadata only.
-- No Rust compilation, benchmark execution, audio render, human review, rights clearance or CI pass is claimed.
+- Both research-profile JSON files were parsed and their profile IDs, source references, source coverage, catalogue references and non-executable readiness flags were checked before publication.
+- `research-style-profile-v1.schema.json` defines the external Draft 2020-12 shape. The schema file itself was parsed as JSON; no independent JSON Schema engine was available in the authoring environment, so schema conformance is not claimed as executed.
+- `symthaea-muse-protocol/src/research_profile_contract_tests.rs` adds seven Rust tests: one positive contract test per profile, schema metadata/required-field checks, and negative controls for unknown source IDs, executable-capability mutation, catalogue-ID mutation and runtime-recipe promotion.
+- The existing `.github/workflows/ci.yml` Muse job now includes `cargo test -p symthaea-muse-protocol --lib` so these tests are part of the normal exact-head qualification path. The job is guarded against draft pull requests and will run when the PR is ready for review; it has not run on this head.
+- Read-back and source-bound repository checks were completed. The package remains research metadata only.
+- No Rust compilation/test pass, benchmark execution, audio render, human review, rights clearance or CI pass is claimed.
 
 ## Immediate follow-on tasks
 
