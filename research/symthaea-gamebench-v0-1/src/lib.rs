@@ -6,6 +6,12 @@
 //! / local observations (O1/O2). It is a benchmark substrate, not a Symthaea agent,
 //! game-playing result, or production runtime component.
 
+mod partial_map;
+pub use partial_map::{
+    ExploreAction, ExploreGame, ExploreObservation, ExploreSpec, ExploreSpecError,
+    ExploreState, ExploreStepError, ExploreTransition, ObservedCell,
+};
+
 mod prerequisites;
 pub use prerequisites::{
     DoorSpec, KeySpec, PrerequisiteGame, PrerequisiteSpec, PrerequisiteSpecError,
