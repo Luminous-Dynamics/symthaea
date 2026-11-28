@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use super::baselines::{BaselineCollection, BaselineMap};
 use super::report::{BenchmarkReport, key_metric_for_benchmark};
 
-/// A single normative comparison between agent performance and human baseline.
+/// A descriptive comparison between an agent metric and a selected human reference statistic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormativeScore {
     /// Benchmark name (e.g., "Executive::Stroop").
@@ -30,9 +30,9 @@ pub struct NormativeScore {
     pub human_sd: f64,
     /// z-score: (agent - human_mean) / human_sd, sign-corrected so positive = better.
     pub z_score: f64,
-    /// Percentile rank in the human population (0.0 to 100.0).
+    /// Normal-CDF transformed z-score (0.0 to 100.0); not an empirical sample percentile unless normality is appropriate.
     pub percentile: f64,
-    /// Clinical interpretation label (e.g., "Average", "Superior").
+    /// Neutral descriptive label for the standardized difference; not a clinical classification.
     pub interpretation: String,
     /// Source citation for the baseline.
     pub source: String,
@@ -66,18 +66,18 @@ pub fn interpret_z(z: f64) -> &'static str {
     }
 }
 
-/// Full normative comparison report across all benchmarks.
+/// Descriptive reference report. Cross-metric summary fields are legacy dashboard conveniences, not a validated overall ability measure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormativeReport {
     /// Individual normative scores.
     pub scores: Vec<NormativeScore>,
-    /// Mean z-score across all comparisons.
+    /// Legacy unweighted mean standardized difference across heterogeneous metrics; not a validated aggregate score.
     pub overall_mean_z: f64,
-    /// Overall percentile (from overall_mean_z).
+    /// Legacy normal-CDF transform of the unweighted mean z-score; not an empirically measured population percentile.
     pub overall_percentile: f64,
-    /// Metrics where agent significantly exceeds human norms (z > 1.0).
+    /// Metrics more than one reference SD above the selected mean (not statistically significant by this fact alone).
     pub strengths: Vec<String>,
-    /// Metrics where agent significantly falls below human norms (z < -1.0).
+    /// Metrics more than one reference SD below the selected mean (not statistically significant by this fact alone).
     pub weaknesses: Vec<String>,
 }
 
@@ -616,7 +616,7 @@ mod tests {
 
         // Should contain table structure
         assert!(
-            md.contains("Normative Comparison Report"),
+            md.contains("Descriptive Reference Comparison"),
             "Missing report title"
         );
         assert!(md.contains("| Benchmark |"), "Missing table header");
