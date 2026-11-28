@@ -511,6 +511,11 @@ mod tests {
             SpatialFourierEncoder::new(128, f64::NAN, 0, [0xA5; 32]).unwrap_err(),
             SpatialFourierError::InvalidLengthScale
         );
+        assert_eq!(
+            SpatialFourierEncoder::new(128, 1.0e-309, 7, [0xA5; 32]).unwrap_err(),
+            SpatialFourierError::InvalidLengthScale,
+            "a finite but too-small scale must not admit infinite frequencies"
+        );
     }
 
     #[test]
