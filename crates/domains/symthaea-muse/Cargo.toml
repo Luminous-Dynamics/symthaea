@@ -151,6 +151,10 @@ name = "renderer_ab_fair"
 required-features = ["theory"]
 
 [[example]]
+name = "style_interaction_probe"
+required-features = ["theory"]
+
+[[example]]
 name = "validator_calibration"
 required-features = ["theory"]
 
