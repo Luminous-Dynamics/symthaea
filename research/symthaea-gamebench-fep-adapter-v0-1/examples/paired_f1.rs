@@ -27,6 +27,7 @@ struct EpisodeRecord {
     excess_actions: Option<i64>,
     decision_latencies_ns: Vec<u128>,
     wall_time: Duration,
+    candidate_error: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -111,6 +112,7 @@ where
             excess_actions: report.excess_actions,
             decision_latencies_ns: report.decision_latency_ns,
             wall_time,
+            candidate_error: report.candidate_error,
         };
 
         aggregate.episodes += 1;
@@ -129,8 +131,13 @@ where
             aggregate.missing_optimum += 1;
         }
 
+        let candidate_error = record
+            .candidate_error
+            .as_deref()
+            .unwrap_or("")
+            .replace('"', "\"\"");
         println!(
-            "episode,{policy_name},{map_seed},{},{},{},{},{},{},{}",
+            "episode,{policy_name},{map_seed},{},{},{},{},{},{},{},\"{}\"",
             u8::from(record.success),
             u8::from(record.candidate_protocol_valid),
             record.actions,
@@ -139,6 +146,7 @@ where
             percentile(&record.decision_latencies_ns, 0.50),
             percentile(&record.decision_latencies_ns, 0.95),
             record.wall_time.as_nanos(),
+            candidate_error,
         );
     }
 
@@ -189,7 +197,7 @@ fn print_summary(name: &str, aggregate: &mut Aggregate) {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("record,policy,map_seed,success,protocol_valid,actions,optimal_actions,excess_actions,p50_decision_ns,p95_decision_ns,episode_wall_ns");
+    println!("record,policy,map_seed,success,protocol_valid,actions,optimal_actions,excess_actions,p50_decision_ns,p95_decision_ns,episode_wall_ns,candidate_error");
     println!("summary_header,policy,episodes,success_rate,protocol_valid_rate,mean_actions,mean_excess_actions,p50_decision_ns,p95_decision_ns,p95_episode_wall_ns");
 
     let mut random = RandomLegalCandidate::new(0x5241_4E44_4F4D);
