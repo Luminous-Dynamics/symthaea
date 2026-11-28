@@ -213,3 +213,22 @@ Source contracts, docs and authored tests exist on the research branch. They are
 - [TurnBench paper](https://arxiv.org/abs/2608.25218) — dyadic turn-taking reference; interpret the currently documented v1 ranking limitation conservatively.
 
 The InteractionBench and Duplex-MPE data/code usage rights must be checked through the benchmark provenance/license gate before inclusion in any commercial model training or derived-media workflow. External evaluation rights do not imply training or redistribution rights.
+
+
+## New research frontier — state-changing conversation and recovery (2026-11-28)
+
+A November 19, 2026 survey, *Evaluating Real-Time Voice Agents: A Survey from Component Quality to Grounded Outcomes* (arXiv:2609.30798v2), reports that only 13 of 91 evaluation works check external state or action traces, only 5 of 21 grounded-outcome benchmarks use real human speech, and only 2 of 26 multiparty benchmarks verify state. It proposes Timing–Recovery–Grounded (TRG) reporting, with a conditional multiparty dimension.
+
+This shifts the next competitive question from “did the avatar respond well?” to “did the authorized spoken action produce the intended external state, survive or recover correctly from interruption, and was completion reported only after independent observation?”
+
+New companion programme:
+- [CGRB protocol](SYMTHAEA_CONVERSATIONAL_GROUNDED_RECOVERY_BENCHMARK_V0_1_2026-11-28.md)
+- [CGRB scenario schema](SYMTHAEA_CGRB_SCENARIO_SCHEMA_V0_1_2026-11-28.json)
+- [CGRB positive/negative fixtures](SYMTHAEA_CGRB_SCENARIO_FIXTURES_V0_1_2026-11-28.json)
+- [Issue #14303](https://github.com/Luminous-Dynamics/symthaea/issues/14303)
+
+CGRB composes with #14213 rather than replacing the AV pilot. It adds versioned environment state, preconditions/postconditions, exact action authority, idempotency semantics, reconciliation after unknown outcomes, separately authorized compensation, independent state-oracle reads, and claim–state concordance. The initial pilot uses an isolated deterministic environment; production side effects are out of scope.
+
+Use TRG panels and a conditional multiparty panel. Authority, evidence integrity, zero unauthorized side effects, no blind non-idempotent retries, and no unsupported completion claims are hard gates, not weighted score components.
+
+This is a research hypothesis and protocol increment. It is not an executed benchmark, dataset release, model result or deployment qualification.
