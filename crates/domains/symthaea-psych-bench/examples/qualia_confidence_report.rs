@@ -50,19 +50,31 @@ fn main() {
     let score = QualiaConfidenceScore::from_results(&results);
 
     if json_output {
+        let complete = score.indicators.iter().all(|indicator| indicator.raw_value.is_finite());
         println!("{{");
         println!("  \"seed\": {seed},");
         println!("  \"summary_type\": \"theory_probe_heuristic_index\",");
         println!("  \"consciousness_measure\": false,");
-        println!("  \"theory_probe_heuristic_index\": {:.4},", score.composite);
-        println!("  \"heuristic_bucket\": \"{}\",", score.level);
-        // Deprecated compatibility fields: retain until downstream consumers migrate.
-        println!("  \"composite\": {:.4},", score.composite);
-        println!("  \"level\": \"{}\",", score.level);
+        if complete {
+            println!("  \"theory_probe_heuristic_index\": {:.4},", score.composite);
+            println!("  \"heuristic_bucket\": \"{}\",", score.level);
+            // Deprecated compatibility fields: retain until downstream consumers migrate.
+            println!("  \"composite\": {:.4},", score.composite);
+            println!("  \"level\": \"{}\",", score.level);
+        } else {
+            println!("  \"theory_probe_heuristic_index\": null,");
+            println!("  \"heuristic_bucket\": \"INCOMPLETE\",");
+            // Deprecated compatibility fields: null signals that the run is incomplete.
+            println!("  \"composite\": null,");
+            println!("  \"level\": \"INCOMPLETE\",");
+        }
+        println!("  \"complete\": {complete},");
         println!(
-            "  \"predictions_met\": {}/{}",
-            score.predictions_met, score.predictions_total
+            "  \"predictions_met\": {},",
+            score.predictions_met
         );
+        println!("  \"predictions_total\": {},", score.predictions_total);
+        println!("  \"not_run\": {},", score.indicators.iter().filter(|indicator| !indicator.raw_value.is_finite()).count());
         println!("  \"indicators\": [");
         for (i, ind) in score.indicators.iter().enumerate() {
             let comma = if i + 1 < score.indicators.len() {
