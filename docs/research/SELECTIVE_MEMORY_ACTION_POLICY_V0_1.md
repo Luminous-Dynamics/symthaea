@@ -44,8 +44,22 @@ Persistence remains a proposal to the existing governed memory owner. This polic
 | `clarify` | Ask for missing user intent, preference or task constraints | Ask for the missing variable, not a leading or invented answer |
 | `abstain` | Stop because the requested answer/action is unsupported, unsafe or infeasible | Record reason, evidence state and stopping point |
 | `probe` | Acquire bounded new evidence in an authorized environment | Enforce the existing action authority, scope and resource budget |
+| `ignore_preference` | Do not expose a preference to the current task/response context | A legal non-use choice; does not authorize reading or exposing the underlying memory |
+| `support_preference` | Let an applicable preference inform the response as supporting context | Requires the same canonical source, scope, freshness and use-time revalidation gates as `use` |
+| `dominate_preference` | Apply an applicable preference as a strong interaction constraint | Also requires a separate upstream `dominant_preference_authorized` decision; model-inferred strength cannot self-authorize dominance |
 
 A valid memory may still be irrelevant to the current query. A useful transient fact may be unsafe to persist. Verification and clarification are not interchangeable. A tool call is not verification merely because a tool was called.
+
+
+### 2.3 Preference influence is a separate query-time choice
+
+RPEval demonstrates why preference utilization should not be reduced to a binary retrieval decision. Its labels distinguish **Ignore**, **Support** and **Dominate**: a preference may be irrelevant, useful as secondary context, or important enough to guide the response strongly. The selector now represents these as separate query-time actions rather than treating every admissible preference as a controlling instruction.
+
+- `ignore_preference` is a valid non-use decision and must not expose the preference in the current context.
+- `support_preference` inherits the normal source, scope, freshness, lifecycle and canonical-revalidation gates.
+- `dominate_preference` inherits those gates and requires the independent `dominant_preference_authorized` admission fact. The candidate model cannot set that fact from its own prose or infer strength from semantic similarity.
+
+Dominance remains subordinate to authority, privacy, audience, tool and safety constraints. It changes preference influence, not the lawfulness or feasibility of an action. This is the RPEval mapping; MemPABench, OP-Bench and PrefDiag-Bench remain separate outcome tracks.
 
 ## 3. Decision-theoretic policy
 
