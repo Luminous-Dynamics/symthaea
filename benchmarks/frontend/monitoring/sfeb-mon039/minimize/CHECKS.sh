@@ -99,6 +99,8 @@ set -e
 jq -e '.orders_attempted == 2 and (.orders|length) == 2 and .evidence_complete == true and .global_minimum_claimed == true and .campaign_verdict == "indeterminate" and .production_action_permitted == false' "$TMP/tournament-result.json" >/dev/null
 
 go test -run '^
+echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."
  -bench 'Benchmark(ExhaustiveTwelveFaults|OneMinimalSixtyFourFaults|MinimizeTournamentEightOrders)
+echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."
  -benchmem -count=5
 echo "MON-039 format, vet, unit, race, CLI, tournament, signature, completeness and benchmark checks passed."
