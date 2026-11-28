@@ -1,0 +1,12 @@
+[package]
+name = "cmaq-052-reference-uncertainty-alpha-split"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent-reference Hoeffding target envelope with explicit alpha budget split"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+
+[workspace]
