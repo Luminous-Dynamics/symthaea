@@ -583,9 +583,12 @@ pub fn handle_json_line_v1<R: MaceTimlRuntimeV1>(
         } => {
             if mode != "raw_native_cases" { return Err(AdapterRejectV1::UnsupportedMode); }
             let active = state.active.as_ref().ok_or(AdapterRejectV1::NoActiveSample)?;
-            if active.session_ids.is_empty() { return Err(AdapterRejectV1::QueryBeforeSessionIngest); }
+            // Bind the request to the active sample before checking whether that
+            // sample has ingested data, so cross-sample probes have deterministic
+            // rejection semantics and never reach the runtime.
             if sample_id != active.sample_id { return Err(AdapterRejectV1::SampleMismatch); }
             if language != active.language { return Err(AdapterRejectV1::LanguageMismatch); }
+            if active.session_ids.is_empty() { return Err(AdapterRejectV1::QueryBeforeSessionIngest); }
             if !valid_identifier(&task_id, 256) || !valid_identifier(&task_type, 128)
                 || !valid_identifier(&baseline, 128) || query.trim().is_empty()
                 || query.len() > 32_000
