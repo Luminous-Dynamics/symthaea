@@ -5,7 +5,7 @@
 //! The hidden rule itself is never included in candidate observations.
 
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use crate::{Action, Position, TerminalStatus};
 
@@ -67,7 +67,7 @@ impl Display for HiddenMechanicsError {
 
 impl Error for HiddenMechanicsError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct HiddenMechanicsGame {
     // Private evaluator-selected rule. No getter and no rule field in
     // HiddenMechanicsObservation: the only candidate-visible evidence is the
@@ -76,6 +76,18 @@ pub struct HiddenMechanicsGame {
     max_actions: u32,
     state: HiddenMechanicsState,
     status: TerminalStatus,
+}
+
+impl Debug for HiddenMechanicsGame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Deliberately omit hidden_effect so diagnostics cannot leak the
+        // evaluator-selected rule to the candidate.
+        f.debug_struct("HiddenMechanicsGame")
+            .field("max_actions", &self.max_actions)
+            .field("state", &self.state)
+            .field("status", &self.status)
+            .finish()
+    }
 }
 
 impl HiddenMechanicsGame {
@@ -146,8 +158,6 @@ impl HiddenMechanicsGame {
                 if let Some(destination) = adjacent(self.state.position, direction) {
                     let north_gate = Position::new(1, 0);
                     let east_gate = Position::new(2, 1);
-                    let goal = Position::new(2, 0);
-
                     let blocked_by_closed_gate =
                         (destination == north_gate && !self.state.north_gate_open)
                             || (destination == east_gate && !self.state.east_gate_open);
@@ -156,10 +166,6 @@ impl HiddenMechanicsGame {
                         self.state.position = destination;
                         moved = true;
                     }
-                    // The only traversable routes into the goal are through
-                    // one of the two gate tiles (the gate cells and goal share
-                    // the 3x2 test world).
-                    let _ = goal;
                 }
             }
         }
@@ -260,6 +266,14 @@ mod tests {
         assert!(!second.rule_intervened);
         assert_eq!(second.status, TerminalStatus::ActionLimit);
         assert_eq!(game.step(HiddenAction::UseSwitch), Err(HiddenMechanicsError::AlreadyTerminal(TerminalStatus::ActionLimit)));
+    }
+
+    #[test]
+    fn debug_representation_does_not_leak_hidden_rule() {
+        let game = HiddenMechanicsGame::new(SwitchEffect::OpenNorthGate, 8).expect("world");
+        let debug = format!("{game:?}");
+        assert!(!debug.contains("OpenNorthGate"));
+        assert!(!debug.contains("OpenEastGate"));
     }
 
     #[test]
