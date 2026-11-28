@@ -647,7 +647,10 @@ impl ObserverOnlyVisionManifold {
             return Err("observer frame_id was already used in this episode".to_string());
         }
         let evidence_id_digest = sha256_bytes(identity.source_evidence_id.as_bytes());
-        if self.seen_source_evidence_id_sha256.contains(&evidence_id_digest) {
+        if self
+            .seen_source_evidence_id_sha256
+            .contains(&evidence_id_digest)
+        {
             return Err("observer source_evidence_id was already used in this episode".to_string());
         }
         let accepted = self.inner.frame_count();
