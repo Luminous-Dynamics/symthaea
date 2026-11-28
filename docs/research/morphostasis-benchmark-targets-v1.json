@@ -175,7 +175,8 @@
     "random, no-memory, no-remapping, no-slow-channel, fixed-topology, shuffled-channel, target-blind controls",
     "TOPO-ADAPT-001: fixed graph, weight-only adaptation, local greedy repair, fixed-topology distributed routing, adaptive-topology heuristic, degree-matched random rewiring, exact max-flow/min-cost oracle on small instances",
     "GNN communication-topology rewiring family: Delaunay/dynamic triangulation, FOSR/spectral-gap/expander, curvature/effective-resistance, spectrum-preserving sparsification, virtual nodes and learned rewiring",
-    "Resilience-based network-design family: exact MILP/topology-capacity oracle for small cases, PSDA-style stochastic design and GA, subject to exact paper-protocol/artifact admission"
+    "Resilience-based network-design family: exact MILP/topology-capacity oracle for small cases, PSDA-style stochastic design and GA, subject to exact paper-protocol/artifact admission",
+    "One-step full-visibility candidate-sweep oracle: evaluate no edit and every permitted single-edge candidate; maximize service then minimize edit/maintenance cost; upper bound only."
   ],
   "metrics": {
     "geometry": [
@@ -329,8 +330,8 @@
     {
       "repository": "Luminous-Dynamics/symthaea",
       "number": 14127,
-      "role": "draft Rust evaluator for TOPO-ADAPT v0.1 fixtures; max-flow/min-cut, input validation, edit and maintenance cost accounting",
-      "status": "open draft stacked on PR #14125; 8 Rust tests authored, exact-head compile/test/rustfmt/Clippy not run due missing toolchain; no CI pass claimed"
+      "role": "draft Rust evaluator for TOPO-ADAPT v0.1 fixtures; max-flow/min-cut, input validation, edit/maintenance cost accounting and exact one-step candidate-sweep oracle",
+      "status": "open draft stacked on PR #14125; 11 Rust tests authored including stationary-no-edit, new-sink, bridge-reroute oracle decisions; exact-head compile/test/rustfmt/Clippy not run due missing toolchain; no CI pass claimed"
     }
   ],
   "cross_repository_owners": [
@@ -597,9 +598,23 @@
         "declared edit cost units",
         "one-step active-edge maintenance cost units"
       ],
-      "test_count_authored": 8,
+      "test_count_authored": 11,
       "exact_head_status": "not compiled or executed; cargo/rustc/rustfmt unavailable in execution environment",
-      "message_and_update_budget": "declared in fixture but not charged until controller traces exist"
+      "message_and_update_budget": "declared in fixture but not charged until controller traces exist",
+      "candidate_sweep_oracle": {
+        "decision_rule": [
+          "maximize served flow",
+          "then minimize declared edit plus one-step maintenance cost",
+          "then stable candidate-ID tie break"
+        ],
+        "information_access": "full candidate visibility",
+        "evidence_class": "upper bound; not a distributed or learned policy",
+        "tested_cases": [
+          "stationary demand chooses no edit",
+          "new sink demand chooses the sink-path addition",
+          "bridge failure chooses the alternate route"
+        ]
+      }
     },
     "competitive_update": {
       "as_of": "2026-11-28",
