@@ -456,36 +456,50 @@ impl ContextTreePortfolio {
             });
         }
 
-        let mut next_logs = self.nodes.iter().map(|n| n.log_e_value).collect::<Vec<_>>();
-        for item in &staged { next_logs[item.index] = item.log_e_value; }
-        let terms = self.nodes.iter().enumerate()
-            .map(|(i, node)| node.log_prior_weight + next_logs[i])
+        // Increment the fixed node mixture by replacing only the active
+        // path's old contributions. The inactive nodes are unchanged. This
+        // keeps aggregation O(depth), rather than rescanning the full tree.
+        let old_active_terms = staged.iter()
+            .map(|item| {
+                let node = &self.nodes[item.index];
+                node.log_prior_weight + node.log_e_value
+            })
             .collect::<Vec<_>>();
-        let log_mixture = log_sum_exp(&terms)?;
+        let new_active_terms = staged.iter()
+            .map(|item| {
+                let node = &self.nodes[item.index];
+                node.log_prior_weight + item.log_e_value
+            })
+            .collect::<Vec<_>>();
+        let log_old_active = log_sum_exp(&old_active_terms)?;
+        let log_new_active = log_sum_exp(&new_active_terms)?;
+        let log_inactive_remainder = log_sub_exp(self.log_mixture_e_value, log_old_active)?;
+        let log_mixture = log_add_exp(log_inactive_remainder, log_new_active);
+        if !log_mixture.is_finite() {
+            return Err(ContextError::ArithmeticOverflow);
+        }
+
         let mut posterior_sum = 0.0;
-        let mut updates = Vec::with_capacity(self.nodes.len());
-        for (index, node) in self.nodes.iter().enumerate() {
-            let posterior = (node.log_prior_weight + next_logs[index] - log_mixture).exp();
+        let mut updates = Vec::with_capacity(staged.len());
+        for item in &staged {
+            let node = &self.nodes[item.index];
+            let posterior = (node.log_prior_weight + item.log_e_value - log_mixture).exp();
             if !posterior.is_finite() || !(0.0..=1.0 + POSTERIOR_TOLERANCE).contains(&posterior) {
                 return Err(ContextError::PosteriorNormalizationFailure);
             }
             posterior_sum += posterior;
-            let (factor, log_factor, coordinates) = staged.iter()
-                .find(|x| x.index == index)
-                .map(|x| (x.factor, x.log_factor, x.feature_coordinates))
-                .unwrap_or((1.0, 0.0, 0));
             updates.push(ContextNodeUpdate {
                 node_id: node.node_id.clone(),
                 depth: node.depth,
                 prior_weight: node.prior_weight,
                 posterior_weight: posterior,
-                log_e_value: next_logs[index],
-                factor,
-                log_factor,
-                feature_coordinates_evaluated: coordinates,
+                log_e_value: item.log_e_value,
+                factor: item.factor,
+                log_factor: item.log_factor,
+                feature_coordinates_evaluated: item.feature_coordinates,
             });
         }
-        if !posterior_sum.is_finite() || (posterior_sum - 1.0).abs() > POSTERIOR_TOLERANCE {
+        if !posterior_sum.is_finite() || posterior_sum > 1.0 + POSTERIOR_TOLERANCE {
             return Err(ContextError::PosteriorNormalizationFailure);
         }
 
@@ -554,8 +568,24 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, ContextError> {
     if result.is_finite() { Ok(result) } else { Err(ContextError::ArithmeticOverflow) }
 }
 fn log_add_exp(a: f64, b: f64) -> f64 {
+    if a == f64::NEG_INFINITY { return b; }
+    if b == f64::NEG_INFINITY { return a; }
     let m = a.max(b);
     m + ((a-m).exp() + (b-m).exp()).ln()
+}
+fn log_sub_exp(total: f64, subtract: f64) -> Result<f64, ContextError> {
+    if !total.is_finite() || !subtract.is_finite() {
+        return Err(ContextError::ArithmeticOverflow);
+    }
+    let difference = subtract - total;
+    if difference > 1e-10 {
+        return Err(ContextError::PosteriorNormalizationFailure);
+    }
+    if difference >= -1e-14 {
+        return Ok(f64::NEG_INFINITY);
+    }
+    let result = total + (-difference.exp_m1()).ln();
+    if result.is_finite() { Ok(result) } else { Err(ContextError::ArithmeticOverflow) }
 }
 fn log_sum_exp(values: &[f64]) -> Result<f64, ContextError> {
     if values.is_empty() || values.iter().any(|x| !x.is_finite()) {
@@ -644,7 +674,7 @@ mod tests {
         let mut m = tree();
         let update = m.observe_pair(1,"zero",&[0.0],&[0.0],&[0.2]).unwrap();
         assert_eq!(update.active_path, vec!["root","right"]);
-        assert_eq!(update.nodes.len(),3);
+        assert_eq!(update.nodes.len(),2);
         assert_eq!(update.total_feature_coordinates_evaluated,20);
     }
 
@@ -654,7 +684,7 @@ mod tests {
         for t in 1..=32 {
             let u=m.observe_pair(t,&format!("equal-{t}"),&[0.25],&[0.5],&[0.5]).unwrap();
             assert!(u.log_mixture_e_value.abs()<1e-10);
-            assert!((u.nodes.iter().map(|n|n.posterior_weight).sum::<f64>()-1.0).abs()<1e-10);
+            assert!(u.nodes.iter().map(|n|n.posterior_weight).sum::<f64>() <= 1.0 + 1e-10);
             assert_eq!(u.active_path.len(),2);
         }
         assert_eq!(m.selected_counts().iter().map(|x|x.1).sum::<u64>(),64);
