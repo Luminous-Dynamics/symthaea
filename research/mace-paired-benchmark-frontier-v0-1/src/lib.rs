@@ -20,6 +20,7 @@ use sha2::{Digest, Sha256};
 
 pub const REPORT_SCHEMA_VERSION_V1: &str = "mace_paired_benchmark_frontier_v1";
 pub const BOOTSTRAP_REPLICATES_V1: usize = 2_000;
+pub const CONFIRMATORY_CLUSTER_FLOOR_V1: usize = 30;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +49,13 @@ pub struct ConfidenceIntervalV1 {
     pub upper: f64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrontierInferenceStatusV1 {
+    Exploratory,
+    ConfirmatoryClusterFloorMet,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArmFrontierPointV1 {
@@ -56,6 +64,7 @@ pub struct ArmFrontierPointV1 {
     pub memory_method_id: String,
     pub independent_cluster_count: usize,
     pub paired_task_count: usize,
+    pub inference_status: FrontierInferenceStatusV1,
     /// Equal-cluster-weighted means. Every metric remains in its native unit.
     pub metric_means: BTreeMap<String, f64>,
 }
@@ -77,6 +86,7 @@ pub struct PairedMetricEffectV1 {
     pub worst_cluster_directional_gain: Option<f64>,
     pub independent_cluster_count: usize,
     pub paired_task_count: usize,
+    pub inference_status: FrontierInferenceStatusV1,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -96,6 +106,8 @@ pub struct PairedBenchmarkFrontierReportV1 {
     pub baseline_arm_id: String,
     pub bootstrap_seed: u64,
     pub bootstrap_replicates: usize,
+    pub confirmatory_cluster_floor: usize,
+    pub inference_status: FrontierInferenceStatusV1,
     pub inference_unit: String,
     pub cluster_weighting: String,
     pub arm_points: Vec<ArmFrontierPointV1>,
@@ -340,6 +352,11 @@ fn arm_frontier_point(
         memory_method_id: manifest.memory_method_id.clone(),
         independent_cluster_count: cluster_count,
         paired_task_count: rows.len(),
+        inference_status: if cluster_count >= CONFIRMATORY_CLUSTER_FLOOR_V1 {
+            FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet
+        } else {
+            FrontierInferenceStatusV1::Exploratory
+        },
         metric_means,
     }
 }
@@ -397,6 +414,11 @@ fn paired_metric_effects(
             worst_cluster_directional_gain: if metric.direction == MetricDirectionV1::DiagnosticOnly { None } else { worst },
             independent_cluster_count: cluster_ids.len(),
             paired_task_count: baseline_rows.len(),
+            inference_status: if cluster_ids.len() >= CONFIRMATORY_CLUSTER_FLOOR_V1 {
+                FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet
+            } else {
+                FrontierInferenceStatusV1::Exploratory
+            },
         }
     }).collect()
 }
@@ -516,6 +538,12 @@ pub fn analyze_matched_frontier_v1(
         baseline_arm_id: baseline_arm_id.to_owned(),
         bootstrap_seed,
         bootstrap_replicates: BOOTSTRAP_REPLICATES_V1,
+        confirmatory_cluster_floor: CONFIRMATORY_CLUSTER_FLOOR_V1,
+        inference_status: if baseline_rows.keys().map(|(cluster, _)| cluster).collect::<BTreeSet<_>>().len() >= CONFIRMATORY_CLUSTER_FLOOR_V1 {
+            FrontierInferenceStatusV1::ConfirmatoryClusterFloorMet
+        } else {
+            FrontierInferenceStatusV1::Exploratory
+        },
         inference_unit: "independent_cluster".to_owned(),
         cluster_weighting: "equal_cluster_weight_after_within_cluster_task_mean".to_owned(),
         arm_points,
