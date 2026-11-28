@@ -224,7 +224,8 @@
         "beat_ordinal_milli",
         "confidence_ppm",
         "source_grid_hypothesis_id",
-        "target_grid_hypothesis_id"
+        "target_grid_hypothesis_id",
+        "max_phase_error_milli"
       ],
       "properties": {
         "source_anchor_frame": {
@@ -254,6 +255,11 @@
         "target_grid_hypothesis_id": {
           "type": "string",
           "minLength": 1
+        },
+        "max_phase_error_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
         }
       }
     },
