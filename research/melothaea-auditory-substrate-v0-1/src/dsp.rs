@@ -662,10 +662,15 @@ mod tests {
             analysis.complex_stft.frames.len(),
             analysis.log_frequency_energy.frames.len()
         );
-        for index in 0..analysis.complex_stft.frames.len() {
-            let support = analysis.complex_stft.frames[index].support;
-            assert_eq!(analysis.erb_energy.frames[index].support, support);
-            assert_eq!(analysis.log_frequency_energy.frames[index].support, support);
+        for ((stft_frame, erb_frame), log_frame) in analysis
+            .complex_stft
+            .frames
+            .iter()
+            .zip(analysis.erb_energy.frames.iter())
+            .zip(analysis.log_frequency_energy.frames.iter())
+        {
+            assert_eq!(erb_frame.support, stft_frame.support);
+            assert_eq!(log_frame.support, stft_frame.support);
         }
     }
 }
