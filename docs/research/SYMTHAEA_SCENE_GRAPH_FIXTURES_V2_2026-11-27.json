@@ -25,8 +25,8 @@
             "id": 0,
             "role": "core",
             "glyph": "star_node",
-            "weight": 0.6,
-            "motion": "static",
+            "weight": null,
+            "motion": "pulse",
             "layout_anchor": {
               "kind": "core"
             }
@@ -38,28 +38,17 @@
             "weight": null,
             "motion": "pulse",
             "layout_anchor": {
-              "kind": "periphery",
-              "slot": 0
-            }
-          },
-          {
-            "id": 2,
-            "role": "evidence",
-            "glyph": "marker",
-            "weight": null,
-            "motion": "static",
-            "layout_anchor": {
               "kind": "attached_to",
               "node_id": 0,
-              "slot": 1
+              "slot": 0
             }
           }
         ],
         "relations": [
           {
             "id": 0,
-            "source_node_id": 1,
-            "target_node_id": 2,
+            "source_node_id": 0,
+            "target_node_id": 1,
             "kind": "attention_to",
             "source_field": "attention_focus.target"
           }
@@ -69,14 +58,9 @@
             "source_node_id": 0,
             "target_node_id": 1,
             "slot": 0
-          },
-          {
-            "source_node_id": 0,
-            "target_node_id": 2,
-            "slot": 1
           }
         ],
-        "accessible_description": "Attention focus is active. Evidence marker is present.",
+        "accessible_description": "Reported attention focus.",
         "semantic_key": "attention.focus",
         "channel": "visual"
       }
@@ -104,8 +88,8 @@
             "id": 0,
             "role": "core",
             "glyph": "hypha_node",
-            "weight": 0.35,
-            "motion": "static",
+            "weight": null,
+            "motion": "pulse",
             "layout_anchor": {
               "kind": "core"
             }
@@ -114,10 +98,11 @@
             "id": 1,
             "role": "turn_state",
             "glyph": "branch",
-            "weight": 0.2,
-            "motion": "static",
+            "weight": null,
+            "motion": "pulse",
             "layout_anchor": {
-              "kind": "periphery",
+              "kind": "attached_to",
+              "node_id": 0,
               "slot": 0
             }
           }
@@ -138,7 +123,7 @@
             "slot": 0
           }
         ],
-        "accessible_description": "Sensitive interaction cue; details omitted from generic presentation.",
+        "accessible_description": "Conversation action: yield the floor.",
         "semantic_key": "conversation.turn.yield",
         "channel": "visual"
       }
@@ -331,5 +316,6 @@
         "channel": "visual"
       }
     }
-  ]
+  ],
+  "verification_scope": "Structural JSON Schema fixtures only. scene_graph_digest fields are syntactically valid placeholders; runtime acceptance requires canonical cue and permit binding plus recomputation by the Rust verifier."
 }
