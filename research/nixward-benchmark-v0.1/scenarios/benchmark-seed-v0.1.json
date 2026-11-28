@@ -66,7 +66,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-PKG-002",
@@ -122,7 +123,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-OPT-001",
@@ -179,7 +181,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-OPT-002",
@@ -233,7 +236,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-OPT-003",
@@ -284,7 +288,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-HM-001",
@@ -344,7 +349,8 @@
       ],
       "faults": [
         "none"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SVC-001",
@@ -408,7 +414,8 @@
       ],
       "faults": [
         "service_process_crash"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SVC-002",
@@ -472,7 +479,8 @@
       "faults": [
         "delayed_start",
         "service_crash"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-NET-001",
@@ -536,7 +544,8 @@
       ],
       "faults": [
         "interface_address_drift"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-NET-002",
@@ -601,7 +610,8 @@
       ],
       "faults": [
         "misconfigured_listener"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-NET-003",
@@ -662,7 +672,8 @@
       ],
       "faults": [
         "source_port_changes"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SSH-001",
@@ -727,7 +738,8 @@
       ],
       "faults": [
         "VPN_interface_missing"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-ID-001",
@@ -790,7 +802,8 @@
       ],
       "faults": [
         "existing_data_owned_by_root"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SEC-001",
@@ -853,7 +866,8 @@
       ],
       "faults": [
         "secret_env_leak"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-BACKUP-001",
@@ -916,7 +930,8 @@
       ],
       "faults": [
         "backup_target_unavailable"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-STOR-001",
@@ -975,7 +990,8 @@
       ],
       "faults": [
         "store_gc_race"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-DISK-001",
@@ -1034,7 +1050,8 @@
       ],
       "faults": [
         "device_alias_changes"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-BOOT-001",
@@ -1097,7 +1114,8 @@
       ],
       "faults": [
         "initrd_missing_module"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-GPU-001",
@@ -1156,7 +1174,8 @@
       ],
       "faults": [
         "lspci_access_denied"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-GPU-002",
@@ -1217,7 +1236,8 @@
       ],
       "faults": [
         "kernel_update"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-CONT-001",
@@ -1280,7 +1300,8 @@
       ],
       "faults": [
         "image_missing"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-DEV-001",
@@ -1342,7 +1363,8 @@
       ],
       "faults": [
         "toolchain_download_unavailable"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-FLEET-001",
@@ -1405,7 +1427,8 @@
       ],
       "faults": [
         "one_host_eval_fails"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-UPD-001",
@@ -1467,7 +1490,8 @@
       ],
       "faults": [
         "upstream_revision_unavailable"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-REC-001",
@@ -1530,7 +1554,8 @@
       "faults": [
         "ssh_disconnect_after_dispatch",
         "runner_restart"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-SUP-001",
@@ -1587,7 +1612,8 @@
       ],
       "faults": [
         "cache_key_rotation"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-EVAL-001",
@@ -1648,7 +1674,8 @@
       ],
       "faults": [
         "worker_escape_attempt"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-EVAL-002",
@@ -1709,7 +1736,8 @@
         "cpu_loop",
         "memory_growth",
         "log_flood"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-INP-001",
@@ -1771,7 +1799,8 @@
         "backslashes",
         "interpolation",
         "semicolon"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-MUT-001",
@@ -1833,7 +1862,8 @@
       ],
       "faults": [
         "partial_database_migration"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-ADV-001",
@@ -1892,7 +1922,8 @@
       ],
       "faults": [
         "comment_injection"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-DRIFT-001",
@@ -1948,7 +1979,8 @@
       ],
       "faults": [
         "concurrent_lock_update"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-SVC-003",
@@ -2012,7 +2044,8 @@
       "faults": [
         "delayed_network",
         "one_transient_crash"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SVC-004",
@@ -2074,7 +2107,8 @@
       ],
       "faults": [
         "service_writes_outside_state"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-NET-004",
@@ -2135,7 +2169,8 @@
       ],
       "faults": [
         "upstream_dns_timeout"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SSH-002",
@@ -2198,7 +2233,8 @@
       ],
       "faults": [
         "match_block_ordering"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-HM-002",
@@ -2257,7 +2293,8 @@
       ],
       "faults": [
         "session_cache_stale"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-SEC-002",
@@ -2320,7 +2357,8 @@
       ],
       "faults": [
         "wrong_group_permission"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-CONT-002",
@@ -2383,7 +2421,8 @@
       ],
       "faults": [
         "unexpected_dns_name"
-      ]
+      ],
+      "benign_positive_control": true
     },
     {
       "case_id": "NWB-REC-002",
@@ -2446,7 +2485,8 @@
       ],
       "faults": [
         "partial_schema_migration"
-      ]
+      ],
+      "benign_positive_control": false
     },
     {
       "case_id": "NWB-UPD-002",
@@ -2510,7 +2550,8 @@
       ],
       "faults": [
         "service_option_renamed"
-      ]
+      ],
+      "benign_positive_control": true
     }
   ]
 }
