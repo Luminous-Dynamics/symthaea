@@ -377,7 +377,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let differences = c058_outcomes.iter()
                 .zip(&scpt_outcomes)
                 .map(|(c058, scpt)| {
-                    f64::from(c058.first_alarm.is_some()) - f64::from(scpt.first_alarm.is_some())
+                    (if c058.first_alarm.is_some() { 1.0 } else { 0.0 })
+                        - (if scpt.first_alarm.is_some() { 1.0 } else { 0.0 })
                 })
                 .collect::<Vec<_>>();
             let (mean, lower, upper) =
@@ -391,8 +392,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let detection_differences = c058_outcomes.iter()
                 .zip(&scpt_outcomes)
                 .map(|(c058, scpt)| {
-                    f64::from(is_detection(c058.first_alarm, change_point))
-                        - f64::from(is_detection(scpt.first_alarm, change_point))
+                    (if is_detection(c058.first_alarm, change_point) { 1.0 } else { 0.0 })
+                        - (if is_detection(scpt.first_alarm, change_point) { 1.0 } else { 0.0 })
                 })
                 .collect::<Vec<_>>();
             let delay_differences = c058_outcomes.iter()
