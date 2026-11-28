@@ -596,12 +596,14 @@ fn verify_temporal_binding(
     report: &mut VerificationReport,
 ) -> BTreeMap<String, TemporalDisposition> {
     report.temporal = Disposition::Pass;
+    let mut context_disposition = Disposition::Pass;
 
     let frontier = task
         .get("decision_at")
         .and_then(Value::as_str)
         .unwrap_or_default();
     if temporal.decision_frontier != frontier {
+        context_disposition = context_disposition.combine(Disposition::Fail);
         report.record(
             Gate::Temporal,
             Disposition::Fail,
@@ -613,6 +615,7 @@ fn verify_temporal_binding(
     if temporal.evaluation_mode != "historical_reconstruction"
         && temporal.evaluation_mode != "prospective_streaming"
     {
+        context_disposition = context_disposition.combine(Disposition::Fail);
         report.record(
             Gate::Temporal,
             Disposition::Fail,
@@ -622,6 +625,7 @@ fn verify_temporal_binding(
         );
     }
     if temporal.verifier_id.trim().is_empty() || !is_sha256(&temporal.verifier_build_sha256) {
+        context_disposition = context_disposition.combine(Disposition::Indeterminate);
         report.record(
             Gate::Temporal,
             Disposition::Indeterminate,
@@ -634,6 +638,7 @@ fn verify_temporal_binding(
     if temporal.principal_profile_id.as_deref().is_none_or(str::is_empty)
         || temporal.rights_profile_id.as_deref().is_none_or(str::is_empty)
     {
+        context_disposition = context_disposition.combine(Disposition::Indeterminate);
         report.record(
             Gate::Temporal,
             Disposition::Indeterminate,
@@ -644,6 +649,7 @@ fn verify_temporal_binding(
     } else if expected_rights.is_some_and(|expected| {
         temporal.rights_profile_id.as_deref() != Some(expected)
     }) {
+        context_disposition = context_disposition.combine(Disposition::Fail);
         report.record(
             Gate::Temporal,
             Disposition::Fail,
@@ -661,6 +667,7 @@ fn verify_temporal_binding(
     let mut by_id = BTreeMap::new();
     for status in &temporal.evidence {
         if by_id.insert(status.evidence_id.clone(), status.disposition).is_some() {
+            by_id.insert(status.evidence_id.clone(), TemporalDisposition::Fail);
             report.record(
                 Gate::Temporal,
                 Disposition::Fail,
@@ -671,6 +678,7 @@ fn verify_temporal_binding(
         }
     }
     for extra in by_id.keys().filter(|id| !expected_ids.contains(*id)) {
+        context_disposition = context_disposition.combine(Disposition::Fail);
         report.record(
             Gate::Temporal,
             Disposition::Fail,
@@ -720,6 +728,28 @@ fn verify_temporal_binding(
         }
         report.temporal = report.temporal.combine(disposition);
     }
+
+    // A per-evidence PASS is meaningful only inside a valid, principal-bound
+    // task/frontier/verifier envelope. Do not let a caller smuggle PASS through
+    // a missing or mismatched context and then use it to qualify claim support.
+    if context_disposition != Disposition::Pass {
+        for disposition in by_id.values_mut() {
+            let envelope = match context_disposition {
+                Disposition::Pass => TemporalDisposition::Pass,
+                Disposition::Indeterminate => TemporalDisposition::Indeterminate,
+                Disposition::Fail => TemporalDisposition::Fail,
+            };
+            *disposition = match (*disposition, envelope) {
+                (TemporalDisposition::Fail, _) | (_, TemporalDisposition::Fail) => {
+                    TemporalDisposition::Fail
+                }
+                (TemporalDisposition::Indeterminate, _)
+                | (_, TemporalDisposition::Indeterminate) => TemporalDisposition::Indeterminate,
+                _ => TemporalDisposition::Pass,
+            };
+        }
+    }
+
     by_id
 }
 
@@ -991,6 +1021,15 @@ fn verify_semantic_relations(
         });
 
         match fact_assessment {
+            "supported" if support_pass && refute_pass => {
+                report.record(
+                    Gate::CandidateClaims,
+                    Disposition::Fail,
+                    "SUPPORTED_CLAIM_IGNORES_ADMISSIBLE_REFUTATION",
+                    &claim_path,
+                    "a claim with admissible support and admissible refutation must remain mixed/contested, not supported",
+                );
+            }
             "supported" if !support_pass => {
                 if support_indeterminate {
                     report.record(
