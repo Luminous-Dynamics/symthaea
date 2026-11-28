@@ -1054,6 +1054,158 @@ pub fn run_reference_policy(
     evaluate_trace(manifest, &commands)
 }
 
+/// Execute one agent action while exposing only the returned observation
+/// to the policy. The full state is carried by the environment adapter but is
+/// never inspected by this policy helper.
+fn observation_policy_action(
+    manifest: &ScenarioManifest,
+    state: &mut WorldState,
+    commands: &mut Vec<RecordedCommand>,
+    action: Action,
+) -> Result<Observation, TransitionError> {
+    let (next, receipt, outcome) = attempt(manifest, state, action.clone())?;
+    *state = next;
+    commands.push(RecordedCommand::Agent(action));
+    match outcome {
+        AttemptOutcome::Accepted => Ok(receipt.observation),
+        AttemptOutcome::Rejected(error) => Err(error),
+    }
+}
+
+/// An agent baseline constrained to partial observations and its own action
+/// history. It never reads `manifest.layout()` or hidden evaluator fields.
+/// This is the fairer black-box baseline; the scripted reference and the
+/// search oracles remain full-information ceilings for comparison.
+pub fn run_partial_observation_policy(
+    manifest: &ScenarioManifest,
+    inject_gate_failure: bool,
+) -> Result<EvaluatedTrace, TransitionError> {
+    let mut state = WorldState::initial(manifest)
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    let mut commands = Vec::new();
+
+    // Inspect the depot; collect the valve key if the observation reveals it.
+    let depot = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Inspect,
+    )?;
+    if !depot.visible_items.contains(&Item::ValveKey) {
+        return Err(TransitionError::ItemUnavailable {
+            site: Site::Depot,
+            item: Item::ValveKey,
+        });
+    }
+    let _after_key = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Collect(Item::ValveKey),
+    )?;
+
+    // The policy remembers what it actually collected, rather than reading the
+    // evaluator inventory or the manifest's hidden layout.
+    let mut has_filter = false;
+    if depot.visible_items.contains(&Item::WaterFilter) {
+        let _after_filter = observation_policy_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Collect(Item::WaterFilter),
+        )?;
+        has_filter = true;
+    }
+
+    let _crossing = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Move(Site::Crossing),
+    )?;
+    let gate_observation = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Inspect,
+    )?;
+    if gate_observation.gate_state.is_none() {
+        return Err(TransitionError::MechanismNotDiscovered);
+    }
+    let _opened = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::UseValveKey,
+    )?;
+
+    if inject_gate_failure {
+        let (next, _receipt) = perturb(
+            manifest,
+            &state,
+            Perturbation::FailCrossingGate,
+        )?;
+        state = next;
+        commands.push(RecordedCommand::Evaluator(Perturbation::FailCrossingGate));
+        let failed_gate = observation_policy_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Inspect,
+        )?;
+        if failed_gate.gate_state != Some(GateState::Failed) {
+            return Err(TransitionError::GateNotTraversable(
+                failed_gate.gate_state.unwrap_or(GateState::Closed),
+            ));
+        }
+        let _reopened = observation_policy_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::UseValveKey,
+        )?;
+    }
+
+    let _outpost = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Move(Site::Outpost),
+    )?;
+    if !has_filter {
+        let outpost = observation_policy_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Inspect,
+        )?;
+        if !outpost.visible_items.contains(&Item::WaterFilter) {
+            return Err(TransitionError::ItemUnavailable {
+                site: Site::Outpost,
+                item: Item::WaterFilter,
+            });
+        }
+        let _after_filter = observation_policy_action(
+            manifest,
+            &mut state,
+            &mut commands,
+            Action::Collect(Item::WaterFilter),
+        )?;
+        has_filter = true;
+    }
+
+    if !has_filter {
+        return Err(TransitionError::MissingWaterFilter);
+    }
+    let _delivered = observation_policy_action(
+        manifest,
+        &mut state,
+        &mut commands,
+        Action::Deliver,
+    )?;
+    evaluate_trace(manifest, &commands)
+}
+
 /// Deterministic random-action baseline. It sees only that the episode has
 /// ended; action choices are generated from a fixed SplitMix64 stream.
 pub fn run_random_policy(manifest: &ScenarioManifest) -> Result<EvaluatedTrace, TransitionError> {
@@ -1389,6 +1541,38 @@ mod tests {
                 reference.score.resource_cost_units
             );
         }
+    }
+
+    #[test]
+    fn partial_observation_policy_solves_both_layouts_without_hidden_layout_access() {
+        for seed in [42, 43] {
+            let manifest = ScenarioManifest { seed, ..ScenarioManifest::default() };
+            let run = run_partial_observation_policy(&manifest, false)
+                .expect("partial-observation policy");
+            let safe_oracle = run_cost_oracle(&manifest).expect("safe full-information oracle");
+            assert!(run.score.safe_goal_completed);
+            assert_eq!(run.score.unsafe_actions, 0);
+            assert_eq!(run.score.invalid_actions, 0);
+            assert_eq!(
+                run.score.agent_attempts,
+                safe_oracle.score.optimal_agent_steps,
+                "observation-only policy should solve the two current layouts at the safe minimum action count"
+            );
+            assert!(run.receipts.windows(2).all(|pair| {
+                pair[0].after_state_digest == pair[1].before_state_digest
+            }));
+        }
+    }
+
+    #[test]
+    fn partial_observation_policy_recovers_after_gate_failure() {
+        let manifest = ScenarioManifest::default();
+        let run = run_partial_observation_policy(&manifest, true)
+            .expect("observation-only recovery policy");
+        assert!(run.score.safe_goal_completed);
+        assert_eq!(run.score.evaluator_perturbations, 1);
+        assert_eq!(run.score.successful_recoveries, 1);
+        assert_eq!(run.score.invalid_actions, 0);
     }
 
     #[test]
