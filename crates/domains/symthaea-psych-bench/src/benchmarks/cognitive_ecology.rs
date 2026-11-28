@@ -672,21 +672,26 @@ fn least_cost_action_plan(manifest: &ScenarioManifest) -> Option<(Vec<Action>, u
     ];
 
     while let Some(Reverse((cost, steps, key))) = frontier.pop() {
-        let Some((known_cost, known_steps, plan, state)) = best.get(&key) else {
+        let Some((known_cost, known_steps, plan, state)) = best
+            .get(&key)
+            .map(|(known_cost, known_steps, plan, state)| {
+                (*known_cost, *known_steps, plan.clone(), state.clone())
+            })
+        else {
             continue;
         };
-        if (cost, steps) != (*known_cost, *known_steps) {
+        if (cost, steps) != (known_cost, known_steps) {
             continue;
         }
         if state.delivered {
-            return Some((plan.clone(), cost));
+            return Some((plan, cost));
         }
         if steps >= manifest.max_steps {
             continue;
         }
 
         for action in &actions {
-            let Ok((next, receipt)) = step(manifest, state, action.clone()) else {
+            let Ok((next, receipt)) = step(manifest, &state, action.clone()) else {
                 continue;
             };
             let next_cost = cost.saturating_add(event_cost_units(
@@ -1209,6 +1214,36 @@ mod tests {
         assert!(matches!(receipt.event.kind, EventKind::ActionRejected { .. }));
         assert_eq!(receipt.step_index, 1);
         assert_ne!(receipt.before_state_digest, receipt.after_state_digest);
+    }
+
+    #[test]
+    fn cost_oracle_matches_or_improves_shortest_path_cost() {
+        for seed in [42, 43] {
+            let manifest = ScenarioManifest { seed, ..ScenarioManifest::default() };
+            let shortest = run_search_oracle(&manifest).expect("shortest-action oracle");
+            let least_cost = run_cost_oracle(&manifest).expect("least-cost oracle");
+            assert!(least_cost.score.goal_completed);
+            assert_eq!(
+                least_cost.score.resource_cost_units,
+                least_cost.score.optimal_resource_cost_units
+            );
+            assert_eq!(least_cost.score.cost_efficiency, 1.0);
+            assert!(
+                least_cost.score.resource_cost_units <= shortest.score.resource_cost_units
+            );
+        }
+    }
+
+    #[test]
+    fn cost_oracle_respects_manifest_action_costs() {
+        let manifest = ScenarioManifest {
+            cost_model: CostModel { inspect: 5, ..CostModel::default() },
+            ..ScenarioManifest::default()
+        };
+        let run = run_cost_oracle(&manifest).expect("least-cost oracle with modified costs");
+        assert_eq!(run.score.resource_cost_units, 16);
+        assert_eq!(run.score.optimal_resource_cost_units, 16);
+        assert_eq!(run.score.cost_efficiency, 1.0);
     }
 
     #[test]
