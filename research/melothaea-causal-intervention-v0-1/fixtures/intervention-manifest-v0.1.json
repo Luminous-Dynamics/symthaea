@@ -1,0 +1,26 @@
+{
+  "schema_version": "mel-hear-012-intervention-manifest-v0.1",
+  "benchmark_id": "MEL-CAUSAL-ACOUSTIC-INTERVENTION",
+  "benchmark_version": "0.1.0",
+  "case_id": "room-reverb-stay-001",
+  "pair_id": "pair-001",
+  "split": "development",
+  "source_work_lineage_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "performer_session_cluster_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "baseline_audio_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "target_property": "chord_quality",
+  "factor": "room_channel",
+  "intervention_family": "convolutional_room_response",
+  "parameter_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "implementation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "seed": 11,
+  "deterministic": true,
+  "expected_effect": "invariant",
+  "reference_annotation_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "rights_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "reference_hidden_from_model": true,
+  "source_support": {
+    "start_sample": 0,
+    "end_sample": 64
+  }
+}
