@@ -726,22 +726,23 @@ mod tests {
 
     #[test]
     fn deterministic_ties_keep_declared_decision_and_intervention_order() {
-        let utilities = vec![vec![5.0, 5.0], vec![5.0, 5.0]];
+        let baseline_utilities = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
+        let downstream_utilities = vec![vec![5.0, 5.0], vec![5.0, 5.0]];
         let problem = DecisionProblem::new(
             vec!["a".into(), "b".into()],
             vec!["first".into(), "second".into()],
             vec![0.5, 0.5],
-            utilities.clone(),
+            baseline_utilities,
             vec![
                 Intervention {
                     id: "first_probe".into(),
                     cost: 0.0,
-                    outcomes: vec![outcome("only", vec![1.0, 1.0], utilities.clone())],
+                    outcomes: vec![outcome("only", vec![1.0, 1.0], downstream_utilities.clone())],
                 },
                 Intervention {
                     id: "second_probe".into(),
                     cost: 0.0,
-                    outcomes: vec![outcome("only", vec![1.0, 1.0], utilities)],
+                    outcomes: vec![outcome("only", vec![1.0, 1.0], downstream_utilities)],
                 },
             ],
         ).expect("valid tied problem");
