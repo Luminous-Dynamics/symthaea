@@ -103,6 +103,12 @@ pub mod selective_prediction;
 // Population-risk evaluation under declared selective-adjudication designs
 pub mod selective_observation;
 
+// Custodian-randomized stratified audit sampling and inclusion probabilities
+pub mod stratified_audit;
+
+// Design-based risk estimation for stratified randomized audits
+pub mod stratified_risk;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -121,14 +127,22 @@ pub use meta_learning::{
     VerificationStrategy,
 };
 pub use researcher::WebResearcher;
-pub use selective_prediction::{
-    evaluate_risk_coverage, CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts,
-    RiskCoverageConfig, RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord,
-};
 pub use selective_observation::{
-    evaluate_selective_observation, AdjudicationSamplingDesign,
-    AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
+    AdjudicationSamplingDesign, AdjudicationSamplingMechanism, PropensitySupportDiagnostics,
     PropensityWeightedReport, SelectiveObservationEvaluation, SelectiveObservationRecord,
+    evaluate_selective_observation,
+};
+pub use selective_prediction::{
+    CoreRiskCoverageReport, CoverageOperatingPoint, DecisionCosts, RiskCoverageConfig,
+    RiskCoverageError, RiskCoverageReport, SelectivePredictionRecord, evaluate_risk_coverage,
+};
+pub use stratified_audit::{
+    AuditCandidate, AuditSelection, AuditStratumPlan, AuditStratumQuota, StratifiedAuditError,
+    StratifiedAuditPlan, build_stratified_random_audit_plan,
+};
+pub use stratified_risk::{
+    ApproximateRiskInterval, DesignBasedRiskEstimate, StratifiedRiskError, StratifiedRiskReport,
+    evaluate_stratified_audit_risk,
 };
 pub use types::*;
 pub use verifier::{

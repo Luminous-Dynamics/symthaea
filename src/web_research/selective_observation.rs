@@ -178,10 +178,16 @@ impl std::fmt::Display for SelectiveObservationError {
         match self {
             Self::EmptyDesignId => write!(formatter, "sampling design ID must not be empty"),
             Self::EmptyDesignManifestReference => {
-                write!(formatter, "sampling design manifest reference must not be empty")
+                write!(
+                    formatter,
+                    "sampling design manifest reference must not be empty"
+                )
             }
             Self::EmptyConditioningVariable => {
-                write!(formatter, "pre-label conditioning variable names must not be empty")
+                write!(
+                    formatter,
+                    "pre-label conditioning variable names must not be empty"
+                )
             }
             Self::EmptyRecordId => write!(formatter, "record IDs must not be empty"),
             Self::DuplicateRecordId(id) => write!(formatter, "duplicate record ID: {id}"),
@@ -192,7 +198,10 @@ impl std::fmt::Display for SelectiveObservationError {
                 write!(formatter, "coverage targets must be finite and in (0, 1]")
             }
             Self::InvalidConfidenceThreshold => {
-                write!(formatter, "confidence thresholds must be finite and in [0, 1]")
+                write!(
+                    formatter,
+                    "confidence thresholds must be finite and in [0, 1]"
+                )
             }
         }
     }
@@ -264,7 +273,7 @@ pub fn evaluate_selective_observation(
                         "pending labels have inclusion probability 1.0 under a design ",
                         "defined at this evaluation cutoff"
                     )
-                        .to_owned(),
+                    .to_owned(),
                 ),
             )
         } else if !diagnostics.positive_support_for_entire_cohort {
@@ -378,8 +387,8 @@ fn support_diagnostics(records: &[SelectiveObservationRecord]) -> PropensitySupp
         .iter()
         .map(|weight| weight * weight)
         .sum::<f64>();
-    let kish_effective_sample_size = (scaled_sum_squared > 0.0)
-        .then_some(scaled_sum * scaled_sum / scaled_sum_squared);
+    let kish_effective_sample_size =
+        (scaled_sum_squared > 0.0).then_some(scaled_sum * scaled_sum / scaled_sum_squared);
 
     PropensitySupportDiagnostics {
         population_records: records.len(),
@@ -412,8 +421,9 @@ fn compute_population_report(
     });
 
     let total = sorted.len();
+    let record_refs: Vec<&SelectiveObservationRecord> = records.iter().collect();
     let all_indices: Vec<usize> = (0..total).collect();
-    let always_answer = weighted_point(records, &all_indices, config.minimum_sample_size);
+    let always_answer = weighted_point(&record_refs, &all_indices, config.minimum_sample_size);
     let observed_indices: Vec<usize> = sorted
         .iter()
         .enumerate()
@@ -692,12 +702,14 @@ fn stratify_population(
                 (
                     None,
                     Some(
-                        "stratum effective sample size is below the configured minimum"
-                            .to_owned(),
+                        "stratum effective sample size is below the configured minimum".to_owned(),
                     ),
                 )
             } else {
-                (Some(compute_population_report(&group, design, config)), None)
+                (
+                    Some(compute_population_report(&group, design, config)),
+                    None,
+                )
             };
             reports.push(PropensityStratifiedReport {
                 dimension,
@@ -773,7 +785,12 @@ mod tests {
         let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
         assert!(!report.diagnostics.positive_support_for_entire_cohort);
         assert!(report.population_report.is_none());
-        assert!(report.unavailable_reason.unwrap().contains("not identifiable"));
+        assert!(
+            report
+                .unavailable_reason
+                .unwrap()
+                .contains("not identifiable")
+        );
     }
 
     #[test]
@@ -791,7 +808,10 @@ mod tests {
         assert_eq!(population.always_answer.estimated_error_total, 2.0);
         let naive_adjudicated_risk = 1.0 / 3.0;
         assert_eq!(population.always_answer.estimated_risk, Some(0.5));
-        assert_ne!(population.always_answer.estimated_risk, Some(naive_adjudicated_risk));
+        assert_ne!(
+            population.always_answer.estimated_risk,
+            Some(naive_adjudicated_risk)
+        );
         assert_eq!(population.always_answer.accepted_count_in_full_cohort, 4);
     }
 
@@ -819,10 +839,12 @@ mod tests {
         assert_eq!(point.accepted_count_in_full_cohort, 2);
         assert_eq!(point.independently_labelled_accepted_count, 1);
         assert_eq!(point.coverage_in_full_cohort, 1.0);
-        assert!(report
-            .stratified
-            .iter()
-            .any(|group| group.value == "panel-assigned-before-label"));
+        assert!(
+            report
+                .stratified
+                .iter()
+                .any(|group| group.value == "panel-assigned-before-label")
+        );
     }
 
     #[test]
@@ -832,8 +854,7 @@ mod tests {
                 observed(prediction("labelled", 0.8, true, Some(true)), Some(0.5)),
                 observed(prediction("bad", 0.2, true, None), bad),
             ];
-            let report =
-                evaluate_selective_observation(&records, &design(), &config()).unwrap();
+            let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
             assert!(report.population_report.is_none());
         }
     }
@@ -924,7 +945,12 @@ mod tests {
             observed(zero_support, Some(0.0)),
         ];
         let report = evaluate_selective_observation(&records, &design(), &config()).unwrap();
-        assert!(report.stratified.iter().any(|group| group.value == "unknown"));
+        assert!(
+            report
+                .stratified
+                .iter()
+                .any(|group| group.value == "unknown")
+        );
         assert!(report.stratified.iter().any(|group| group.report.is_none()));
     }
 }
