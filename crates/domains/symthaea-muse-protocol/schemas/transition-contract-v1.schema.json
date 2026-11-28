@@ -322,7 +322,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/gain_point"
-          }
+          },
+          "minItems": 2
         }
       }
     }
