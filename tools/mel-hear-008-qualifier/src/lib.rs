@@ -398,6 +398,56 @@ fn validate_estimand(
         ));
     }
 
+    if estimand.kind == EstimandKind::DeclaredTargetPopulationMean {
+        if weights_by_id.len() != panel_cells.len() {
+            return Err(
+                "declared target population must weight every potential work-performer cell"
+                    .to_owned(),
+            );
+        }
+        if estimand.target_work_weights.len() != work_ids.len()
+            || estimand.target_performer_weights.len() != performer_ids.len()
+        {
+            return Err(
+                "declared target population must provide complete work and performer marginals"
+                    .to_owned(),
+            );
+        }
+
+        let mut work_marginals = BTreeMap::<&str, f64>::new();
+        let mut performer_marginals = BTreeMap::<&str, f64>::new();
+        for (cell_id, weight) in &weights_by_id {
+            let cell = cells_by_id[cell_id];
+            *work_marginals.entry(cell.work_id.as_str()).or_default() += weight;
+            let performer_id = cell.performer_membership[0].performer_id.as_str();
+            *performer_marginals.entry(performer_id).or_default() += weight;
+        }
+
+        for marginal in &estimand.target_work_weights {
+            let derived = work_marginals
+                .get(marginal.unit_id.as_str())
+                .copied()
+                .unwrap_or(0.0);
+            if !approximately_equal(derived, marginal.weight) {
+                return Err(
+                    "declared target work marginal disagrees with joint cell weights".to_owned(),
+                );
+            }
+        }
+        for marginal in &estimand.target_performer_weights {
+            let derived = performer_marginals
+                .get(marginal.unit_id.as_str())
+                .copied()
+                .unwrap_or(0.0);
+            if !approximately_equal(derived, marginal.weight) {
+                return Err(
+                    "declared target performer marginal disagrees with joint cell weights"
+                        .to_owned(),
+                );
+            }
+        }
+    }
+
     let missing_target_cells = weights_by_id
         .keys()
         .filter(|cell_id| cells_by_id[*cell_id].status != CellStatus::Observed)
@@ -818,6 +868,33 @@ mod tests {
     fn incorrect_recomputed_support_is_rejected() {
         let mut panel = fixture();
         panel.support_audit.connected_components = 2;
+        assert!(audit_panel(&panel).is_err());
+    }
+
+    #[test]
+    fn declared_joint_target_must_match_work_and_performer_marginals() {
+        let mut panel = fixture();
+        let target = panel
+            .estimands
+            .iter_mut()
+            .find(|item| item.kind == EstimandKind::DeclaredTargetPopulationMean)
+            .expect("declared target must exist");
+        target.target_work_weights[0].weight = 0.5;
+        target.target_work_weights[1].weight = 0.25;
+        target.target_work_weights[2].weight = 0.25;
+        assert!(audit_panel(&panel).is_err());
+    }
+
+    #[test]
+    fn declared_joint_target_must_include_every_potential_cell() {
+        let mut panel = fixture();
+        let target = panel
+            .estimands
+            .iter_mut()
+            .find(|item| item.kind == EstimandKind::DeclaredTargetPopulationMean)
+            .expect("declared target must exist");
+        target.cell_weights.pop();
+        target.cell_weights[0].weight += 1.0 / 9.0;
         assert!(audit_panel(&panel).is_err());
     }
 
