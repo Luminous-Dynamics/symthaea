@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon025-versions-v1.schema.json",
+  "title": "MON-025 Version Profiles",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "reviewed_at",
+    "source_profiles",
+    "streaming_profiles",
+    "recovery_profiles",
+    "pinning_policy"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon025-version-matrix-v1"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "source_profiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "component",
+          "version",
+          "image",
+          "role",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "streaming_profiles": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "component",
+          "role",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string"
+          },
+          "kafka_version": {
+            "type": "string"
+          },
+          "kafka_image": {
+            "type": "string"
+          },
+          "debezium_version": {
+            "type": "string"
+          },
+          "connect_version": {
+            "type": "string"
+          },
+          "debezium_image": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recovery_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "component",
+          "version",
+          "role",
+          "notes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pinning_policy": {
+      "type": "object",
+      "required": [
+        "compose_tags_are_not_digests",
+        "record_runtime_image_digest_before_each_run",
+        "lock_digest_file_required_for_confirmatory_runs",
+        "mutable_latest_tags_prohibited",
+        "baseline_and_extension_results_must_not_be_pooled"
+      ],
+      "properties": {
+        "compose_tags_are_not_digests": {
+          "type": "boolean"
+        },
+        "record_runtime_image_digest_before_each_run": {
+          "type": "boolean"
+        },
+        "lock_digest_file_required_for_confirmatory_runs": {
+          "type": "boolean"
+        },
+        "mutable_latest_tags_prohibited": {
+          "type": "boolean"
+        },
+        "baseline_and_extension_results_must_not_be_pooled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

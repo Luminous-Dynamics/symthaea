@@ -1,0 +1,335 @@
+{
+  "profile": "mon025-live-recovery-challenge-v1",
+  "version": "1.0.0",
+  "classification": "synthetic-descriptive-seeds",
+  "scenarios": [
+    {
+      "id": "MON025-P001",
+      "class": "positive_control",
+      "name": "normal_stream_and_pit_restore",
+      "expected_outcome": "qualified",
+      "injection": "none",
+      "notes": "Baseline CDC capture, physical backup and same-major PITR with source/target truth comparison"
+    },
+    {
+      "id": "MON025-P002",
+      "class": "positive_control",
+      "name": "exact_duplicate_replay",
+      "expected_outcome": "qualified",
+      "injection": "replay exact event envelopes",
+      "notes": "Exact replay with identical key, envelope and payload is deduplicated but recorded"
+    },
+    {
+      "id": "MON025-P003",
+      "class": "positive_control",
+      "name": "explicit_row_stream_scope",
+      "expected_outcome": "qualified",
+      "injection": "declare out-of-scope surfaces",
+      "notes": "Row-stream claim may pass only with exact explicit exclusion manifest"
+    },
+    {
+      "id": "MON025-N001",
+      "class": "negative_control",
+      "name": "connector_restart_after_commit",
+      "expected_outcome": "indeterminate",
+      "injection": "kill Connect after a source transaction commit; restart Connect",
+      "notes": "Immediately after restart, continuity remains indeterminate until an independent event-set and offset reconciliation proves no loss or conflicting replay."
+    },
+    {
+      "id": "MON025-N002",
+      "class": "negative_control",
+      "name": "connector_crash_mid_transaction",
+      "expected_outcome": "indeterminate",
+      "injection": "terminate Connect during a multi-row transaction",
+      "notes": "A crash mid-transaction is indeterminate until transaction-envelope closure is independently reconciled; a proven missing member blocks."
+    },
+    {
+      "id": "MON025-N003",
+      "class": "negative_control",
+      "name": "broker_restart_after_produce",
+      "expected_outcome": "indeterminate",
+      "injection": "stop Kafka broker after event production and before offset/consumer reconciliation",
+      "notes": "Observed output and offset durability must be reconciled independently"
+    },
+    {
+      "id": "MON025-N004",
+      "class": "negative_control",
+      "name": "source_immediate_shutdown",
+      "expected_outcome": "indeterminate",
+      "injection": "immediate stop PostgreSQL with outstanding WAL/slot state",
+      "notes": "Restart and reconcile duplicate/replayed WAL before declaring continuity"
+    },
+    {
+      "id": "MON025-N005",
+      "class": "negative_control",
+      "name": "conflicting_duplicate_event",
+      "expected_outcome": "blocked",
+      "injection": "replay same event ID with altered payload digest",
+      "notes": "Same identity with conflicting content is divergence"
+    },
+    {
+      "id": "MON025-N006",
+      "class": "negative_control",
+      "name": "missing_expected_event",
+      "expected_outcome": "blocked",
+      "injection": "remove one expected event from independently read Kafka data",
+      "notes": "Source truth vs Kafka event set mismatch blocks continuity"
+    },
+    {
+      "id": "MON025-N007",
+      "class": "negative_control",
+      "name": "transaction_membership_gap",
+      "expected_outcome": "blocked",
+      "injection": "omit one member of a multi-row transaction",
+      "notes": "Transaction envelope closure fails"
+    },
+    {
+      "id": "MON025-N008",
+      "class": "negative_control",
+      "name": "publication_filter_change",
+      "expected_outcome": "indeterminate",
+      "injection": "change publication/table filter after baseline",
+      "notes": "Scope boundary must be updated and re-attested"
+    },
+    {
+      "id": "MON025-N009",
+      "class": "negative_control",
+      "name": "schema_ddl_outside_row_stream",
+      "expected_outcome": "indeterminate",
+      "injection": "add/alter column after connector snapshot",
+      "notes": "DDL change must be surfaced by independent inventory evidence"
+    },
+    {
+      "id": "MON025-N010",
+      "class": "negative_control",
+      "name": "generated_column_not_emitted",
+      "expected_outcome": "indeterminate",
+      "injection": "change inputs that alter generated value",
+      "notes": "Row stream cannot imply generated-column state coverage"
+    },
+    {
+      "id": "MON025-N011",
+      "class": "negative_control",
+      "name": "sequence_advanced",
+      "expected_outcome": "indeterminate",
+      "injection": "advance sequence independently of row transaction",
+      "notes": "Sequence state requires explicit synchronization/evidence"
+    },
+    {
+      "id": "MON025-N012",
+      "class": "negative_control",
+      "name": "large_object_mutated",
+      "expected_outcome": "indeterminate",
+      "injection": "write/replace large-object bytes",
+      "notes": "Large object digest mismatch blocks full-state claim"
+    },
+    {
+      "id": "MON025-N013",
+      "class": "negative_control",
+      "name": "materialized_view_stale",
+      "expected_outcome": "blocked",
+      "injection": "change base rows without refreshing materialized view",
+      "notes": "Recovered derived state must match declared refresh semantics"
+    },
+    {
+      "id": "MON025-N014",
+      "class": "negative_control",
+      "name": "unlogged_table_content_lost",
+      "expected_outcome": "indeterminate",
+      "injection": "write unlogged table before backup/restore",
+      "notes": "Do not infer WAL recoverability of unlogged relation contents"
+    },
+    {
+      "id": "MON025-N015",
+      "class": "negative_control",
+      "name": "partition_topology_changed",
+      "expected_outcome": "indeterminate",
+      "injection": "add/drop/attach/detach a partition",
+      "notes": "Inventory and schema/partition digests must change"
+    },
+    {
+      "id": "MON025-N016",
+      "class": "negative_control",
+      "name": "wal_archive_gap",
+      "expected_outcome": "blocked",
+      "injection": "withhold a WAL segment required by target time",
+      "notes": "Requested PITR target is not reachable"
+    },
+    {
+      "id": "MON025-N017",
+      "class": "negative_control",
+      "name": "restore_target_too_early",
+      "expected_outcome": "blocked",
+      "injection": "restore to a time before required committed transaction",
+      "notes": "Recovered point must match exact requested target semantics"
+    },
+    {
+      "id": "MON025-N018",
+      "class": "negative_control",
+      "name": "restore_target_too_late",
+      "expected_outcome": "blocked",
+      "injection": "restore beyond authorized target boundary",
+      "notes": "No forward rounding beyond declared target"
+    },
+    {
+      "id": "MON025-N019",
+      "class": "negative_control",
+      "name": "wrong_source_backup",
+      "expected_outcome": "blocked",
+      "injection": "restore backup from another system identifier/database",
+      "notes": "Source lineage mismatch blocks"
+    },
+    {
+      "id": "MON025-N020",
+      "class": "negative_control",
+      "name": "wrong_timeline",
+      "expected_outcome": "blocked",
+      "injection": "supply WAL from incompatible timeline without parent/fork evidence",
+      "notes": "No numeric-only LSN comparison across timelines"
+    },
+    {
+      "id": "MON025-N021",
+      "class": "negative_control",
+      "name": "target_surface_mismatch",
+      "expected_outcome": "blocked",
+      "injection": "alter one restored state surface while preserving row count",
+      "notes": "Canonical surface digest comparison detects drift"
+    },
+    {
+      "id": "MON025-N022",
+      "class": "negative_control",
+      "name": "dependency_unavailable",
+      "expected_outcome": "blocked",
+      "injection": "deny one required application dependency",
+      "notes": "Database ready does not promote service ready"
+    },
+    {
+      "id": "MON025-N023",
+      "class": "negative_control",
+      "name": "old_primary_unfenced",
+      "expected_outcome": "blocked",
+      "injection": "leave former primary accepting writes",
+      "notes": "Activation blocked against split-brain risk"
+    },
+    {
+      "id": "MON025-N024",
+      "class": "negative_control",
+      "name": "stale_endpoint_reachable",
+      "expected_outcome": "blocked",
+      "injection": "leave stale route/DNS/service endpoint usable",
+      "notes": "All stale endpoints must be fenced before activation"
+    },
+    {
+      "id": "MON025-N025",
+      "class": "negative_control",
+      "name": "write_probe_not_rolled_back",
+      "expected_outcome": "blocked",
+      "injection": "write test value and omit rollback",
+      "notes": "Service readiness fails until write probe is rolled back and observed"
+    },
+    {
+      "id": "MON025-N026",
+      "class": "negative_control",
+      "name": "traffic_before_acceptance",
+      "expected_outcome": "blocked",
+      "injection": "enable traffic before independent service acceptance",
+      "notes": "Activation-order invariant violated"
+    },
+    {
+      "id": "MON025-N027",
+      "class": "negative_control",
+      "name": "unknown_promotion_outcome",
+      "expected_outcome": "indeterminate",
+      "injection": "time out failover/promotion API and do not query actual role",
+      "notes": "No second mutation until original outcome is reconciled"
+    },
+    {
+      "id": "MON025-N028",
+      "class": "negative_control",
+      "name": "observer_common_cause",
+      "expected_outcome": "indeterminate",
+      "injection": "run source, target and observer under one admin root",
+      "notes": "Independent verification claim is unsupported"
+    },
+    {
+      "id": "MON025-N029",
+      "class": "negative_control",
+      "name": "clock_uncertainty_unbounded",
+      "expected_outcome": "indeterminate",
+      "injection": "inject drift/uncertainty above declared clock budget",
+      "notes": "RPO/RTO upper bounds cannot be qualified"
+    },
+    {
+      "id": "MON025-N030",
+      "class": "negative_control",
+      "name": "backup_checksum_corruption",
+      "expected_outcome": "blocked",
+      "injection": "corrupt a backup page or archive artifact",
+      "notes": "Integrity/restore check must fail closed"
+    },
+    {
+      "id": "MON025-N031",
+      "class": "negative_control",
+      "name": "connector_config_drift",
+      "expected_outcome": "indeterminate",
+      "injection": "change plugin, slot, publication or snapshot config without new manifest",
+      "notes": "Version and source-scope digest mismatch"
+    },
+    {
+      "id": "MON025-N032",
+      "class": "negative_control",
+      "name": "kafka_432_patch_extension",
+      "expected_outcome": "indeterminate",
+      "injection": "run Kafka 4.3.2 against pinned Debezium connector",
+      "notes": "Extension profile requires compatibility and full challenge requalification"
+    },
+    {
+      "id": "MON025-N033",
+      "class": "negative_control",
+      "name": "kafka_440_series_extension",
+      "expected_outcome": "indeterminate",
+      "injection": "run Kafka 4.4.0 against pinned Debezium connector",
+      "notes": "New-series compatibility is not assumed from 4.3.1 test note"
+    },
+    {
+      "id": "MON025-N034",
+      "class": "negative_control",
+      "name": "pgbackrest_version_mismatch",
+      "expected_outcome": "blocked",
+      "injection": "use different local and remote pgBackRest binaries",
+      "notes": "pgBackRest protocol requires exact version alignment"
+    },
+    {
+      "id": "MON025-N035",
+      "class": "negative_control",
+      "name": "same_event_id_altered_payload_preserved_row_count",
+      "expected_outcome": "blocked",
+      "injection": "alter a Kafka row payload amount while keeping event ID and batch row count unchanged",
+      "notes": "The independent source SQL oracle must detect value divergence even when event counts and primary keys still match."
+    },
+    {
+      "id": "MON025-N036",
+      "class": "negative_control",
+      "name": "transaction_end_event_count_mismatch",
+      "expected_outcome": "blocked",
+      "injection": "alter Debezium END event_count or omit one row event from a multi-row transaction",
+      "notes": "A complete set of primary keys does not override a missing BEGIN/END witness, wrong END event_count or non-contiguous per-event ordering."
+    },
+    {
+      "id": "MON025-P004",
+      "class": "positive_control",
+      "name": "exact_transaction_boundary_replay",
+      "expected_outcome": "qualified",
+      "injection": "replay byte-identical BEGIN and END transaction topic records while retaining the original records",
+      "notes": "Exact duplicate transaction envelopes are deduplicated and counted as replay, not mistaken for conflicting or missing boundaries."
+    },
+    {
+      "id": "MON025-N037",
+      "class": "negative_control",
+      "name": "conflicting_transaction_boundary_replay",
+      "expected_outcome": "blocked",
+      "injection": "reuse one transaction ID with a changed BEGIN or END payload, including a changed END event_count",
+      "notes": "Conflicting boundary metadata under the same transaction ID is divergence even when row events match."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+MON039 deterministic fault schedule v1
+trial=trial-039-001
+initial_fault_ids=fault-a,fault-b,fault-c
+oracle=blocked iff fault-a and fault-c are both present
+failure_signature=30100eb79964719053a37a1ef7fe2be0e9290f7639284a848565a99dc77ffa5e

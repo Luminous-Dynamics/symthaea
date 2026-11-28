@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mon035-observer-independence-input-v1.schema.json",
+  "title": "MON-035 Observer Common-Cause Independence Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "version",
+    "now",
+    "nodes",
+    "observers"
+  ],
+  "properties": {
+    "profile": {
+      "const": "mon035-observer-independence-input-v1"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "now": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "failure_class": {
+            "type": "string",
+            "enum": [
+              "operator",
+              "identity_provider",
+              "control_plane",
+              "compute_host",
+              "storage",
+              "network",
+              "time_source",
+              "signer"
+            ]
+          },
+          "failure_domain_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "depends_on": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 50000,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "failure_class"
+              ]
+            },
+            "then": {
+              "required": [
+                "failure_domain_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "failure_domain_id"
+              ]
+            },
+            "then": {
+              "required": [
+                "failure_class"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "observers": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "root_node_id",
+          "inventory_complete",
+          "inventory_attestation_sha256",
+          "evidence_grade",
+          "observed_at",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "root_node_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "inventory_complete": {
+            "type": "boolean"
+          },
+          "inventory_attestation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "evidence_grade": {
+            "const": "runtime_independently_verified"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

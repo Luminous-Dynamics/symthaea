@@ -1,0 +1,206 @@
+name: ${COMPOSE_PROJECT_NAME:-mon025}
+
+services:
+  kafka:
+    image: ${MON025_KAFKA_IMAGE:-apache/kafka:4.3.1}
+    hostname: kafka
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_NUM_PARTITIONS: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  connect:
+    image: ${MON025_CONNECT_IMAGE:-quay.io/debezium/connect:3.7.1.Final}
+    hostname: connect
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: "1"
+      CONFIG_STORAGE_TOPIC: mon025_connect_configs
+      OFFSET_STORAGE_TOPIC: mon025_connect_offsets
+      STATUS_STORAGE_TOPIC: mon025_connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      REST_ADVERTISED_HOST_NAME: connect
+      REST_PORT: "8083"
+    ports:
+      - "127.0.0.1:8083:8083"
+    restart: unless-stopped
+
+  postgres18:
+    profiles: ["pg18"]
+    image: postgres:18.7-bookworm
+    hostname: postgres18
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=256MB
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=30s
+      - -c
+      - archive_command=mkdir -p /wal-archive && if [ -f /wal-archive/%f ]; then cmp -s %p /wal-archive/%f; else cp %p /wal-archive/%f; fi
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+      POSTGRES_USER: ${MON025_DB_USER:-mon025}
+      POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
+      POSTGRES_DB: ${MON025_DB_NAME:-mon025}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:55418:5432"
+    volumes:
+      - pg18_source_data:/var/lib/postgresql
+      - pg18_backups:/backups
+      - pg18_wal_archive:/wal-archive
+      - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/lab/source-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MON025_DB_USER:-mon025} -d ${MON025_DB_NAME:-mon025}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres19:
+    profiles: ["pg19"]
+    image: postgres:19.0-bookworm
+    hostname: postgres19
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=256MB
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=30s
+      - -c
+      - archive_command=mkdir -p /wal-archive && if [ -f /wal-archive/%f ]; then cmp -s %p /wal-archive/%f; else cp %p /wal-archive/%f; fi
+    environment:
+      PGDATA: /var/lib/postgresql/19/docker
+      POSTGRES_USER: ${MON025_DB_USER:-mon025}
+      POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
+      POSTGRES_DB: ${MON025_DB_NAME:-mon025}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:55419:5432"
+    volumes:
+      - pg19_source_data:/var/lib/postgresql
+      - pg19_backups:/backups
+      - pg19_wal_archive:/wal-archive
+      - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - ./postgres/source-entrypoint.sh:/lab/source-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/lab/source-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MON025_DB_USER:-mon025} -d ${MON025_DB_NAME:-mon025}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  restore18:
+    profiles: ["restore18"]
+    image: postgres:18.7-bookworm
+    hostname: restore18
+    entrypoint: ["/bin/sh", "/lab/restore-entrypoint.sh"]
+    command: ["postgres", "-c", "hot_standby=on"]
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+      POSTGRES_USER: ${MON025_DB_USER:-mon025}
+      POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
+      POSTGRES_DB: ${MON025_DB_NAME:-mon025}
+      MON025_BACKUP_ID: ${MON025_BACKUP_ID:-}
+      MON025_RECOVERY_TARGET_LSN: ${MON025_RECOVERY_TARGET_LSN:-}
+      MON025_RECOVERY_TARGET_TIMELINE: ${MON025_RECOVERY_TARGET_TIMELINE:-}
+    ports:
+      - "127.0.0.1:56418:5432"
+    volumes:
+      - pg18_source_data:/source-data:ro
+      - pg18_backups:/backups:ro
+      - pg18_wal_archive:/wal-archive:ro
+      - pg18_restore_data:/var/lib/postgresql
+      - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
+      - ./postgres:/lab/postgres:ro
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      postgres18:
+        condition: service_healthy
+    restart: "no"
+
+  restore19:
+    profiles: ["restore19"]
+    image: postgres:19.0-bookworm
+    hostname: restore19
+    entrypoint: ["/bin/sh", "/lab/restore-entrypoint.sh"]
+    command: ["postgres", "-c", "hot_standby=on"]
+    environment:
+      PGDATA: /var/lib/postgresql/19/docker
+      POSTGRES_USER: ${MON025_DB_USER:-mon025}
+      POSTGRES_PASSWORD: ${MON025_DB_PASSWORD:?Set MON025_DB_PASSWORD in .env}
+      POSTGRES_DB: ${MON025_DB_NAME:-mon025}
+      MON025_BACKUP_ID: ${MON025_BACKUP_ID:-}
+      MON025_RECOVERY_TARGET_LSN: ${MON025_RECOVERY_TARGET_LSN:-}
+      MON025_RECOVERY_TARGET_TIMELINE: ${MON025_RECOVERY_TARGET_TIMELINE:-}
+    ports:
+      - "127.0.0.1:56419:5432"
+    volumes:
+      - pg19_source_data:/source-data:ro
+      - pg19_backups:/backups:ro
+      - pg19_wal_archive:/wal-archive:ro
+      - pg19_restore_data:/var/lib/postgresql
+      - ./restore/restore-entrypoint.sh:/lab/restore-entrypoint.sh:ro
+      - ./postgres:/lab/postgres:ro
+    depends_on:
+      postgres19:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  pg18_source_data:
+  pg18_backups:
+  pg18_wal_archive:
+  pg18_restore_data:
+  pg19_source_data:
+  pg19_backups:
+  pg19_wal_archive:
+  pg19_restore_data:

@@ -1,0 +1,14 @@
+{
+  "profile": "mon034-postgres-timeline-ancestry-input-v1",
+  "version": "1.0.0",
+  "expected_system_identifier": "7438291029384756102",
+  "base_backup_system_identifier": "7438291029384756102",
+  "base_backup_timeline_id": 1,
+  "base_backup_lsn": "0/00000010",
+  "recovered_system_identifier": "7438291029384756102",
+  "recovered_timeline_id": 1,
+  "recovery_target_lsn": "0/00000020",
+  "history_timeline_id": 1,
+  "history_sha256": "",
+  "history_text": ""
+}

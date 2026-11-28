@@ -1,0 +1,112 @@
+{
+  "profile": "mon039-counterfactual-fault-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON039-P001",
+      "classification": "positive_control",
+      "name": "two_fault_global_minimum",
+      "expected_outcome": "global_candidate_minimum",
+      "mutation": "Complete three-fault subset table reduces to the exact two-fault failure signature"
+    },
+    {
+      "id": "MON039-P002",
+      "classification": "positive_control",
+      "name": "large_set_one_minimal",
+      "expected_outcome": "one_minimal",
+      "mutation": "A 13-fault candidate set reduces by single deletion and reports only one-minimal"
+    },
+    {
+      "id": "MON039-N001",
+      "classification": "negative_control",
+      "name": "missing_empty_subset",
+      "expected_outcome": "not_established",
+      "mutation": "Missing empty-set observation prevents proof of global minimum"
+    },
+    {
+      "id": "MON039-N002",
+      "classification": "negative_control",
+      "name": "different_blocked_signature",
+      "expected_outcome": "not_preserved",
+      "mutation": "A blocked subset with different failure signature is not treated as the same failure"
+    },
+    {
+      "id": "MON039-N003",
+      "classification": "negative_control",
+      "name": "incomplete_subset_observation",
+      "expected_outcome": "not_established",
+      "mutation": "An incomplete replay is not a no-failure control"
+    },
+    {
+      "id": "MON039-N004",
+      "classification": "negative_control",
+      "name": "stale_code_revision",
+      "expected_outcome": "blocked",
+      "mutation": "Observation from a different commit is rejected"
+    },
+    {
+      "id": "MON039-N005",
+      "classification": "negative_control",
+      "name": "cross_boundary_observation",
+      "expected_outcome": "blocked",
+      "mutation": "Observation from another recovery boundary is rejected"
+    },
+    {
+      "id": "MON039-N006",
+      "classification": "negative_control",
+      "name": "duplicate_fault_set_receipt",
+      "expected_outcome": "blocked",
+      "mutation": "Ambiguous duplicate replay evidence is rejected"
+    },
+    {
+      "id": "MON039-N007",
+      "classification": "negative_control",
+      "name": "duplicate_fault_id",
+      "expected_outcome": "blocked",
+      "mutation": "Initial fault ID set is not unique"
+    },
+    {
+      "id": "MON039-N008",
+      "classification": "negative_control",
+      "name": "future_observation",
+      "expected_outcome": "blocked",
+      "mutation": "Replay receipt postdates evaluation time"
+    },
+    {
+      "id": "MON039-N009",
+      "classification": "negative_control",
+      "name": "target_signature_mismatch",
+      "expected_outcome": "blocked",
+      "mutation": "Caller-specified expected failure signature differs from full-set result"
+    },
+    {
+      "id": "MON039-N010",
+      "classification": "negative_control",
+      "name": "initial_set_did_not_fail",
+      "expected_outcome": "not_applicable",
+      "mutation": "No failure signature exists to minimize"
+    },
+    {
+      "id": "MON039-N011",
+      "classification": "negative_control",
+      "name": "evaluation_budget_exhausted",
+      "expected_outcome": "not_established",
+      "mutation": "Search limit reached before minimality proof"
+    },
+    {
+      "id": "MON039-N012",
+      "classification": "negative_control",
+      "name": "non_monotone_interaction",
+      "expected_outcome": "one_minimal",
+      "mutation": "Single deletion cannot establish a global minimum in a non-monotone fault system"
+    },
+    {
+      "id": "MON039-N013",
+      "classification": "negative_control",
+      "name": "runtime_receipts_unauthenticated",
+      "expected_outcome": "indeterminate",
+      "mutation": "Runtime candidates lack independently authenticated replay receipts"
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "profile": "mon024-end-to-end-evidence-graph-v1",
+  "version": "1.0.0",
+  "classification": "synthetic-descriptive-seeds",
+  "scenarios": [
+    {
+      "id": "MON024-P001",
+      "class": "positive_control",
+      "test_name": "TestPositiveChainQualifiesAndTrafficMayBeEnabled",
+      "expected_verdict": "qualified",
+      "expected_reason": "",
+      "mutation": "none; five-stage full-state graph with attested N/A surfaces",
+      "notes": "Valid full-state recovery evidence must qualify."
+    },
+    {
+      "id": "MON024-P002",
+      "class": "positive_control",
+      "test_name": "TestRowStreamAllowsManifestedExclusions",
+      "expected_verdict": "qualified",
+      "expected_reason": "",
+      "mutation": "row-stream scope with explicit exclusion manifest",
+      "notes": "Scoped row-stream success may qualify without claiming full database state."
+    },
+    {
+      "id": "MON024-N001",
+      "class": "negative_control",
+      "test_name": "TestMissingStageIsIndeterminate",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "required_stage_missing",
+      "mutation": "remove restore-to-service receipt",
+      "notes": "Missing stage is not success."
+    },
+    {
+      "id": "MON024-N002",
+      "class": "negative_control",
+      "test_name": "TestBoundaryMismatchBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "recovery_boundary_mismatch",
+      "mutation": "change source epoch in CDC receipt",
+      "notes": "Cross-stage source identity substitution must block."
+    },
+    {
+      "id": "MON024-N003",
+      "class": "negative_control",
+      "test_name": "TestParentDigestMismatchBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "parent_binding_mismatch",
+      "mutation": "substitute causal output digest in temporal parent reference",
+      "notes": "Parent digest substitution must block."
+    },
+    {
+      "id": "MON024-N004",
+      "class": "negative_control",
+      "test_name": "TestExpiredEvidenceIsIndeterminate",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "evidence_expired",
+      "mutation": "expire causal receipt before evaluation time",
+      "notes": "Stale evidence cannot enable traffic."
+    },
+    {
+      "id": "MON024-N005",
+      "class": "negative_control",
+      "test_name": "TestObserverSharingProducerControlRootBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "observer_not_independent",
+      "mutation": "set observer control root equal to producer control root",
+      "notes": "Producer-controlled observer cannot count as independent."
+    },
+    {
+      "id": "MON024-N006",
+      "class": "negative_control",
+      "test_name": "TestSingleObserverDomainIsIndeterminate",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "insufficient_independent_observer_domains",
+      "mutation": "collapse all observer receipts into one control root",
+      "notes": "Single-domain evidence lacks minimum diversity."
+    },
+    {
+      "id": "MON024-N007",
+      "class": "negative_control",
+      "test_name": "TestUnknownMutationOutcomeBlocksTraffic",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "unresolved_mutation_outcome",
+      "mutation": "leave a prior restore/promotion command outcome unresolved",
+      "notes": "No new mutation until the unknown outcome is reconciled."
+    },
+    {
+      "id": "MON024-N008",
+      "class": "negative_control",
+      "test_name": "TestFailedCDCAcknowledgementCheckBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "ack_within_durable_watermark",
+      "mutation": "mark CDC ACK beyond durable evidence watermark",
+      "notes": "Durable-before-ack invariant failure blocks."
+    },
+    {
+      "id": "MON024-N009",
+      "class": "negative_control",
+      "test_name": "TestUnknownCheckIsIndeterminate",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "cross_source_handoffs_witnessed",
+      "mutation": "set cross-source ordering proof to unknown",
+      "notes": "Unknown temporal evidence cannot be treated as passed."
+    },
+    {
+      "id": "MON024-N010",
+      "class": "negative_control",
+      "test_name": "TestFullStateClaimCannotExcludeRequiredSurface",
+      "expected_verdict": "blocked",
+      "expected_reason": "full_state_claim_contains_exclusions",
+      "mutation": "exclude one required state surface from a full-state claim",
+      "notes": "A full-state claim cannot contain exclusions."
+    },
+    {
+      "id": "MON024-N011",
+      "class": "negative_control",
+      "test_name": "TestUnknownSurfaceCannotQualify",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "required_surface_coverage_unknown",
+      "mutation": "leave one required database surface unknown",
+      "notes": "Unresolved state surface blocks qualification."
+    },
+    {
+      "id": "MON024-N012",
+      "class": "negative_control",
+      "test_name": "TestWrongParentEdgeBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "unexpected_parent_edge",
+      "mutation": "connect CDC directly to causal provenance instead of temporal order",
+      "notes": "Proof graph topology is normative."
+    },
+    {
+      "id": "MON024-N013",
+      "class": "negative_control",
+      "test_name": "TestDuplicateStageBlocks",
+      "expected_verdict": "blocked",
+      "expected_reason": "duplicate_stage_receipt",
+      "mutation": "duplicate the causal stage receipt",
+      "notes": "Duplicate stage evidence is ambiguous and blocked."
+    },
+    {
+      "id": "MON024-N014",
+      "class": "negative_control",
+      "test_name": "TestMissingRollbackBlocksServiceClaim",
+      "expected_verdict": "blocked",
+      "expected_reason": "write_probe_rollback",
+      "mutation": "fail rollback after application write/readback probe",
+      "notes": "Unreverted service probe blocks service recovery."
+    },
+    {
+      "id": "MON024-N015",
+      "class": "negative_control",
+      "test_name": "TestAlreadyEnabledTrafficBlocksOrderedActivationClaim",
+      "expected_verdict": "blocked",
+      "expected_reason": "traffic_disabled_until_ready",
+      "mutation": "report traffic enabled before readiness qualification",
+      "notes": "Premature traffic activation is a hard failure."
+    },
+    {
+      "id": "MON024-N016",
+      "class": "negative_control",
+      "test_name": "TestStructuralEvidenceCannotQualifyProductionClaim",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "evidence_not_runtime_independently_verified",
+      "mutation": "downgrade CDC receipt grade to structurally_checked",
+      "notes": "Structural checks are not production runtime evidence."
+    },
+    {
+      "id": "MON024-N017",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/duplicate_evidence_identity",
+      "expected_verdict": "blocked",
+      "expected_reason": "duplicate_evidence_id",
+      "mutation": "reuse one evidence ID across distinct stages",
+      "notes": "Evidence identities must be unique."
+    },
+    {
+      "id": "MON024-N018",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/future-dated_evidence",
+      "expected_verdict": "blocked",
+      "expected_reason": "evidence_from_future",
+      "mutation": "set observed time after evaluation time",
+      "notes": "Future-dated evidence is invalid."
+    },
+    {
+      "id": "MON024-N019",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/unsubstantiated_not-applicable_surface",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "not_applicable_surfaces_unsubstantiated",
+      "mutation": "remove the N/A evidence digest while N/A count is non-zero",
+      "notes": "N/A is a claim requiring its own evidence."
+    },
+    {
+      "id": "MON024-N020",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/row-stream_exclusions_lack_manifest",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "row_stream_exclusions_not_manifested",
+      "mutation": "remove exclusion manifest for row-stream claim",
+      "notes": "Scoped exclusions must be explicit and digest-bound."
+    },
+    {
+      "id": "MON024-N021",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/dependency_readiness_failed",
+      "expected_verdict": "blocked",
+      "expected_reason": "dependencies_ready",
+      "mutation": "mark required application dependency unavailable",
+      "notes": "Database readiness alone cannot qualify service readiness."
+    },
+    {
+      "id": "MON024-N022",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/old_primary_not_fenced",
+      "expected_verdict": "blocked",
+      "expected_reason": "old_primary_fenced",
+      "mutation": "leave former primary writable or unfenced",
+      "notes": "Split-brain risk blocks traffic."
+    },
+    {
+      "id": "MON024-N023",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/activation_order_unknown",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "activation_order_verified",
+      "mutation": "remove independent proof of activation ordering",
+      "notes": "The evaluator does not infer ordering from end state."
+    },
+    {
+      "id": "MON024-N024",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/independent_service_acceptance_missing",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "independent_service_acceptance",
+      "mutation": "omit independent service acceptance evidence",
+      "notes": "Service acceptance must be separately witnessed."
+    },
+    {
+      "id": "MON024-N025",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/evidence_clock_domain_mismatch",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "evidence_clock_domain_unmatched",
+      "mutation": "change one receipt to an unmatched clock domain",
+      "notes": "Cross-stage freshness claims require comparable bounded time."
+    },
+    {
+      "id": "MON024-N026",
+      "class": "negative_control",
+      "test_name": "TestAdditionalAdversarialControls/clock_uncertainty_exceeds_bound",
+      "expected_verdict": "indeterminate",
+      "expected_reason": "clock_uncertainty_exceeds_bound",
+      "mutation": "raise one observer's clock uncertainty above the plan bound",
+      "notes": "Unbounded timing uncertainty cannot qualify freshness."
+    }
+  ]
+}

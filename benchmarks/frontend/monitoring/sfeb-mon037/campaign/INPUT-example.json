@@ -1,0 +1,207 @@
+{
+  "profile": "mon037-unified-recovery-campaign-input-v1",
+  "version": "1.0.0",
+  "trial_id": "trial-offline-clean-001",
+  "scenario_id": "MON037-P001",
+  "mode": "offline_fixture",
+  "evaluated_at": "2026-11-27T12:00:00Z",
+  "offset_target_required": false,
+  "required_claim_ids": [
+    "claim-cdc",
+    "claim-backup"
+  ],
+  "source_events": [
+    {
+      "event_id": "row-1",
+      "transaction_id": "tx-1",
+      "topic": "ledger",
+      "operation": "INSERT",
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "total_order": 1,
+      "collection_order": 1,
+      "data_collection": "public.ledger"
+    },
+    {
+      "event_id": "message-1",
+      "transaction_id": "tx-1",
+      "topic": "message",
+      "operation": "MESSAGE",
+      "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "total_order": 2,
+      "collection_order": 1,
+      "data_collection": "LOGICAL_DECODING_MESSAGE"
+    }
+  ],
+  "observed_events": [
+    {
+      "event_id": "row-1",
+      "transaction_id": "tx-1",
+      "topic": "ledger",
+      "operation": "INSERT",
+      "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "total_order": 1,
+      "collection_order": 1,
+      "partition": 0,
+      "offset": 10,
+      "data_collection": "public.ledger"
+    },
+    {
+      "event_id": "message-1",
+      "transaction_id": "tx-1",
+      "topic": "message",
+      "operation": "MESSAGE",
+      "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "total_order": 2,
+      "collection_order": 1,
+      "partition": 0,
+      "offset": 7,
+      "data_collection": "LOGICAL_DECODING_MESSAGE"
+    }
+  ],
+  "topic_partitions": [
+    {
+      "topic": "ledger",
+      "partition_count": 1
+    },
+    {
+      "topic": "message",
+      "partition_count": 1
+    }
+  ],
+  "transactions": [
+    {
+      "transaction_id": "tx-1",
+      "expected_event_count": 2,
+      "begin_observed": true,
+      "end_observed": true,
+      "end_event_count": 2,
+      "data_collections": {
+        "public.ledger": 1,
+        "LOGICAL_DECODING_MESSAGE": 1
+      }
+    }
+  ],
+  "exact_replay_deduplication_proven": false,
+  "surface_scope": "full_state",
+  "surfaces": [
+    {
+      "id": "heap",
+      "disposition": "covered",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "restored_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "index",
+      "disposition": "covered",
+      "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "restored_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "id": "large-object",
+      "disposition": "not_applicable",
+      "justification_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "restore_checks": {
+    "artifact_validated": "passed",
+    "database_recovered": "passed",
+    "dependencies_ready": "passed",
+    "application_read_probe": "passed",
+    "application_write_readback": "passed",
+    "write_probe_rollback": "passed",
+    "application_invariants": "passed",
+    "old_primary_fenced": "passed",
+    "stale_endpoints_fenced": "passed",
+    "independent_service_acceptance": "passed",
+    "activation_order_verified": "passed",
+    "traffic_disabled_until_ready": "passed"
+  },
+  "traffic_currently_enabled": false,
+  "components": {
+    "mon034_timeline_result": {
+      "profile": "mon034-postgres-timeline-ancestry-result-v1",
+      "version": "1.0.0",
+      "result": {
+        "verdict": "qualified",
+        "reason_codes": []
+      }
+    },
+    "mon035_observer_result": {
+      "profile": "mon035-observer-independence-result-v1",
+      "version": "1.0.0",
+      "result": {
+        "verdict": "qualified",
+        "independent": true,
+        "shared_domains": [],
+        "observer_assessments": [
+          {
+            "observer_id": "observer-a",
+            "eligible": true
+          },
+          {
+            "observer_id": "observer-b",
+            "eligible": true
+          }
+        ],
+        "reason_codes": []
+      }
+    },
+    "mon036_continuity_result": {
+      "profile": "mon036-recovery-evidence-continuity-result-v1",
+      "version": "1.0.0",
+      "ledger_integrity_valid": true,
+      "ledger_complete": true,
+      "claims": [
+        {
+          "claim_id": "claim-cdc",
+          "disposition": "retain",
+          "reason_codes": []
+        },
+        {
+          "claim_id": "claim-backup",
+          "disposition": "retain",
+          "reason_codes": []
+        }
+      ],
+      "reason_codes": []
+    },
+    "mon024_proof_graph_result": {
+      "verdict": "indeterminate",
+      "may_enable_traffic": false,
+      "reason_codes": [
+        "evidence_not_runtime_independently_verified"
+      ]
+    }
+  },
+  "required_surface_ids": [
+    "heap",
+    "index",
+    "large-object"
+  ],
+  "source_truth_complete": true,
+  "source_truth_manifest_sha256": "c5c47db07e3a2055380c16d271acae1a1c44933a7ff244c891a65c29207a8525",
+  "observed_capture_complete": true,
+  "observed_capture_manifest_sha256": "5bc9c15baf7d2b5704d17ac3ee2ba15f4a64805b581ca0ac45bca888ba60e49e",
+  "transaction_report_complete": true,
+  "transaction_report_sha256": "013f2547dc5b7fc69f763ee1fad4ba38c541e3510acf2c95533034bdcd65ca48",
+  "surface_inventory_complete": true,
+  "surface_inventory_sha256": "2c5d58ea9e058f1475e796fc0654dc51a2080f73565b9f2b95868b95c745199b",
+  "source_events_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "observed_events_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "transaction_proofs_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "topic_partitions_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "required_surface_ids_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "surface_assertions_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "recovery_boundary": {
+    "incident_id": "mon037-fixture-incident-001",
+    "claim_id": "claim-cdc",
+    "source_cluster_id": "fixture-source-cluster",
+    "database": "mon037_fixture",
+    "source_epoch": "primary-epoch-001",
+    "timeline_id": "1",
+    "snapshot_id": "snapshot-001",
+    "terminal_position": "0/200",
+    "scope_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inventory_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}
