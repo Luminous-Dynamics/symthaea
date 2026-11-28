@@ -724,6 +724,50 @@ mod tests {
     }
 
     #[test]
+    fn authority_and_request_mutation_matrix_fails_closed() {
+        let base = seed_corpus().tasks.remove(0);
+        assert_eq!(reference_disposition(&base), "allow");
+
+        let mut cases = Vec::new();
+
+        let mut task = base.clone();
+        task.authority_snapshot.principal_id = Some("different-actor".into());
+        cases.push(("principal mismatch", task));
+
+        let mut task = base.clone();
+        task.authority_snapshot.subject_id = Some("different-subject".into());
+        cases.push(("authority subject mismatch", task));
+
+        let mut task = base.clone();
+        task.request.action = "patient.delete".into();
+        cases.push(("unrecognized action", task));
+
+        let mut task = base.clone();
+        task.authority_snapshot.scopes = vec!["patient:synthetic-patient-001:write".into()];
+        cases.push(("wrong scope", task));
+
+        let mut task = base.clone();
+        task.authority_snapshot.valid_until = Some(task.request.evaluated_at.clone());
+        cases.push(("expiry boundary is exclusive", task));
+
+        let mut task = base.clone();
+        task.request.subject_id = "synthetic-patient-002".into();
+        cases.push(("wrong requested subject", task));
+
+        let mut task = base;
+        task.authority_snapshot.status = "unknown".into();
+        cases.push(("unknown authority state", task));
+
+        for (case, task) in cases {
+            assert_eq!(
+                reference_disposition(&task),
+                "deny",
+                "mutation must fail closed: {case}"
+            );
+        }
+    }
+
+    #[test]
     fn revoked_authority_fails_closed() {
         let mut task = seed_corpus().tasks.remove(0);
         task.authority_snapshot.status = "revoked".into();
