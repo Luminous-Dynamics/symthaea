@@ -165,6 +165,13 @@ pub enum EventKind {
     Perturbed(Perturbation),
 }
 
+/// Ordered command trace used to deterministically replay a scenario.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecordedCommand {
+    Agent(Action),
+    Evaluator(Perturbation),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
     pub tick: u32,
@@ -380,6 +387,33 @@ pub fn step(
     Ok((next, receipt))
 }
 
+/// Replay a complete agent/evaluator command trace from the manifest's initial state.
+///
+/// The returned receipts are suitable for independent digest comparison. The
+/// manifest digest is checked on every transition, so replaying against a
+/// modified scenario fails closed.
+pub fn replay(
+    manifest: &ScenarioManifest,
+    commands: &[RecordedCommand],
+) -> Result<(WorldState, Vec<StepReceipt>), TransitionError> {
+    let mut state = WorldState::initial(manifest)
+        .map_err(|error| TransitionError::Serialization(error.to_string()))?;
+    let mut receipts = Vec::with_capacity(commands.len());
+
+    for command in commands {
+        let (next, receipt) = match command {
+            RecordedCommand::Agent(action) => step(manifest, &state, action.clone())?,
+            RecordedCommand::Evaluator(perturbation) => {
+                perturb(manifest, &state, *perturbation)?
+            }
+        };
+        state = next;
+        receipts.push(receipt);
+    }
+
+    Ok((state, receipts))
+}
+
 /// Apply an evaluator-only regime shift. It is not available to the agent.
 pub fn perturb(
     manifest: &ScenarioManifest,
@@ -506,6 +540,40 @@ mod tests {
         let before = state.digest().expect("digest");
         assert!(step(&manifest, &state, Action::Deliver).is_err());
         assert_eq!(state.digest().expect("digest"), before);
+    }
+
+    #[test]
+    fn replay_reproduces_every_receipt_and_final_state() {
+        let manifest = ScenarioManifest::default();
+        let commands = vec![
+            RecordedCommand::Agent(Action::Inspect),
+            RecordedCommand::Agent(Action::Collect(Item::ValveKey)),
+            RecordedCommand::Agent(Action::Move(Site::Crossing)),
+            RecordedCommand::Agent(Action::Inspect),
+            RecordedCommand::Agent(Action::UseValveKey),
+            RecordedCommand::Evaluator(Perturbation::FailCrossingGate),
+            RecordedCommand::Agent(Action::Inspect),
+            RecordedCommand::Agent(Action::UseValveKey),
+        ];
+
+        let (state_a, receipts_a) = replay(&manifest, &commands).expect("first replay");
+        let (state_b, receipts_b) = replay(&manifest, &commands).expect("second replay");
+        assert_eq!(state_a, state_b);
+        assert_eq!(receipts_a, receipts_b);
+        assert_eq!(state_a.event_log.len(), commands.len());
+    }
+
+    #[test]
+    fn changed_manifest_cannot_reuse_an_existing_state() {
+        let original = ScenarioManifest::default();
+        let state = WorldState::initial(&original).expect("initial state");
+        let mut changed = original.clone();
+        changed.max_steps += 1;
+
+        assert_eq!(
+            step(&changed, &state, Action::Inspect),
+            Err(TransitionError::ManifestMismatch)
+        );
     }
 
     #[test]
