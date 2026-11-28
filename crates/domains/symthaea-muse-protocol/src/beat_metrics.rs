@@ -743,6 +743,59 @@ mod tests {
         (0..=12).map(|value| value as f64).collect()
     }
 
+    #[derive(Deserialize)]
+    struct GoldenFixtureSet {
+        sample_rate_hz: u32,
+        total_frames: u64,
+        cases: Vec<GoldenFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct GoldenFixtureCase {
+        name: String,
+        reference_frames: Vec<u64>,
+        estimated_frames: Vec<u64>,
+        expected: MirexBeatMetricScores,
+    }
+
+    fn assert_score_close(actual: MirexBeatMetricScores, expected: MirexBeatMetricScores) {
+        let tolerance = 1e-9;
+        assert!((actual.f_measure - expected.f_measure).abs() <= tolerance);
+        assert!((actual.cemgil - expected.cemgil).abs() <= tolerance);
+        assert!((actual.goto - expected.goto).abs() <= tolerance);
+        assert!((actual.p_score - expected.p_score).abs() <= tolerance);
+        assert!((actual.cmlc - expected.cmlc).abs() <= tolerance);
+        assert!((actual.cmlt - expected.cmlt).abs() <= tolerance);
+        assert!((actual.amlc - expected.amlc).abs() <= tolerance);
+        assert!((actual.amlt - expected.amlt).abs() <= tolerance);
+        assert!(
+            (actual.cemgil_best_metric_level - expected.cemgil_best_metric_level).abs()
+                <= tolerance
+        );
+    }
+
+    #[test]
+    fn checked_in_mir_eval_082_fixture_matches_all_eight_public_columns() {
+        let json = include_str!("../fixtures/mirex-beat-metrics-v1/golden.json");
+        let fixture: GoldenFixtureSet = serde_json::from_str(json).unwrap();
+        assert_eq!(fixture.sample_rate_hz, 1_000);
+        assert_eq!(fixture.total_frames, 15_000);
+        assert_eq!(fixture.cases.len(), 8);
+
+        for case in fixture.cases {
+            let actual = score_mirex_beat_track(
+                &case.reference_frames,
+                &case.estimated_frames,
+                fixture.sample_rate_hz,
+                fixture.total_frames,
+            )
+            .unwrap()
+            .scores;
+            assert_score_close(actual, case.expected);
+            assert!(!case.name.is_empty());
+        }
+    }
+
     #[test]
     fn perfect_grid_matches_mireval_082_golden_vector() {
         let scores = score_seconds(&reference(), &reference());
