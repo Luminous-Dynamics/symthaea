@@ -592,7 +592,7 @@
         },
         {
           "name": "Resilience-based network design optimization under aleatory uncertainty",
-          "source": "https://www.sciencedirect.com/science/article/abs/pii/S0360835226006790",
+          "source": "https://www.sciencedirect.com/science/article/pii/S0360835226006790",
           "methods": [
             "joint topology and integer link-capacity selection",
             "repeated disruption and recover-mode dynamics",
@@ -606,7 +606,17 @@
             20,
             74
           ],
-          "admission_status": "secondary-source lead; reconcile exact objective, uncertainty model, constraints, artifacts and evaluation before claiming reproduction"
+          "admission_status": "secondary-source lead; reconcile exact objective, uncertainty model, constraints, artifacts and evaluation before claiming reproduction",
+          "authors": [
+            "Kais Zaman",
+            "Tavila Sharmin",
+            "Faisal Mahmud"
+          ],
+          "doi": "10.1016/j.cie.2026.112478",
+          "journal": "Computers & Industrial Engineering",
+          "volume": "223",
+          "issue_date": "2027-01",
+          "publication_status": "online-available early-access study; issue listing is January 2027 as of 2026-11-28"
         }
       ],
       "required_extension": [
