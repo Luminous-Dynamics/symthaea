@@ -287,8 +287,9 @@ pub fn verify_action_cancellation_v1(
 pub struct ActionExecutionTick {
     pub dispatch_segment_ids: Vec<String>,
     pub missed_segment_ids: Vec<String>,
-    /// Scheduled intervals that elapsed. This is not physical completion proof.
-    pub elapsed_segment_ids: Vec<String>,
+    /// Segments whose scheduled end was reached; the adapter must issue a stop.
+    /// This is not physical completion proof.
+    pub scheduled_stop_segment_ids: Vec<String>,
     /// Active segments whose actuators should be stopped immediately.
     pub stop_required_segment_ids: Vec<String>,
     pub cancelled: bool,
@@ -380,7 +381,7 @@ impl ActionExecutionGate {
             return Ok(ActionExecutionTick {
                 dispatch_segment_ids: Vec::new(),
                 missed_segment_ids: Vec::new(),
-                elapsed_segment_ids: Vec::new(),
+                scheduled_stop_segment_ids: Vec::new(),
                 stop_required_segment_ids,
                 cancelled: false,
                 expired: true,
@@ -400,14 +401,14 @@ impl ActionExecutionGate {
             return Ok(ActionExecutionTick {
                 dispatch_segment_ids: Vec::new(),
                 missed_segment_ids: Vec::new(),
-                elapsed_segment_ids: Vec::new(),
+                scheduled_stop_segment_ids: Vec::new(),
                 stop_required_segment_ids,
                 cancelled: true,
                 expired: false,
             });
         }
 
-        let mut elapsed_segment_ids = Vec::new();
+        let mut scheduled_stop_segment_ids = Vec::new();
         let mut still_active_segment_ids = HashSet::new();
         for id in self.active_segment_ids.drain() {
             let still_active = self.timeline.segments.iter().any(|segment| {
@@ -417,7 +418,7 @@ impl ActionExecutionGate {
             if still_active {
                 still_active_segment_ids.insert(id);
             } else {
-                elapsed_segment_ids.push(id);
+                scheduled_stop_segment_ids.push(id);
             }
         }
         self.active_segment_ids = still_active_segment_ids;
@@ -441,12 +442,12 @@ impl ActionExecutionGate {
         }
         dispatch_segment_ids.sort();
         missed_segment_ids.sort();
-        elapsed_segment_ids.sort();
+        scheduled_stop_segment_ids.sort();
 
         Ok(ActionExecutionTick {
             dispatch_segment_ids,
             missed_segment_ids,
-            elapsed_segment_ids,
+            scheduled_stop_segment_ids,
             stop_required_segment_ids: Vec::new(),
             cancelled: false,
             expired: false,
@@ -694,6 +695,16 @@ mod tests {
         let tick = gate.advance(6_000, "clock:source-1", None).unwrap();
         assert!(tick.dispatch_segment_ids.is_empty());
         assert_eq!(tick.missed_segment_ids, vec!["gesture-1", "speech-1", "viseme-1"]);
+    }
+
+    #[test]
+    fn segment_end_emits_a_scheduled_stop_request() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        gate.advance(2_000, "clock:source-1", None).unwrap();
+        let ended = gate.advance(4_000, "clock:source-1", None).unwrap();
+        assert_eq!(ended.scheduled_stop_segment_ids, vec!["gesture-1"]);
+        assert!(ended.stop_required_segment_ids.is_empty());
     }
 
     #[test]
