@@ -1122,6 +1122,69 @@ mod tests {
     }
 
     #[test]
+    fn skipped_fixture_demand_time_rejects_without_partial_commit() {
+        let (mut episode, semantics) = episode();
+        episode.demand_schedule.push(DemandSchedule {
+            time: 1,
+            sinks: vec![SinkDemand { node: 3, demand: 2 }],
+        });
+        episode.demand_schedule.push(DemandSchedule {
+            time: 2,
+            sinks: vec![SinkDemand { node: 3, demand: 1 }],
+        });
+        let mut runtime = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+        let empty: Vec<ExogenousEvent> = Vec::new();
+        let initial = PolicyAction::NoOp {
+            action_id: "tick-zero".to_string(),
+            expected_pre_state_digest: expected_digest(&runtime, 0, &empty),
+        };
+        runtime.apply_tick(0, &empty, Some(initial)).unwrap();
+        let before = runtime.state_digest();
+
+        assert_eq!(
+            runtime.apply_tick(2, &empty, None).unwrap_err(),
+            "tick_skips_fixture_event_time"
+        );
+        assert_eq!(runtime.state_digest(), before);
+        assert_eq!(runtime.current_tick(), Some(0));
+    }
+
+    #[test]
+    fn repeated_event_id_in_later_tick_rejects_without_mutation() {
+        let (episode, semantics) = episode();
+        let mut runtime = EpisodeRuntimeState::new(&episode, &semantics).unwrap();
+        let first_events = vec![ExogenousEvent {
+            event_id: "reused-event".to_string(),
+            kind: ExogenousEventKind::EdgeCapacityChange {
+                from: 0,
+                to: 2,
+                capacity_after: 3,
+            },
+        }];
+        let first_action = PolicyAction::NoOp {
+            action_id: "tick-zero".to_string(),
+            expected_pre_state_digest: expected_digest(&runtime, 0, &first_events),
+        };
+        runtime.apply_tick(0, &first_events, Some(first_action)).unwrap();
+        let before = runtime.state_digest();
+
+        let second_events = vec![ExogenousEvent {
+            event_id: "reused-event".to_string(),
+            kind: ExogenousEventKind::EdgeCapacityChange {
+                from: 0,
+                to: 2,
+                capacity_after: 2,
+            },
+        }];
+        assert_eq!(
+            runtime.apply_tick(1, &second_events, None).unwrap_err(),
+            "duplicate_event_id:reused-event"
+        );
+        assert_eq!(runtime.state_digest(), before);
+        assert_eq!(runtime.current_tick(), Some(0));
+    }
+
+    #[test]
     fn edit_budget_is_cumulative_across_ticks() {
         let (episode, mut semantics) = episode();
         semantics.edit_budget = 1;
