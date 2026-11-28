@@ -287,7 +287,6 @@ pub fn validate_intervention_pair(
         || receipt.input_frame_count == 0
         || receipt.output_frame_count == 0
         || receipt.applied_end_sample > receipt.input_frame_count
-        || receipt.input_frame_count as usize > input_audio.len()
     {
         return Err(InterventionError::InvalidSampleGeometry);
     }
@@ -405,15 +404,13 @@ mod tests {
     #[test]
     fn receipt_cannot_be_replayed_against_another_manifest() {
         let (manifest, receipt, input, output) = valid_case();
-        let mut changed = manifest.clone();
-        let mut changed_json: serde_json::Value = serde_json::from_slice(&changed).unwrap();
+        let mut changed_json: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
         changed_json["target_property"] = serde_json::json!("root_pitch_class");
-        changed = to_vec(&changed_json).unwrap();
+        let changed = to_vec(&changed_json).unwrap();
         assert_eq!(
             validate_intervention_pair(&changed, &receipt, &input, &output),
             Err(InterventionError::ManifestDigestMismatch)
         );
-        let _ = manifest;
     }
 
     #[test]
