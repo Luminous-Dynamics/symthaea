@@ -504,7 +504,8 @@ mod tests {
         let registry = PsychBenchRegistry::pilot().expect("pilot registry should validate");
         assert_eq!(registry.schema_version, REGISTRY_SCHEMA_VERSION);
         assert_eq!(registry.maturity, RegistryMaturity::PilotIncomplete);
-        assert_eq!(registry.benchmarks.len(), 7);
+        assert_eq!(registry.benchmarks.len(), 8);
+        assert_eq!(registry.benchmarks.iter().map(|benchmark| benchmark.metrics.len()).sum::<usize>(), 40);
     }
 
     #[test]
