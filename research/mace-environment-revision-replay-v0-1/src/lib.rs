@@ -327,14 +327,13 @@ pub fn resolve_environment_policy_v1(
     }
 
     validate_complete_event_stream(events, expected_stream_head_sha256)?;
-    if let Some(first) = events.first() {
-        if first.stream_id != query.stream_id
+    if let Some(first) = events.first()
+        && (first.stream_id != query.stream_id
             || first.environment_id != query.environment_id
             || first.procedure_id != query.procedure_id
-            || first.scope_id != query.scope_id
-        {
-            return Err(ReplayRejectV1::QueryIdentityMismatch);
-        }
+            || first.scope_id != query.scope_id)
+    {
+        return Err(ReplayRejectV1::QueryIdentityMismatch);
     }
 
     let mut active: Option<ActiveRevisionState> = None;
