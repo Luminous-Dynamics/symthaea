@@ -421,6 +421,12 @@ pub fn build_conformal_interval_v1(
         )));
     }
 
+    scores.sort_by(|a, b| {
+        a.score
+            .total_cmp(&b.score)
+            .then_with(|| a.label_id.cmp(&b.label_id))
+            .then_with(|| a.label_revision.cmp(&b.label_revision))
+    });
     let n = scores.len();
     if n == 0 {
         reasons.push(ConformalSetBuildReasonV1::CalibrationWindowEmpty);
@@ -434,12 +440,6 @@ pub fn build_conformal_interval_v1(
         status = ConformalSetBuildStatusV1::FullSetRequired;
         reasons.push(ConformalSetBuildReasonV1::InsufficientCalibrationForFiniteQuantile);
     } else {
-        scores.sort_by(|a, b| {
-            a.score
-                .total_cmp(&b.score)
-                .then_with(|| a.label_id.cmp(&b.label_id))
-                .then_with(|| a.label_revision.cmp(&b.label_revision))
-        });
         let q = scores[quantile_rank - 1].score;
         let radius = match policy.score_kind {
             ConformalScoreKindV1::AbsoluteResidual => q,
@@ -654,6 +654,53 @@ mod tests {
         assert_eq!(output.calibration_sample_count, 19);
         assert!(output.calibration_window_label_ids.contains(&"label-24".into()));
         assert!(!output.calibration_window_label_ids.contains(&"label-0".into()));
+    }
+
+    #[test]
+    fn calibration_from_another_model_score_policy_or_measurand_is_rejected() {
+        let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
+        let mut candidate = sample(0, 1.0, 1_800_000_100, &policy);
+        candidate.global_model_artifact_sha256 = digest('z');
+        assert!(
+            build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err()
+        );
+
+        candidate = sample(0, 1.0, 1_800_000_100, &policy);
+        candidate.score_policy_sha256 = digest('z');
+        assert!(
+            build_conformal_interval_v1(&policy, &input(0.05), &[candidate.clone()]).is_err()
+        );
+
+        candidate = sample(0, 1.0, 1_800_000_100, &policy);
+        candidate.measurement_contract_sha256 = digest('z');
+        assert!(
+            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
+        );
+    }
+
+    #[test]
+    fn duplicate_sample_label_or_measurement_event_cannot_be_double_counted() {
+        let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
+        let first = sample(0, 1.0, 1_800_000_100, &policy);
+        let mut duplicate = sample(0, 2.0, 1_800_000_110, &policy);
+        duplicate.label_id = "another-label".into();
+        duplicate.eligibility_report.label_id = "another-label".into();
+        let mut canonical = duplicate.eligibility_report.clone();
+        canonical.report_sha256.clear();
+        duplicate.eligibility_report.report_sha256 = json_sha256(&canonical).unwrap();
+        assert!(
+            build_conformal_interval_v1(&policy, &input(0.05), &[first, duplicate]).is_err()
+        );
+    }
+
+    #[test]
+    fn calibration_sample_prediction_receipt_is_mandatory() {
+        let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
+        let mut candidate = sample(0, 1.0, 1_800_000_100, &policy);
+        candidate.prediction_receipt_sha256 = "bad".into();
+        assert!(
+            build_conformal_interval_v1(&policy, &input(0.05), &[candidate]).is_err()
+        );
     }
 
     #[test]
