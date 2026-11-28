@@ -323,6 +323,12 @@
       "number": 14125,
       "role": "TOPO-ADAPT v0.1 frozen deterministic graph fixtures with independently checked max-flow/min-cut references",
       "status": "open draft; declarative JSON/Markdown only; no Rust evaluator or controller implementation"
+    },
+    {
+      "repository": "Luminous-Dynamics/symthaea",
+      "number": 14127,
+      "role": "draft Rust evaluator for TOPO-ADAPT v0.1 fixtures; max-flow/min-cut, input validation, edit and maintenance cost accounting",
+      "status": "open draft stacked on PR #14125; 8 Rust tests authored, exact-head compile/test/rustfmt/Clippy not run due missing toolchain; no CI pass claimed"
     }
   ],
   "cross_repository_owners": [
@@ -455,7 +461,7 @@
   "new_workstream": {
     "owner_issue": 14123,
     "title": "TOPO-ADAPT-001",
-    "status": "fixture_specification_draft_pr_open",
+    "status": "rust_evaluator_draft_pr_open_uncompiled",
     "first_slice": {
       "node_count": "12-20",
       "oracle": "independent exact max-flow/min-cost references for small hand-checkable instances",
@@ -503,7 +509,28 @@
         }
       ]
     },
-    "claim_limit": "No controller implementation, score or superiority claim exists yet."
+    "claim_limit": "No controller implementation, score or superiority claim exists yet.",
+    "evaluator": {
+      "pull_request": 14127,
+      "package": "tools/topo-adapt-benchmark",
+      "algorithms": [
+        "residual-network augmenting-path maximum flow",
+        "independent exhaustive minimum-cut enumeration with nonzero-arc iteration"
+      ],
+      "limits": {
+        "fixture_nodes_min": 12,
+        "fixture_nodes_max": 20,
+        "min_cut_oracle_max_nodes": 20
+      },
+      "reported_costs": [
+        "accepted edge additions",
+        "declared edit cost units",
+        "one-step active-edge maintenance cost units"
+      ],
+      "test_count_authored": 8,
+      "exact_head_status": "not compiled or executed; cargo/rustc/rustfmt unavailable in execution environment",
+      "message_and_update_budget": "declared in fixture but not charged until controller traces exist"
+    }
   },
   "architecture_topology_layers": [
     {
