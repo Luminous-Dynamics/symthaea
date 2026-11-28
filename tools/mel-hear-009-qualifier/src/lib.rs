@@ -207,6 +207,7 @@ fn validate_condition_common(condition: &Condition, budget_sha: &str) -> Result<
         (&condition.system_prompt_sha256, "system_prompt_sha256"),
         (&condition.adapter_identity_sha256, "adapter_identity_sha256"),
         (&condition.decoding_config_sha256, "decoding_config_sha256"),
+        (&condition.question_sha256, "condition.question_sha256"),
         (&condition.budget_profile_sha256, "condition.budget_profile_sha256"),
         (&condition.execution_receipt_sha256, "execution_receipt_sha256"),
         (&condition.input_context_sha256, "input_context_sha256"),
@@ -391,6 +392,9 @@ pub fn audit_panel(panel: &Panel) -> Result<AuditReport, String> {
     let mut by_kind = BTreeMap::new();
     for condition in &panel.conditions {
         validate_condition_common(condition, &panel.matched_budget_profile_sha256)?;
+        if condition.question_sha256 != panel.question_sha256 {
+            return Err("condition question digest differs from the panel's canonical question".to_owned());
+        }
         validate_condition_kind(condition, &panel.audio_evidence_manifest_sha256)?;
         if by_kind.insert(condition.kind, condition).is_some() {
             return Err("condition kinds must be unique".to_owned());
@@ -564,6 +568,14 @@ mod tests {
     fn mismatched_matched_budget_profile_is_rejected() {
         let mut panel = fixture();
         panel.conditions[1].budget_profile_sha256 =
+            "abababababababababababababababababababababababababababababababab".to_owned();
+        assert!(audit_panel(&panel).is_err());
+    }
+
+    #[test]
+    fn condition_question_substitution_is_rejected() {
+        let mut panel = fixture();
+        panel.conditions[1].question_sha256 =
             "abababababababababababababababababababababababababababababababab".to_owned();
         assert!(audit_panel(&panel).is_err());
     }
