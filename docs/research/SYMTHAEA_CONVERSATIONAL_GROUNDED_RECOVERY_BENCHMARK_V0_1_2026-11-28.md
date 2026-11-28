@@ -252,6 +252,16 @@ The module provides 16 authored regression tests covering version conflicts, pre
 
 **Critical boundary:** this is a reference model, not a separate process or independent oracle. Its `reference_snapshot` must not be promoted to independent state evidence. The pure state-outcome verifier and reference world are composable test mechanics. A harness-pinned read-only oracle trait is now present; the missing layers are an actual separately operated oracle service, scenario runner, and fault-injection executor. The Rust tests remain uncompiled and unexecuted.
  
+## 11.3 Evaluator-only gold-label projection
+
+`crates/domains/symthaea-soma/src/cgrb_scenario.rs` now provides an allowlisted information-flow boundary between the frozen evaluator manifest and the evaluated model. It emits a separate `CgrbModelVisibleScenarioV1` containing only benchmark/scenario/task identity, media references and opaque session/capture/speaker tokens, plus the exact live authority scope (permitted action types, target scope, purpose, destination, policy version and validity window).
+
+It intentionally excludes gold intent/addressee, allowed gold action IDs, expected outcome/final claim, goal postconditions, interruption schedule, oracle identity, initial-state evidence, grant token, rights record and policy digest. Gold labels are held on a non-serializable evaluator envelope and accessed through an explicit grader-side accessor. The manifest digest binds both visible and evaluator-only sections; changing gold labels changes the manifest digest without changing the model view.
+
+Six Rust regression tests are authored for projection non-leakage, evaluator-only access, invalid gold visibility, invalid authority window, malformed media digest, and hidden-label changes preserving the model view while changing the manifest digest. These tests are not compiled or executed.
+
+The projection is not a substitute for independent Draft 2020-12 validation: the caller must first validate the complete frozen manifest and rights/split conditions, then pass that validated document to `from_validated_json`. Raw audio/video must be delivered through a separately permissioned media path; the projection includes only content digests and opaque identifiers.
+
 ## 12. Non-claims
 
 This protocol does not establish a licensed dataset, production connector, atomic transaction semantics, secure external oracle, hardware safety, model quality, benchmark leadership, or deployment readiness. The first run is a controlled benchmark with an isolated world-state service. Production side effects remain out of scope until a separate connector-specific authority, safety and reconciliation qualification exists.
