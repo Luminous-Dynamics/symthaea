@@ -76,6 +76,7 @@ pub enum DelayedAciReasonV1 {
     PendingPredictionMissing,
     PredictionIdMismatch,
     UpstreamAuthorityFlagSet,
+    LabelRevisionInvalid,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -431,6 +432,12 @@ pub fn deliver_delayed_aci_label_v1(
 
     let report = &delivery.eligibility_report;
     let mut reasons = Vec::new();
+    if delivery.label_revision == 0 {
+        reasons.push(DelayedAciReasonV1::LabelRevisionInvalid);
+    }
+    if report.schema != "luminous.semi-bench.label-consumption-report.v1" {
+        reasons.push(DelayedAciReasonV1::EligibilityReportDigestMismatch);
+    }
     if prediction.receipt_sha256 != prediction_digest(&prediction)? {
         reasons.push(DelayedAciReasonV1::PredictionReceiptDigestMismatch);
     }
@@ -498,6 +505,9 @@ pub fn deliver_delayed_aci_label_v1(
     }
     if engine.policy.require_source_authenticity_assertion && !report.source_authenticity_proven {
         reasons.push(DelayedAciReasonV1::SourceAuthenticityAssertionMissing);
+    }
+    if report.training_snapshot_mutated || report.equipment_control_authority {
+        reasons.push(DelayedAciReasonV1::UpstreamAuthorityFlagSet);
     }
     if report.training_snapshot_mutated || report.equipment_control_authority {
         reasons.push(DelayedAciReasonV1::UpstreamAuthorityFlagSet);
