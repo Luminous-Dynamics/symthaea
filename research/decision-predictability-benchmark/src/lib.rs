@@ -10,6 +10,7 @@
 
 pub mod robust;
 pub mod sequential;
+pub mod sdcb_pole_swap;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
