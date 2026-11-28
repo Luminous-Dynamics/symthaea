@@ -19,6 +19,7 @@ use std::collections::HashSet;
 pub struct RoiCalibrationEvidence {
     pub calibration_id: String,
     pub model_digest: String,
+    pub calibration_report_digest: String,
     pub task_family: String,
     pub sample_count: u64,
     /// Expected calibration error on a held-out calibration report, [0, 1].
@@ -146,6 +147,7 @@ pub fn evaluate_roi_information_value(
     validate_identifier(&estimate.calibration.calibration_id)?;
     validate_identifier(&estimate.calibration.task_family)?;
     validate_digest(&estimate.calibration.model_digest)?;
+    validate_digest(&estimate.calibration.calibration_report_digest)?;
 
     if estimate.source_timestamp_us > now_us {
         return Err(RoiInformationValueError::FutureSourceTimestamp);
@@ -325,6 +327,7 @@ mod tests {
             calibration: RoiCalibrationEvidence {
                 calibration_id: "turn-cal-v1".to_owned(),
                 model_digest: "a".repeat(64),
+                calibration_report_digest: "b".repeat(64),
                 task_family: "turn_floor_state".to_owned(),
                 sample_count: 500,
                 expected_calibration_error: 0.04,
