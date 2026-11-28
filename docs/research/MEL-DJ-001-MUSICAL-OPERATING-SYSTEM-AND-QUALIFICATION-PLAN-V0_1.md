@@ -373,3 +373,20 @@ MEL-DJ-004 is now tracked as [issue #14272](https://github.com/Luminous-Dynamics
 6. Keep offline transition rendering separate from live device qualification (#MEL-DJ-005).
 
 The key methodological shift is from one universal smoothness score to **intent-conditioned, multi-objective transition quality**. A hard cut that deliberately resets energy should not be scored as a failed smooth crossfade. Preference must also be tested against human DJ transitions, not only algorithmic baselines.
+
+
+## 19. Copilot and set-trajectory integration with existing programmes
+
+MEL-DJ-006 must be an application layer over existing human/agent-interaction work, not a duplicate causal-study framework:
+
+- **#10088 / MEL-RMI-001** owns reciprocal musical interaction and causal contingency. Reuse its session/event transaction and treatment/yoked-control logic; add DJ tasks (prepare, choose next track, preview transition, respond to live set changes) as a domain-specific cohort.
+- **#10190 / MEL-PRE-001** owns predictive transparency and musician anticipation. A DJ copilot preview should be a precommitted forecast object with target execution window, input/evidence digests, uncertainty, alternatives, expiry/revision semantics and eventual outcome receipt. Do not expose private chain-of-thought; show actionable musical commitment and uncertainty.
+- **#10133 / MEL-RMD-001** owns longitudinal relational memory and creative non-assimilation. If set-level personalization spans multiple sessions, consume its consent/scope/revision model rather than creating a parallel DJ memory store.
+- **#10417 / MEL-BENCH-001** owns the reproducible external SOTA and industry comparison ledger. Add dated DJ product/paper baselines there; this document defines the DJ domain scorecards, not a second global comparison registry.
+- **#12190 / MEL-MR-EVAL-042** owns selection-pressure / evaluator-exploitability qualification. Any Pareto or candidate-ranking optimizer must be evaluated as a trajectory across best-of-N, repeated repair, and adaptive search; proxy score increases must be checked against held-out DJ judgments and hard musical obligations.
+- **#11297 / MUSE-ORCH-004** is a reusable design precedent for bounded deterministic constraint search and Pareto alternatives. It owns orchestration assignment, not track sequencing or DJ transitions; reuse patterns, not its domain model.
+- **#9535 / MUSE-EVAL-MARKET-001** and **#11379 / MUSE-EDITBENCH-001** remain separate composition/editing evaluations. Their outputs can inform music quality and editing, but must not be presented as DJ transition or live-control performance.
+
+The DJ-specific copilot experiment should compare no preview, post-hoc explanation, yoked preview, one precommitted forecast, uncertainty-aware alternatives, and steerable preview. Hold model, input, candidate budget and task schedule fixed across arms. Measure whether a DJ can anticipate, correct, steer or reject a proposed action before execution, and whether this improves intent attainment without degrading agency or increasing workload.
+
+The set-level planner should compose existing candidate and evidence primitives into a DJ-specific transition graph. It returns a Pareto set over stated DJ intent, musical continuity, contrast, novelty, diversity, familiarity and technical feasibility. It must not optimize one universal "good set" scalar or learn a preference profile without an explicit scope/consent and review path.
