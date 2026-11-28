@@ -43,13 +43,21 @@ The research directory contains a retained synthetic panel and a draft JSON Sche
 The contract records all nine potential single-performer cells, including seven observed cells and two explicit not-sampled records. The contract records:
 - synthetic or digest-shaped work, performer, cell and session locators (never raw performer identities);
 - the work × performer incidence cells and observed/missing status;
-- performer membership weights for a cell, with the sum-to-one rule enforced by a future consumer;
+- performer membership weights in the schema; v0 execution accepts only one performer per cell and rejects ensemble/set-valued membership until a distinct ensemble estimand is defined;
 - distinct estimand kinds and explicit per-cell weights;
 - target work and performer marginals for the declared product-population estimand; the full target weight vector includes both missing cell records;
 - connected components, isolated nodes, and maximum row/column degree;
 - a fail-closed disposition when target cells are missing and extrapolation is not authorized.
 
-The schema checks structure only. It does not verify weight sums, graph connectivity, identity authenticity, sampling probabilities or statistical validity. Those require an executable consumer and independently reviewed rules.
+JSON Schema checks shape only. The standalone Rust qualifier at `tools/mel-hear-008-qualifier` additionally validates the explicit W × P incidence grid, membership and estimand-weight sums, graph connectivity, declared support diagnostics, known-answer arithmetic, missing-target refusal and row-order invariance. It still does not authenticate identities, validate sampling probabilities or establish statistical validity.
+
+## Executable v0 qualifier
+
+The independent Rust 1.96 harness in `tools/mel-hear-008-qualifier` parses the fixture with unknown fields rejected, verifies every potential work × performer cell is represented exactly once, recomputes support graph components/degrees, validates the three weighting rules and checks the retained known answers. Negative controls reject omitted cells, duplicate pairs, incorrect support diagnostics, invalid membership weights, unsupported missing-cell claims and altered expected means. A row-order permutation test checks that the report is invariant to manifest order.
+
+The qualifier is deliberately fail-closed on ensemble/multi-performer rows. Although the draft schema can represent membership sets, v0 does not pretend that one ensemble observation is several independent performer observations. A future extension needs an explicit group-level or membership-weighted estimand before those records are supported.
+
+These checks establish structural/arithmetic contract behavior only; they do not estimate uncertainty or select a production inference method.
 
 ## Statistical consequences
 
@@ -67,7 +75,7 @@ The next simulation increment under #14026 should hold the data-generating proce
 1. Missing or ambiguous estimand/weights: no population interval.
 2. Unobserved target cells with no declared extrapolation model: not estimable for that target.
 3. Disconnected incidence components: no across-component population claim without explicit identifying assumptions.
-4. Unresolved ensemble membership or weights that do not sum to one: reject the affected estimand.
+4. v0 qualifier rejects all set-valued/ensemble cells; future membership weights must sum to one and be tied to a declared group or membership estimand.
 5. Report sample counts and effective support separately; neither a raw count nor a connected graph is a power calculation.
 6. No automatic item-wise bootstrap fallback.
 
