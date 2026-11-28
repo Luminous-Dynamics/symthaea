@@ -129,7 +129,8 @@ pub struct GroupMessageV1 {
     pub content: String,
     pub author: Option<String>,
     pub role: Option<String>,
-    pub timestamp: String,
+    #[serde(default)]
+    pub timestamp: Option<String>,
     pub reply_to: Option<String>,
     pub channel: String,
     pub phase_name: Option<String>,
@@ -138,10 +139,7 @@ pub struct GroupMessageV1 {
 
 impl GroupMessageV1 {
     fn validate(&self) -> Result<(), AdapterRejectV1> {
-        if !nonempty(&self.msg_node)
-            || !nonempty(&self.channel)
-            || !nonempty(&self.timestamp)
-        {
+        if !nonempty(&self.msg_node) || !nonempty(&self.channel) {
             return Err(AdapterRejectV1::InvalidMessage);
         }
         Ok(())
@@ -160,7 +158,7 @@ impl GroupMessageV1 {
         push_tag(&mut tags, "channel", Some(&self.channel));
         push_tag(&mut tags, "phase_name", self.phase_name.as_deref());
         push_tag(&mut tags, "topic", self.topic.as_deref());
-        push_tag(&mut tags, "timestamp", Some(&self.timestamp));
+        push_tag(&mut tags, "timestamp", self.timestamp.as_deref());
         push_tag(&mut tags, "reply_to", self.reply_to.as_deref());
         push_tag(&mut tags, "msg_node", Some(&self.msg_node));
         format!(
@@ -466,7 +464,7 @@ fn validate_messages(messages: &[GroupMessageV1]) -> Result<(), AdapterRejectV1>
         message.validate()?;
         let current = (
             message.channel.as_str(),
-            message.timestamp.as_str(),
+            message.timestamp.as_deref().unwrap_or(""),
             message.msg_node.as_str(),
         );
         if previous.is_some_and(|prior| prior > current) {
@@ -566,7 +564,7 @@ mod tests {
             content: content.to_owned(),
             author: Some("User_3".to_owned()),
             role: Some("Analyst".to_owned()),
-            timestamp: timestamp.to_owned(),
+            timestamp: Some(timestamp.to_owned()),
             reply_to: None,
             channel: channel.to_owned(),
             phase_name: Some("Planning".to_owned()),
@@ -627,6 +625,14 @@ mod tests {
         let empty = message("Msg_2", "team", "2026-01-01T00:00:01Z", "");
         assert_eq!(empty.index_text(), "");
         assert!(validate_messages(&[empty]).is_ok());
+
+        let mut missing_time = message("Msg_3", "team", "unused", "No timestamp.");
+        missing_time.timestamp = None;
+        assert!(validate_messages(&[missing_time.clone()]).is_ok());
+        assert_eq!(
+            missing_time.format_retrieved_passage(),
+            "[user=User_3 / role=Analyst / channel=team / phase_name=Planning / topic=Risk / msg_node=Msg_3]\nNo timestamp."
+        );
     }
 
     #[test]
