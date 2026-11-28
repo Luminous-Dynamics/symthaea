@@ -31,6 +31,15 @@ pub struct RoiCalibrationBinV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoiLossBoundObservationV1 {
+    pub evaluation_item_id: String,
+    /// Salted/opaque cluster token (normally speaker-session or capture group).
+    pub independent_cluster_token: String,
+    pub claimed_loss_reduction_lcb: f32,
+    pub realized_loss_reduction: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RoiCalibrationReportV1 {
     pub schema: String,
     pub report_id: String,
@@ -43,6 +52,9 @@ pub struct RoiCalibrationReportV1 {
     pub calibration_sample_count: u64,
     pub evaluation_sample_count: u64,
     pub bins: Vec<RoiCalibrationBinV1>,
+    /// Nominal coverage claimed by every lower-bound observation in this report.
+    pub loss_bound_confidence_level: f32,
+    pub loss_bound_observations: Vec<RoiLossBoundObservationV1>,
     pub expected_calibration_error: f32,
     pub brier_score: f32,
     pub report_digest: String,
@@ -60,6 +72,9 @@ pub enum RoiCalibrationError {
     BinSampleCountMismatch,
     InvalidMetric,
     MetricMismatch,
+    InvalidBoundObservation,
+    InsufficientIndependentClusters,
+    LossBoundCoverageTooLow,
     ReportDigestMismatch,
 }
 
@@ -73,6 +88,9 @@ pub struct RoiCalibrationVerification {
     pub evaluation_sample_count: u64,
     pub recomputed_expected_calibration_error: f32,
     pub recomputed_brier_score: f32,
+    pub independent_cluster_count: usize,
+    pub observed_loss_bound_coverage: f32,
+    pub wilson_lower_loss_bound_coverage: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,6 +225,46 @@ pub fn verify_roi_calibration_report(
         return Err(RoiCalibrationError::InvalidBinCount);
     }
 
+    if !report.loss_bound_confidence_level.is_finite()
+        || !(0.50..=0.999).contains(&report.loss_bound_confidence_level)
+        || report.loss_bound_observations.len() != report.evaluation_sample_count as usize
+    {
+        return Err(RoiCalibrationError::InvalidBoundObservation);
+    }
+
+    let mut evaluation_items = HashSet::with_capacity(report.loss_bound_observations.len());
+    let mut cluster_coverage: HashMap<&str, bool> = HashMap::new();
+    for observation in &report.loss_bound_observations {
+        validate_identifier(&observation.evaluation_item_id)?;
+        validate_identifier(&observation.independent_cluster_token)?;
+        if !evaluation_items.insert(observation.evaluation_item_id.as_str())
+            || !finite_unit(observation.claimed_loss_reduction_lcb)
+            || !finite_unit(observation.realized_loss_reduction)
+        {
+            return Err(RoiCalibrationError::InvalidBoundObservation);
+        }
+        let covered = observation.realized_loss_reduction
+            >= observation.claimed_loss_reduction_lcb;
+        cluster_coverage
+            .entry(observation.independent_cluster_token.as_str())
+            .and_modify(|all_covered| *all_covered &= covered)
+            .or_insert(covered);
+    }
+    let independent_cluster_count = cluster_coverage.len();
+    if independent_cluster_count < MIN_EVALUATION_SAMPLES as usize {
+        return Err(RoiCalibrationError::InsufficientIndependentClusters);
+    }
+    let covered_clusters = cluster_coverage.values().filter(|covered| **covered).count();
+    let observed_loss_bound_coverage =
+        covered_clusters as f32 / independent_cluster_count as f32;
+    let wilson_lower_loss_bound_coverage =
+        wilson_lower_bound(covered_clusters, independent_cluster_count);
+    if wilson_lower_loss_bound_coverage + METRIC_TOLERANCE
+        < report.loss_bound_confidence_level
+    {
+        return Err(RoiCalibrationError::LossBoundCoverageTooLow);
+    }
+
     let mut count_sum = 0_u64;
     let mut weighted_ece = 0.0_f64;
     let mut weighted_brier = 0.0_f64;
@@ -251,6 +309,9 @@ pub fn verify_roi_calibration_report(
         evaluation_sample_count: report.evaluation_sample_count,
         recomputed_expected_calibration_error: ece,
         recomputed_brier_score: brier,
+        independent_cluster_count,
+        observed_loss_bound_coverage,
+        wilson_lower_loss_bound_coverage,
     })
 }
 
@@ -314,6 +375,19 @@ fn rejection(estimate: &RoiValueEstimate, reason: RoiCalibrationBindingError) ->
     RoiCalibrationBindingRejection { candidate_id: estimate.candidate_id.clone(), reason }
 }
 
+fn wilson_lower_bound(successes: usize, total: usize) -> f32 {
+    if total == 0 {
+        return 0.0;
+    }
+    let n = total as f64;
+    let p = successes as f64 / n;
+    let z = 1.96_f64;
+    let z2 = z * z;
+    let center = p + z2 / (2.0 * n);
+    let margin = z * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt();
+    ((center - margin) / (1.0 + z2 / n)).clamp(0.0, 1.0) as f32
+}
+
 fn finite_unit(value: f32) -> bool {
     value.is_finite() && (0.0..=1.0).contains(&value)
 }
@@ -362,6 +436,13 @@ mod tests {
                 observed_accuracy: 0.78,
                 mean_brier_score: 0.18,
             }).collect(),
+            loss_bound_confidence_level: 0.95,
+            loss_bound_observations: (0..500).map(|index| RoiLossBoundObservationV1 {
+                evaluation_item_id: format!("item-{index}"),
+                independent_cluster_token: format!("cluster-{index}"),
+                claimed_loss_reduction_lcb: 0.20,
+                realized_loss_reduction: 0.25,
+            }).collect(),
             expected_calibration_error: 0.02,
             brier_score: 0.18,
             report_digest: String::new(),
@@ -401,6 +482,9 @@ mod tests {
         let checked = verify_roi_calibration_report(&report()).unwrap();
         assert!((checked.recomputed_expected_calibration_error - 0.02).abs() < 0.000_01);
         assert!((checked.recomputed_brier_score - 0.18).abs() < 0.000_01);
+        assert_eq!(checked.independent_cluster_count, 500);
+        assert_eq!(checked.observed_loss_bound_coverage, 1.0);
+        assert!(checked.wilson_lower_loss_bound_coverage >= 0.95);
     }
 
     #[test]
@@ -523,6 +607,45 @@ mod tests {
         assert_eq!(result.ranked.len(), 1);
         assert!(result.calibration_rejected.is_empty());
         assert!(result.candidate_rejected.is_empty());
+    }
+
+
+    #[test]
+    fn lower_bound_must_meet_clustered_wilson_coverage() {
+        let mut value = report();
+        for observation in value.loss_bound_observations.iter_mut().take(40) {
+            observation.realized_loss_reduction = 0.10;
+        }
+        value.report_digest = compute_roi_calibration_report_digest(&value).unwrap();
+        assert_eq!(
+            verify_roi_calibration_report(&value),
+            Err(RoiCalibrationError::LossBoundCoverageTooLow)
+        );
+    }
+
+    #[test]
+    fn repeated_frames_in_one_session_count_as_one_independent_cluster() {
+        let mut value = report();
+        for observation in &mut value.loss_bound_observations {
+            observation.independent_cluster_token = "one-session".to_owned();
+        }
+        value.report_digest = compute_roi_calibration_report_digest(&value).unwrap();
+        assert_eq!(
+            verify_roi_calibration_report(&value),
+            Err(RoiCalibrationError::InsufficientIndependentClusters)
+        );
+    }
+
+    #[test]
+    fn evaluation_item_ids_must_be_unique() {
+        let mut value = report();
+        value.loss_bound_observations[1].evaluation_item_id =
+            value.loss_bound_observations[0].evaluation_item_id.clone();
+        value.report_digest = compute_roi_calibration_report_digest(&value).unwrap();
+        assert_eq!(
+            verify_roi_calibration_report(&value),
+            Err(RoiCalibrationError::InvalidBoundObservation)
+        );
     }
 
     #[test]
