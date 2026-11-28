@@ -6,8 +6,7 @@
 //! per-condition outcomes without making a population-inference claim.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 const DIGEST_LEN: usize = 64;
 
