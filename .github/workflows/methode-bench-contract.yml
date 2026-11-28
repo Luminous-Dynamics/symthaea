@@ -1,0 +1,39 @@
+name: METHODE-Bench Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/methode-fidelity-harness/**"
+      - ".github/workflows/methode-bench-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Normalize source with the pinned formatter
+        run: cargo fmt --manifest-path tools/methode-fidelity-harness/Cargo.toml
+      - name: Upload rustfmt-normalized source for exact commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: methode-rustfmt-source
+          path: tools/methode-fidelity-harness/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/methode-fidelity-harness/Cargo.toml -- --check
+      - name: Unit and adversarial conformance tests
+        run: cargo test --manifest-path tools/methode-fidelity-harness/Cargo.toml --locked
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/methode-fidelity-harness/Cargo.toml --locked --all-targets -- -D warnings
