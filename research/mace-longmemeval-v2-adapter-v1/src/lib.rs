@@ -26,7 +26,7 @@ pub enum LongMemEvalTierV1 { Small, Medium }
 #[serde(rename_all = "snake_case")]
 pub enum LongMemEvalDomainV1 { Web, Enterprise }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContextItemKindV1 { Text, Image }
 
@@ -115,6 +115,8 @@ pub struct ReaderExposureReceiptV1 {
     pub final_context_items_sha256: String,
     pub reader_request_sha256: String,
     pub reader_response_sha256: String,
+    pub reader_model_sha256: String,
+    pub reader_generation_config_sha256: String,
     pub selected_item_count: u32,
     pub exposed_item_count: u32,
     pub context_budget_tokens: u32,
@@ -272,7 +274,12 @@ pub fn seal_pre_query_selection_v1(
             || !valid_digest(&item.source_lineage_receipt_sha256) {
             return Err(AdapterRejectV1::InvalidDigest);
         }
-        if !seen.insert((item.kind, item.context_item_sha256.as_str())) {
+        if !seen.insert((
+            item.kind,
+            item.context_item_sha256.as_str(),
+            item.evidence_use_receipt_sha256.as_str(),
+            item.source_lineage_receipt_sha256.as_str(),
+        )) {
             return Err(AdapterRejectV1::DuplicateContextItem);
         }
     }
@@ -317,6 +324,8 @@ pub fn finalize_reader_exposure_v1(
     context_was_truncated: bool,
     reader_request_sha256: String,
     reader_response_sha256: String,
+    reader_model_sha256: String,
+    reader_generation_config_sha256: String,
     memory_query_latency_ns: u64,
     post_query_hook_latency_ns: u64,
 ) -> Result<ReaderExposureReceiptV1, AdapterRejectV1> {
@@ -334,6 +343,9 @@ pub fn finalize_reader_exposure_v1(
     }
     if !valid_digest(&reader_response_sha256) {
         return Err(AdapterRejectV1::MissingReaderResponse);
+    }
+    if !valid_digest(&reader_model_sha256) || !valid_digest(&reader_generation_config_sha256) {
+        return Err(AdapterRejectV1::InvalidDigest);
     }
     if context_budget_tokens == 0 || final_context_tokens > context_budget_tokens
         || final_context_tokens > original_context_tokens {
@@ -359,7 +371,12 @@ pub fn finalize_reader_exposure_v1(
         if !valid_digest(&item.context_item_sha256) {
             return Err(AdapterRejectV1::InvalidDigest);
         }
-        if !seen_final.insert((item.kind, item.context_item_sha256.as_str())) {
+        if !seen_final.insert((
+            item.kind,
+            item.context_item_sha256.as_str(),
+            selected.evidence_use_receipt_sha256.as_str(),
+            selected.source_lineage_receipt_sha256.as_str(),
+        )) {
             return Err(AdapterRejectV1::DuplicateContextItem);
         }
         exposed_evidence.push(ExposedEvidenceItemV1 {
@@ -380,6 +397,8 @@ pub fn finalize_reader_exposure_v1(
         final_context_items_sha256: digest_serialized(final_items)?,
         reader_request_sha256,
         reader_response_sha256,
+        reader_model_sha256,
+        reader_generation_config_sha256,
         selected_item_count: pre_query.selected_items.len() as u32,
         exposed_item_count: final_items.len() as u32,
         context_budget_tokens,
@@ -430,6 +449,7 @@ mod tests {
             &query(), &selection(),
             &items, budget, original, final_tokens, truncated,
             digest("exact-reader-request"), digest("reader-response"),
+            digest("reader-model"), digest("reader-generation-config"),
             120_000_000, 1_000_000,
         )
     }
@@ -492,7 +512,7 @@ mod tests {
         let selected_empty = seal_pre_query_selection_v1(&query(), digest("policy"), vec![]).unwrap();
         let result = finalize_reader_exposure_v1(
             &query(), &selected_empty, &[], 100, 100, 100, false,
-            digest("request"), digest("response"), 1, 1
+            digest("request"), digest("response"), digest("reader"), digest("generation"), 1, 1
         ).unwrap();
         assert_eq!(result.exposed_item_count, 0);
         assert!(result.verify_integrity());
@@ -573,11 +593,11 @@ mod tests {
             context_item_sha256: selected.selected_items[0].context_item_sha256.clone()
         }];
         assert_eq!(
-            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, String::new(), digest("response"), 1, 1),
+            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, String::new(), digest("response"), digest("reader"), digest("generation"), 1, 1),
             Err(AdapterRejectV1::MissingReaderRequest)
         );
         assert_eq!(
-            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, digest("request"), String::new(), 1, 1),
+            finalize_reader_exposure_v1(&query(), &selected, &items, 100, 50, 40, true, digest("request"), String::new(), digest("reader"), digest("generation"), 1, 1),
             Err(AdapterRejectV1::MissingReaderResponse)
         );
     }
@@ -593,4 +613,47 @@ mod tests {
         receipt.reader_request_sha256 = digest("different-request");
         assert!(!receipt.verify_integrity());
     }
+
+    #[test]
+    fn identical_context_bytes_from_distinct_evidence_sources_remain_distinguishable() {
+        let query = query();
+        let same_content = digest("identical-evidence-text");
+        let selected = seal_pre_query_selection_v1(
+            &query,
+            digest("selection-policy"),
+            vec![
+                PreQueryContextItemV1 {
+                    ordinal: 0,
+                    kind: ContextItemKindV1::Text,
+                    context_item_sha256: same_content.clone(),
+                    evidence_use_receipt_sha256: digest("use-source-a"),
+                    source_lineage_receipt_sha256: digest("lineage-source-a"),
+                },
+                PreQueryContextItemV1 {
+                    ordinal: 1,
+                    kind: ContextItemKindV1::Text,
+                    context_item_sha256: same_content.clone(),
+                    evidence_use_receipt_sha256: digest("use-source-b"),
+                    source_lineage_receipt_sha256: digest("lineage-source-b"),
+                },
+            ],
+        ).unwrap();
+        let final_items = vec![
+            FinalContextItemV1 { ordinal: 0, kind: ContextItemKindV1::Text, context_item_sha256: same_content.clone() },
+            FinalContextItemV1 { ordinal: 1, kind: ContextItemKindV1::Text, context_item_sha256: same_content },
+        ];
+        let receipt = finalize_reader_exposure_v1(
+            &query, &selected, &final_items,
+            1000, 200, 200, false,
+            digest("reader-request"), digest("reader-response"),
+            digest("reader-model"), digest("reader-generation"),
+            10, 2,
+        ).unwrap();
+        assert_eq!(receipt.exposed_evidence.len(), 2);
+        assert_ne!(
+            receipt.exposed_evidence[0].source_lineage_receipt_sha256,
+            receipt.exposed_evidence[1].source_lineage_receipt_sha256
+        );
+    }
+
 }
