@@ -74,6 +74,7 @@ pub struct JointPopulationRowV1 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JointTauAciArmEvidenceV1 {
     pub policy: DelayedAciPolicyV1,
+    pub interval_method_sha256: String,
     pub predictions: Vec<DelayedAciPredictionReceiptV1>,
     pub deliveries: Vec<DelayedAciLabelDeliveryV1>,
     pub updates: Vec<DelayedAciUpdateReceiptV1>,
@@ -457,7 +458,17 @@ fn validate_selection_risk_input(
             arm.arm_id
         )));
     };
-    if !audit.independent_of_operational_qualification {
+    if !audit.independent_of_operational_qualification
+        || !valid_sha256(&audit.design_sha256)
+        || !valid_sha256(&audit.randomization_provenance_sha256)
+        || !valid_sha256(&audit.reference_method_sha256)
+        || !audit.minimum_inclusion_probability.is_finite()
+        || audit.minimum_inclusion_probability <= 0.0
+        || audit.minimum_inclusion_probability > 1.0
+        || !audit.confidence_delta.is_finite()
+        || audit.confidence_delta <= 0.0
+        || audit.confidence_delta >= 1.0
+    {
         return Err(JointRiskTraceErrorV1(format!(
             "arm {} audit design is not independent of operational qualification",
             arm.arm_id
@@ -661,6 +672,7 @@ fn validate_aci_arm(
         )));
     }
     if json_sha256(&evidence.policy)? != arm.controller_policy_sha256
+        || evidence.interval_method_sha256 != arm.interval_method_sha256
         || evidence.policy.delay_rounds == 0
     {
         return Err(JointRiskTraceErrorV1(format!(
@@ -774,7 +786,8 @@ fn validate_aci_arm(
             )));
         }
         let mutates = update.disposition == AciUpdateDispositionV1::Updated;
-        if update.phase_state_mutated != mutates
+        if update.disposition == AciUpdateDispositionV1::PendingPredictionMissing
+            || update.phase_state_mutated != mutates
             || update.phase != Some(prediction.phase)
         {
             return Err(JointRiskTraceErrorV1(format!(
@@ -957,16 +970,16 @@ fn validate_aci_arm(
         let has_delivery = deliveries_by_sample.contains_key(prediction.sample_id.as_str());
         let has_missing = missing_by_sample.contains_key(prediction.sample_id.as_str());
         let has_degenerate = degenerate_samples.contains(prediction.sample_id.as_str());
-        let due_outcome_present = has_update || has_delivery || has_missing || has_degenerate;
-        if usize::from(has_update)
+        let terminal_paths = usize::from(has_delivery)
             + usize::from(has_missing)
-            + usize::from(has_degenerate) > 1
-        {
+            + usize::from(has_degenerate);
+        if terminal_paths != 1 || has_delivery != has_update {
             return Err(JointRiskTraceErrorV1(format!(
-                "tau-ACI arm {} has multiple terminal outcomes for sample {}",
+                "tau-ACI arm {} must have exactly one delivery+update, missing, or degenerate path for sample {}",
                 arm.arm_id, prediction.sample_id
             )));
         }
+        let due_outcome_present = terminal_paths == 1;
         if !due_outcome_present {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} omits due feedback/forfeit/degenerate record for sample {}",
@@ -1123,9 +1136,17 @@ fn validate_ca_arm(
             || prediction.measurement_event_id != row.measurement_event_id
             || prediction.physical_measurement_selected != row.physical_measurement_selected
             || prediction.global_model_artifact_sha256 != arm.global_model_artifact_sha256
+            || prediction.interval_method_sha256 != arm.interval_method_sha256
             || prediction.policy_sha256 != arm.controller_policy_sha256
             || report.tracking_capacity != evidence.policy.tracking_capacity
             || report.tracking_occupancy_after > report.tracking_capacity
+            || !report.weighted_feedback_sum.is_finite()
+            || !report.threshold_before.is_finite()
+            || !report.threshold_after.is_finite()
+            || !report.tracking_load_ell_f.is_finite()
+            || !report.proxy_survival_at_max_delay.is_finite()
+            || report.proxy_survival_at_max_delay < 0.0
+            || report.proxy_survival_at_max_delay > 1.0
             || reports.insert(report.round, report).is_some()
         {
             return Err(JointRiskTraceErrorV1(format!(
@@ -1215,13 +1236,18 @@ fn validate_ca_arm(
                     arm.arm_id, feedback.sample_id
                 )));
             };
-            if feedback.disposition == CaOcrcFeedbackDispositionV1::Updated
-                && (outcome_row.outcome_state != PopulationOutcomeStateV1::Qualified
-                    || outcome_row.label_id.as_deref() != Some(feedback.label_id.as_str())
-                    || outcome_row.label_revision != Some(feedback.label_revision))
+            if outcome_row.label_id.as_deref() != Some(feedback.label_id.as_str())
+                || outcome_row.label_revision != Some(feedback.label_revision)
+                || (feedback.disposition == CaOcrcFeedbackDispositionV1::Updated
+                    && outcome_row.outcome_state != PopulationOutcomeStateV1::Qualified)
+                || (outcome_row.outcome_state == PopulationOutcomeStateV1::Unknown
+                    && feedback.disposition != CaOcrcFeedbackDispositionV1::HeldUnknown)
+                || (outcome_row.outcome_state == PopulationOutcomeStateV1::Blocked
+                    && feedback.disposition != CaOcrcFeedbackDispositionV1::Blocked)
+                || (outcome_row.outcome_state == PopulationOutcomeStateV1::Unmeasured)
             {
                 return Err(JointRiskTraceErrorV1(format!(
-                    "CA-OCRC arm {} updates from non-qualified or mismatched label {}",
+                    "CA-OCRC arm {} feedback result disposition/identity conflicts with shared label state for {}",
                     arm.arm_id, feedback.label_id
                 )));
             }
