@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:nixward:benchmark-manifest:0.1",
+  "title": "NixWard benchmark manifest v0.1",
+  "description": "Synthetic benchmark task specifications. Runtime results require separately frozen environments and receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "corpus_id", "synthetic_only", "cases"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "corpus_id": {"const": "NIXWARD-BENCHMARK-SEED-V0.1"},
+    "synthetic_only": {"const": true},
+    "cases": {
+      "type": "array",
+      "minItems": 20,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "target_kind", "nixos_release", "system", "flake_identity", "host_count", "hardware_profile"],
+      "properties": {
+        "fixture_id": {"type": "string", "minLength": 1},
+        "target_kind": {"enum": ["single_host", "fleet", "vm", "install_media"]},
+        "nixos_release": {"type": "string", "minLength": 1},
+        "system": {"type": "string", "minLength": 1},
+        "flake_identity": {"type": "string", "minLength": 1},
+        "host_count": {"type": "integer", "minimum": 1},
+        "hardware_profile": {"type": "string", "minLength": 1}
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "independent_oracle", "hidden"],
+      "properties": {
+        "kind": {
+          "enum": ["static_contract", "source_oracle", "nix_eval", "nix_build", "nixos_vm", "runtime_probe", "fault_injection"]
+        },
+        "independent_oracle": {"type": "boolean"},
+        "hidden": {"type": "boolean"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id", "cluster_id", "family", "task_kind", "title", "user_prompt",
+        "target", "starting_state", "hard_constraints", "soft_preferences",
+        "forbidden_effects", "allowed_tools", "required_observations",
+        "plan_requirements", "postconditions", "runtime_tier",
+        "evaluator", "hard_gates", "faults"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "pattern": "^NWB-[A-Z]{2,6}-[0-9]{3}$"},
+        "cluster_id": {"type": "string", "minLength": 1},
+        "family": {
+          "enum": [
+            "packages", "nixos_options", "home_manager", "services", "networking",
+            "remote_access", "identity", "secrets", "backup_restore", "storage",
+            "boot_recovery", "hardware", "containers", "development", "multi_host",
+            "updates", "recovery", "supply_chain", "untrusted_evaluation", "input_security"
+          ]
+        },
+        "task_kind": {"enum": ["plan", "configure", "diagnose", "advise", "recover", "abstain"]},
+        "title": {"type": "string", "minLength": 1},
+        "user_prompt": {"type": "string", "minLength": 1},
+        "target": {"$ref": "#/$defs/target"},
+        "starting_state": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "hard_constraints": {"type": "array", "items": {"type": "string"}},
+        "soft_preferences": {"type": "array", "items": {"type": "string"}},
+        "forbidden_effects": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "allowed_tools": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "required_observations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "plan_requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "postconditions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "runtime_tier": {"enum": ["static", "evaluation", "build", "vm", "external_runtime", "hardware"]},
+        "evaluator": {"$ref": "#/$defs/evaluator"},
+        "hard_gates": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "faults": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
