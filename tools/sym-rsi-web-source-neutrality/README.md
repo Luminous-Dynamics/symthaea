@@ -6,7 +6,7 @@ It does not copy or reimplement their logic.
 
 ## Contract
 
-- `SourceEvidence.supports = None` means the source/claim relation is unclassified.
+- The production retrieval path uses `SourceEvidence::unclassified`, which always sets `supports = None`; this is tested directly.
 - Unclassified retrieval results contribute neither support nor contradiction, regardless of query similarity or source confidence.
 - A prior `WebResearchResult.confidence` is not evidence that a source supports a particular claim.
 - Explicit `Some(true)` and `Some(false)` relations remain available for callers that have performed claim-specific evaluation.
