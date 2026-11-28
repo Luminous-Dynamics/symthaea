@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::transition::{
     validate_transition_contract, AnalysisEvidenceRef, AudioSourceRef, TrackWindowRef,
-    TransitionContract,
+    TransitionContract, MAX_SAFE_JSON_INTEGER,
 };
 
 /// Current beat-grid report schema understood by this crate.
@@ -135,6 +135,7 @@ pub enum BeatGridViolationCode {
     InvalidSampleRate,
     InvalidChannelCount,
     EmptySource,
+    SourceFrameCountExceedsJsonSafeInteger,
     InvalidEvidenceManifestSha256,
     EvidenceSourceDigestMismatch,
     EmptyAnalysisVersion,
@@ -148,10 +149,13 @@ pub enum BeatGridViolationCode {
     TooFewPulseAnchors,
     PulseAnchorOutOfEvidenceWindow,
     PulseAnchorConfidenceOutOfRange,
+    PulseBeatIndexExceedsJsonSafeInteger,
     PulseFramesNotStrictlyIncreasing,
     PulseIndexesNotStrictlyIncreasing,
     DownbeatAnchorOutOfEvidenceWindow,
     DownbeatAnchorConfidenceOutOfRange,
+    DownbeatBeatIndexExceedsJsonSafeInteger,
+    DownbeatBarIndexExceedsJsonSafeInteger,
     DownbeatFramesNotStrictlyIncreasing,
     DownbeatIndexesNotStrictlyIncreasing,
     DownbeatDoesNotMatchPulse,
@@ -162,6 +166,7 @@ pub enum BeatGridViolationCode {
     TempoInterpolationMismatch,
     MeterSegmentConfidenceOutOfRange,
     MeterStartBeatNotInPulseMap,
+    MeterStartBeatExceedsJsonSafeInteger,
     MeterSegmentsNotStrictlyIncreasing,
     InvalidMeterSignature,
     EmptyMeterGrouping,
@@ -198,6 +203,13 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
     }
     if report.source.total_frames == 0 {
         push(&mut violations, BeatGridViolationCode::EmptySource, "source.total_frames");
+    }
+    if report.source.total_frames > MAX_SAFE_JSON_INTEGER {
+        push(
+            &mut violations,
+            BeatGridViolationCode::SourceFrameCountExceedsJsonSafeInteger,
+            "source.total_frames",
+        );
     }
 
     if !is_lowercase_sha256(&report.evidence.manifest_sha256) {
@@ -324,6 +336,13 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
                     format!("{path}.frame"),
                 );
             }
+            if anchor.beat_index.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseBeatIndexExceedsJsonSafeInteger,
+                    format!("{path}.beat_index"),
+                );
+            }
             if anchor.confidence_ppm > MAX_CONFIDENCE_PPM {
                 push(
                     &mut violations,
@@ -358,6 +377,401 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
                     &mut violations,
                     BeatGridViolationCode::DownbeatAnchorOutOfEvidenceWindow,
                     format!("{path}.frame"),
+                );
+            }
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Audio-derived beat-grid and tempo-map evidence contracts (MEL-DJ-007).
+//!
+//! This module defines portable evidence records and a deterministic
+//! structural validator. It does not decode audio, estimate beats, or prove
+//! that a supplied analysis is perceptually correct. Signal and auditory-scene
+//! evidence remains owned by MEL-HEAR-011 (#14227).
+//!
+//! Beat positions use integer source-local frame coordinates. Tempo uses
+//! milli-BPM, confidence uses parts per million, and no clock conversion is
+//! performed implicitly. A report can retain multiple competing hypotheses
+//! or explicitly abstain; consumers must not silently select the first one.
+
+use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+
+use crate::transition::{
+    validate_transition_contract, AnalysisEvidenceRef, AudioSourceRef, TrackWindowRef,
+    TransitionContract, MAX_SAFE_JSON_INTEGER,
+};
+
+/// Current beat-grid report schema understood by this crate.
+pub const BEAT_GRID_SCHEMA_VERSION: u16 = 1;
+
+/// Confidence represented in parts per million, from 0 through 1,000,000.
+pub const MAX_CONFIDENCE_PPM: u32 = 1_000_000;
+
+/// Report-level disposition. Resolved means exactly one hypothesis is emitted;
+/// Ambiguous means two or more alternatives are retained.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BeatGridDisposition {
+    Resolved,
+    Ambiguous,
+    Abstained,
+    NotEvaluated,
+}
+
+/// One detected pulse location, indexed by an integer beat ordinal.
+///
+/// This does not assert a bar/downbeat location. Downbeat phase is represented
+/// separately so pulse tracking and meter interpretation cannot be conflated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PulseAnchor {
+    pub frame: u64,
+    pub beat_index: i64,
+    pub confidence_ppm: u32,
+}
+
+/// A downbeat anchor referring to one exact pulse anchor in the same hypothesis.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DownbeatAnchor {
+    pub frame: u64,
+    pub beat_index: i64,
+    pub bar_index: i64,
+    pub confidence_ppm: u32,
+}
+
+/// Semantics for values between successive tempo-map points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TempoInterpolation {
+    /// Hold the previous BPM value until the next point.
+    StepwiseConstant,
+    /// Interpolate BPM linearly in source-frame time between points.
+    LinearInFrameTime,
+}
+
+/// A point in a piecewise tempo map. Tempo is in milli-BPM, avoiding floating
+/// point serialization and making boundary comparisons deterministic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TempoMapPoint {
+    pub frame: u64,
+    pub bpm_milli: u32,
+    pub confidence_ppm: u32,
+}
+
+/// Meter/grouping hypothesis beginning at a beat ordinal.
+///
+/// Grouping expresses additive numerator groupings, e.g. 7/8 as [2, 2, 3].
+/// It is optional at the hypothesis level: pulse evidence can be useful even
+/// when meter or bar phase is unknown.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MeterMapSegment {
+    pub start_beat_index: i64,
+    pub numerator: u8,
+    pub denominator: u8,
+    pub grouping: Vec<u8>,
+    pub confidence_ppm: u32,
+}
+
+/// A competing explanation of the source's pulse, tempo, and meter.
+///
+/// Confidence is a producer-supplied score in parts per million. It is not a
+/// calibrated probability unless a separate calibration record establishes that.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BeatGridHypothesis {
+    pub hypothesis_id: String,
+    pub confidence_ppm: u32,
+    pub pulse_anchors: Vec<PulseAnchor>,
+    pub downbeat_anchors: Vec<DownbeatAnchor>,
+    pub tempo_interpolation: Option<TempoInterpolation>,
+    pub tempo_map: Vec<TempoMapPoint>,
+    pub meter_map: Vec<MeterMapSegment>,
+}
+
+/// Versioned report binding hypotheses to the source audio and its analysis manifest.
+///
+/// There is no Default implementation: a decoder cannot manufacture an
+/// empty-but-valid report, confidence, source identity, or evidence provenance.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BeatGridReportV1 {
+    pub schema_version: u16,
+    pub source: AudioSourceRef,
+    pub evidence: AnalysisEvidenceRef,
+    pub disposition: BeatGridDisposition,
+    pub hypotheses: Vec<BeatGridHypothesis>,
+    pub abstention_reason: Option<String>,
+}
+
+/// Stable machine-readable validation errors for beat-grid reports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BeatGridViolationCode {
+    UnsupportedSchemaVersion,
+    InvalidSourceSha256,
+    InvalidSampleRate,
+    InvalidChannelCount,
+    EmptySource,
+    SourceFrameCountExceedsJsonSafeInteger,
+    InvalidEvidenceManifestSha256,
+    EvidenceSourceDigestMismatch,
+    EmptyAnalysisVersion,
+    InvalidEvidenceWindow,
+    ReportDispositionMismatch,
+    MissingAbstentionReason,
+    UnexpectedAbstentionReason,
+    EmptyHypothesisId,
+    DuplicateHypothesisId,
+    HypothesisConfidenceOutOfRange,
+    TooFewPulseAnchors,
+    PulseAnchorOutOfEvidenceWindow,
+    PulseAnchorConfidenceOutOfRange,
+    PulseBeatIndexExceedsJsonSafeInteger,
+    PulseFramesNotStrictlyIncreasing,
+    PulseIndexesNotStrictlyIncreasing,
+    DownbeatAnchorOutOfEvidenceWindow,
+    DownbeatAnchorConfidenceOutOfRange,
+    DownbeatBeatIndexExceedsJsonSafeInteger,
+    DownbeatBarIndexExceedsJsonSafeInteger,
+    DownbeatFramesNotStrictlyIncreasing,
+    DownbeatIndexesNotStrictlyIncreasing,
+    DownbeatDoesNotMatchPulse,
+    TempoPointOutOfEvidenceWindow,
+    TempoPointConfidenceOutOfRange,
+    TempoValueMustBePositive,
+    TempoFramesNotStrictlyIncreasing,
+    TempoInterpolationMismatch,
+    MeterSegmentConfidenceOutOfRange,
+    MeterStartBeatNotInPulseMap,
+    MeterStartBeatExceedsJsonSafeInteger,
+    MeterSegmentsNotStrictlyIncreasing,
+    InvalidMeterSignature,
+    EmptyMeterGrouping,
+    InvalidMeterGrouping,
+}
+
+/// One stable validation result with a machine-readable field path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BeatGridViolation {
+    pub code: BeatGridViolationCode,
+    pub path: String,
+}
+
+/// Validate source linkage, report disposition, and all source-local temporal claims.
+///
+/// Validation is structural only. It does not verify detector accuracy,
+/// probability calibration, musical correctness, or legal dataset permission.
+pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViolation> {
+    let mut violations = Vec::new();
+
+    if report.schema_version != BEAT_GRID_SCHEMA_VERSION {
+        push(&mut violations, BeatGridViolationCode::UnsupportedSchemaVersion, "schema_version");
+    }
+
+    if !is_lowercase_sha256(&report.source.sha256) {
+        push(&mut violations, BeatGridViolationCode::InvalidSourceSha256, "source.sha256");
+    }
+    if report.source.sample_rate_hz == 0 {
+        push(&mut violations, BeatGridViolationCode::InvalidSampleRate, "source.sample_rate_hz");
+    }
+    if report.source.channels == 0 {
+        push(&mut violations, BeatGridViolationCode::InvalidChannelCount, "source.channels");
+    }
+    if report.source.total_frames == 0 {
+        push(&mut violations, BeatGridViolationCode::EmptySource, "source.total_frames");
+    }
+    if report.source.total_frames > MAX_SAFE_JSON_INTEGER {
+        push(
+            &mut violations,
+            BeatGridViolationCode::SourceFrameCountExceedsJsonSafeInteger,
+            "source.total_frames",
+        );
+    }
+
+    if !is_lowercase_sha256(&report.evidence.manifest_sha256) {
+        push(
+            &mut violations,
+            BeatGridViolationCode::InvalidEvidenceManifestSha256,
+            "evidence.manifest_sha256",
+        );
+    }
+    if report.evidence.source_audio_sha256 != report.source.sha256 {
+        push(
+            &mut violations,
+            BeatGridViolationCode::EvidenceSourceDigestMismatch,
+            "evidence.source_audio_sha256",
+        );
+    }
+    if report.evidence.analysis_version.trim().is_empty() {
+        push(
+            &mut violations,
+            BeatGridViolationCode::EmptyAnalysisVersion,
+            "evidence.analysis_version",
+        );
+    }
+    let evidence_window = report.evidence.covered_window;
+    if !evidence_window.is_non_empty() || evidence_window.end_frame > report.source.total_frames {
+        push(
+            &mut violations,
+            BeatGridViolationCode::InvalidEvidenceWindow,
+            "evidence.covered_window",
+        );
+    }
+
+    match report.disposition {
+        BeatGridDisposition::Resolved => {
+            if report.hypotheses.len() != 1 {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
+            }
+            if report.abstention_reason.is_some() {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::UnexpectedAbstentionReason,
+                    "abstention_reason",
+                );
+            }
+        }
+        BeatGridDisposition::Ambiguous => {
+            if report.hypotheses.len() < 2 {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
+            }
+            if report.abstention_reason.is_some() {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::UnexpectedAbstentionReason,
+                    "abstention_reason",
+                );
+            }
+        }
+        BeatGridDisposition::Abstained | BeatGridDisposition::NotEvaluated => {
+            if !report.hypotheses.is_empty() {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::ReportDispositionMismatch,
+                    "hypotheses",
+                );
+            }
+            if report.abstention_reason.as_deref().is_none_or(|reason| reason.trim().is_empty()) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MissingAbstentionReason,
+                    "abstention_reason",
+                );
+            }
+        }
+    }
+
+    let mut hypothesis_ids = BTreeSet::new();
+    for (hypothesis_index, hypothesis) in report.hypotheses.iter().enumerate() {
+        let base = format!("hypotheses[{hypothesis_index}]");
+        if hypothesis.hypothesis_id.trim().is_empty() {
+            push(
+                &mut violations,
+                BeatGridViolationCode::EmptyHypothesisId,
+                format!("{base}.hypothesis_id"),
+            );
+        } else if !hypothesis_ids.insert(hypothesis.hypothesis_id.as_str()) {
+            push(
+                &mut violations,
+                BeatGridViolationCode::DuplicateHypothesisId,
+                format!("{base}.hypothesis_id"),
+            );
+        }
+
+        if hypothesis.confidence_ppm > MAX_CONFIDENCE_PPM {
+            push(
+                &mut violations,
+                BeatGridViolationCode::HypothesisConfidenceOutOfRange,
+                format!("{base}.confidence_ppm"),
+            );
+        }
+        if hypothesis.pulse_anchors.len() < 2 {
+            push(
+                &mut violations,
+                BeatGridViolationCode::TooFewPulseAnchors,
+                format!("{base}.pulse_anchors"),
+            );
+        }
+
+        let mut previous_frame = None;
+        let mut previous_beat_index = None;
+        for (anchor_index, anchor) in hypothesis.pulse_anchors.iter().enumerate() {
+            let path = format!("{base}.pulse_anchors[{anchor_index}]");
+            if !evidence_window.contains_frame(anchor.frame) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseAnchorOutOfEvidenceWindow,
+                    format!("{path}.frame"),
+                );
+            }
+            if anchor.beat_index.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseBeatIndexExceedsJsonSafeInteger,
+                    format!("{path}.beat_index"),
+                );
+            }
+            if anchor.confidence_ppm > MAX_CONFIDENCE_PPM {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseAnchorConfidenceOutOfRange,
+                    format!("{path}.confidence_ppm"),
+                );
+            }
+            if previous_frame.is_some_and(|previous| anchor.frame <= previous) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseFramesNotStrictlyIncreasing,
+                    format!("{path}.frame"),
+                );
+            }
+            if previous_beat_index.is_some_and(|previous| anchor.beat_index <= previous) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::PulseIndexesNotStrictlyIncreasing,
+                    format!("{path}.beat_index"),
+                );
+            }
+            previous_frame = Some(anchor.frame);
+            previous_beat_index = Some(anchor.beat_index);
+        }
+
+        let mut previous_downbeat_frame = None;
+        let mut previous_bar_index = None;
+        for (anchor_index, anchor) in hypothesis.downbeat_anchors.iter().enumerate() {
+            let path = format!("{base}.downbeat_anchors[{anchor_index}]");
+            if !evidence_window.contains_frame(anchor.frame) {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatAnchorOutOfEvidenceWindow,
+                    format!("{path}.frame"),
+                );
+            }
+            if anchor.beat_index.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatBeatIndexExceedsJsonSafeInteger,
+                    format!("{path}.beat_index"),
+                );
+            }
+            if anchor.bar_index.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::DownbeatBarIndexExceedsJsonSafeInteger,
+                    format!("{path}.bar_index"),
                 );
             }
             if anchor.confidence_ppm > MAX_CONFIDENCE_PPM {
@@ -449,6 +863,13 @@ pub fn validate_beat_grid_report(report: &BeatGridReportV1) -> Vec<BeatGridViola
                     &mut violations,
                     BeatGridViolationCode::MeterSegmentConfidenceOutOfRange,
                     format!("{path}.confidence_ppm"),
+                );
+            }
+            if segment.start_beat_index.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
+                push(
+                    &mut violations,
+                    BeatGridViolationCode::MeterStartBeatExceedsJsonSafeInteger,
+                    format!("{path}.start_beat_index"),
                 );
             }
             if !pulse_indexes.contains(&segment.start_beat_index) {
@@ -921,6 +1342,26 @@ mod tests {
         assert_eq!(decoded, report);
         assert!(!json.contains("bpm_f32"));
         assert!(json.contains("\"bpm_milli\":120000"));
+    }
+
+    #[test]
+    fn rejects_source_frame_count_above_exact_json_integer_range() {
+        let mut report = report();
+        report.source.total_frames = MAX_SAFE_JSON_INTEGER + 1;
+        assert!(codes(&report)
+            .contains(&BeatGridViolationCode::SourceFrameCountExceedsJsonSafeInteger));
+    }
+
+    #[test]
+    fn rejects_beat_and_bar_indices_above_exact_json_integer_range() {
+        let mut report = report();
+        report.hypotheses[0].pulse_anchors[0].beat_index =
+            (MAX_SAFE_JSON_INTEGER as i64) + 1;
+        report.hypotheses[0].downbeat_anchors[0].bar_index =
+            (MAX_SAFE_JSON_INTEGER as i64) + 1;
+        let found = codes(&report);
+        assert!(found.contains(&BeatGridViolationCode::PulseBeatIndexExceedsJsonSafeInteger));
+        assert!(found.contains(&BeatGridViolationCode::DownbeatBarIndexExceedsJsonSafeInteger));
     }
 
     #[test]
