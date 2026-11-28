@@ -10,7 +10,7 @@
 //! asymptotic pointwise intervals, not finite-sample or simultaneous guarantees.
 
 use super::selective_prediction::{RiskCoverageConfig, SelectivePredictionRecord};
-use super::stratified_audit::{StratifiedAuditPlan, STRATIFIED_AUDIT_DESIGN_VERSION};
+use super::stratified_audit::{STRATIFIED_AUDIT_DESIGN_VERSION, StratifiedAuditPlan};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -135,7 +135,10 @@ impl std::fmt::Display for StratifiedRiskError {
                 write!(formatter, "invalid stratified audit plan: {message}")
             }
             Self::PredictionCountMismatch => {
-                write!(formatter, "prediction cohort size does not match the audit plan")
+                write!(
+                    formatter,
+                    "prediction cohort size does not match the audit plan"
+                )
             }
             Self::EmptyPredictionId => write!(formatter, "prediction record ID must not be empty"),
             Self::DuplicatePredictionId(id) => {
@@ -145,13 +148,22 @@ impl std::fmt::Display for StratifiedRiskError {
                 write!(formatter, "prediction record is not in audit plan: {id}")
             }
             Self::MissingPredictionId(id) => {
-                write!(formatter, "audit-plan record has no candidate prediction: {id}")
+                write!(
+                    formatter,
+                    "audit-plan record has no candidate prediction: {id}"
+                )
             }
             Self::InvalidPredictionConfidence(id) => {
-                write!(formatter, "prediction confidence is invalid for record: {id}")
+                write!(
+                    formatter,
+                    "prediction confidence is invalid for record: {id}"
+                )
             }
             Self::SelectedRecordMissingAdjudication(id) => {
-                write!(formatter, "selected audit record has no independent adjudication: {id}")
+                write!(
+                    formatter,
+                    "selected audit record has no independent adjudication: {id}"
+                )
             }
             Self::NonSelectedRecordHasAdjudication(id) => {
                 write!(formatter, "non-selected record has an audit label: {id}")
@@ -161,7 +173,10 @@ impl std::fmt::Display for StratifiedRiskError {
                 write!(formatter, "coverage targets must be finite and in (0, 1]")
             }
             Self::InvalidConfidenceThreshold => {
-                write!(formatter, "confidence thresholds must be finite and in [0, 1]")
+                write!(
+                    formatter,
+                    "confidence thresholds must be finite and in [0, 1]"
+                )
             }
             Self::ZeroMinimumSampleSize => {
                 write!(formatter, "minimum audit sample size must be positive")
@@ -201,7 +216,9 @@ fn validate_plan(plan: &StratifiedAuditPlan) -> Result<(), StratifiedRiskError> 
             || stratum.population_size == 0
             || stratum.sample_size == 0
             || stratum.sample_size > stratum.population_size
-            || stratum_by_id.insert(stratum.stratum_id.as_str(), stratum).is_some()
+            || stratum_by_id
+                .insert(stratum.stratum_id.as_str(), stratum)
+                .is_some()
         {
             return Err(StratifiedRiskError::InvalidPlan(
                 "stratum IDs, population sizes, quotas or uniqueness are invalid".to_owned(),
@@ -270,10 +287,8 @@ fn validate_plan(plan: &StratifiedAuditPlan) -> Result<(), StratifiedRiskError> 
         }
     }
     for (stratum_id, stratum) in stratum_by_id {
-        if population_by_stratum.get(stratum_id).copied().unwrap_or(0)
-            != stratum.population_size
-            || selected_by_stratum.get(stratum_id).copied().unwrap_or(0)
-                != stratum.sample_size
+        if population_by_stratum.get(stratum_id).copied().unwrap_or(0) != stratum.population_size
+            || selected_by_stratum.get(stratum_id).copied().unwrap_or(0) != stratum.sample_size
         {
             return Err(StratifiedRiskError::InvalidPlan(format!(
                 "selection counts disagree for stratum {stratum_id}"
@@ -365,16 +380,12 @@ pub fn evaluate_stratified_audit_risk(
                 selection.record_id.clone(),
             ));
         };
-        if selection.selected_for_adjudication
-            && prediction.adjudicated_truth.is_none()
-        {
+        if selection.selected_for_adjudication && prediction.adjudicated_truth.is_none() {
             return Err(StratifiedRiskError::SelectedRecordMissingAdjudication(
                 selection.record_id.clone(),
             ));
         }
-        if !selection.selected_for_adjudication
-            && prediction.adjudicated_truth.is_some()
-        {
+        if !selection.selected_for_adjudication && prediction.adjudicated_truth.is_some() {
             return Err(StratifiedRiskError::NonSelectedRecordHasAdjudication(
                 selection.record_id.clone(),
             ));
@@ -470,8 +481,8 @@ pub fn evaluate_stratified_audit_risk(
             let group_error_total = estimate.estimated_error_total - previous_error_total;
             let group_size = end - index;
             for rank in 1..=group_size {
-                let expected_error_total = previous_error_total
-                    + rank as f64 * group_error_total / group_size as f64;
+                let expected_error_total =
+                    previous_error_total + rank as f64 * group_error_total / group_size as f64;
                 let accepted_at_rank = index + rank;
                 aurc_area += (expected_error_total / accepted_at_rank as f64) / total as f64;
             }
@@ -494,9 +505,10 @@ pub fn evaluate_stratified_audit_risk(
             continue;
         }
         let required = (target * total as f64).ceil() as usize;
-        if let Some(point) = curve.iter().find(|point| {
-            point.estimate.accepted_population_count >= required
-        }) {
+        if let Some(point) = curve
+            .iter()
+            .find(|point| point.estimate.accepted_population_count >= required)
+        {
             operating_points.push(DesignBasedOperatingPoint {
                 target_coverage: target,
                 achieved_coverage: point.estimate.accepted_coverage,
@@ -660,16 +672,12 @@ fn estimate_from_stratum_counts(
         accepted_population_count += counts.accepted_population_count;
         accepted_audit_count += counts.accepted_audit_count;
 
-        let sample_error_variance = if counts.accepted_population_count == 0
-            || population_size == n
+        let sample_error_variance = if counts.accepted_population_count == 0 || population_size == n
         {
             Some(0.0)
         } else if n >= 2 {
             // For a binary sample with k ones, s^2 = k(n-k)/(n(n-1)).
-            Some(
-                sample_sum * (n as f64 - sample_sum)
-                    / (n as f64 * (n - 1) as f64),
-            )
+            Some(sample_sum * (n as f64 - sample_sum) / (n as f64 * (n - 1) as f64))
         } else {
             None
         };
@@ -712,18 +720,19 @@ fn estimate_from_stratum_counts(
     } else {
         None
     };
-    let approximate_normal_95_interval = estimated_risk.zip(standard_error).map(|(risk, se)| {
-        ApproximateRiskInterval {
-            lower: risk - NORMAL_95_Z * se,
-            upper: risk + NORMAL_95_Z * se,
-            confidence_level: 0.95,
-            method: concat!(
-                "pointwise normal approximation using unbiased ",
-                "stratified-SRSWOR variance"
-            )
-            .to_owned(),
-        }
-    });
+    let approximate_normal_95_interval =
+        estimated_risk
+            .zip(standard_error)
+            .map(|(risk, se)| ApproximateRiskInterval {
+                lower: risk - NORMAL_95_Z * se,
+                upper: risk + NORMAL_95_Z * se,
+                confidence_level: 0.95,
+                method: concat!(
+                    "pointwise normal approximation using unbiased ",
+                    "stratified-SRSWOR variance"
+                )
+                .to_owned(),
+            });
 
     DesignBasedRiskEstimate {
         acceptance_rule: acceptance_rule.to_owned(),
@@ -749,12 +758,10 @@ fn estimate_from_stratum_counts(
                 .to_owned(),
             )
         } else if !enough_audit_labels {
-            Some(format!(
-                concat!(
-                    "accepted audit label count {accepted_audit_count} is below ",
-                    "the configured minimum {minimum_sample_size}"
-                )
-            ))
+            Some(format!(concat!(
+                "accepted audit label count {accepted_audit_count} is below ",
+                "the configured minimum {minimum_sample_size}"
+            )))
         } else {
             None
         },
@@ -764,10 +771,10 @@ fn estimate_from_stratum_counts(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::stratified_audit::{
-        build_stratified_random_audit_plan, AuditCandidate, AuditStratumQuota,
+        AuditCandidate, AuditStratumQuota, build_stratified_random_audit_plan,
     };
+    use super::*;
 
     fn four_unit_plan() -> StratifiedAuditPlan {
         let candidates = vec![
@@ -792,7 +799,10 @@ mod tests {
                 random_priority: 40,
             },
         ];
-        let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
+        let quotas = vec![AuditStratumQuota {
+            stratum_id: "all".to_owned(),
+            sample_size: 2,
+        }];
         build_stratified_random_audit_plan(
             &candidates,
             &quotas,
@@ -914,7 +924,10 @@ mod tests {
         let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
         assert_eq!(report.always_answer.estimated_error_total, 3.0);
         assert_eq!(report.always_answer.estimated_risk, Some(0.5));
-        assert_eq!(report.always_answer.estimated_error_total_variance, Some(2.0));
+        assert_eq!(
+            report.always_answer.estimated_error_total_variance,
+            Some(2.0)
+        );
         assert!((report.always_answer.estimated_risk_variance.unwrap() - 2.0 / 36.0).abs() < 1e-12);
     }
 
@@ -948,7 +961,10 @@ mod tests {
                 random_priority: 20,
             },
         ];
-        let quotas = vec![AuditStratumQuota { stratum_id: "all".to_owned(), sample_size: 2 }];
+        let quotas = vec![AuditStratumQuota {
+            stratum_id: "all".to_owned(),
+            sample_size: 2,
+        }];
         let plan = build_stratified_random_audit_plan(
             &candidates,
             &quotas,
@@ -980,7 +996,10 @@ mod tests {
                 random_priority: 20,
             },
         ];
-        let quotas = vec![AuditStratumQuota { stratum_id: "single".to_owned(), sample_size: 1 }];
+        let quotas = vec![AuditStratumQuota {
+            stratum_id: "single".to_owned(),
+            sample_size: 1,
+        }];
         let plan = build_stratified_random_audit_plan(
             &candidates,
             &quotas,
@@ -1043,7 +1062,10 @@ mod tests {
         let second = evaluate_stratified_audit_risk(&reversed, &plan, &config()).unwrap();
         assert_eq!(first.aurc, second.aurc);
         assert_eq!(first.operating_points[0].achieved_coverage, 0.5);
-        assert_eq!(first.operating_points[0].estimate.accepted_population_count, 2);
+        assert_eq!(
+            first.operating_points[0].estimate.accepted_population_count,
+            2
+        );
     }
 
     #[test]
@@ -1128,7 +1150,17 @@ mod tests {
         let report = evaluate_stratified_audit_risk(&rows, &plan, &config()).unwrap();
         assert_eq!(report.observed_model_policy.accepted_population_count, 3);
         assert_eq!(report.confidence_threshold_baselines.len(), 2);
-        assert_eq!(report.confidence_threshold_baselines[0].estimate.accepted_population_count, 2);
-        assert_eq!(report.confidence_threshold_baselines[1].estimate.accepted_population_count, 1);
+        assert_eq!(
+            report.confidence_threshold_baselines[0]
+                .estimate
+                .accepted_population_count,
+            2
+        );
+        assert_eq!(
+            report.confidence_threshold_baselines[1]
+                .estimate
+                .accepted_population_count,
+            1
+        );
     }
 }
