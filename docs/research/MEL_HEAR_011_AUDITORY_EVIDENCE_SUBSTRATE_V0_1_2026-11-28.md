@@ -21,7 +21,7 @@ Keep independently addressable, time-aligned views rather than one irreversible 
 | Original waveform and channel metadata | physical samples, phase, clipping, clock and channel lineage | impossible to audit what downstream processing discarded |
 | Complex STFT | local time-frequency energy and phase | magnitude-only analysis loses phase relations |
 | ERB/gammatone-like bands | frequency-selective auditory-scale evidence | linear-frequency bins do not match perceptual frequency resolution |
-| Constant-Q/log-frequency | pitch-related structure across octaves | fixed linear bins allocate resolution poorly for musical pitch |
+| Log-frequency energy | pitch-related structure across octaves, aggregated from STFT power | fixed linear STFT bins limit low-frequency resolution; this is not a true CQT |
 | Modulation/scattering views | attacks, decays, vibrato, tremolo and playing-technique texture | a static spectrum misses temporal modulation |
 | Spatial view | inter-channel timing, level, coherence and source position cues | stereo/ambisonic information disappears in mono |
 
@@ -57,3 +57,12 @@ The views are deliberately marked `planned`. The fixture does **not** claim that
 ## Claim boundary
 
 This code is a metadata validator, not an auditory model. It does not perform source separation, transcription, psychoacoustic loudness, event localization, room estimation, perceptual similarity, or musician-gesture inference. It makes no inference about performer emotion, intent, honesty or stable traits.
+
+
+## Reference DSP implementation added
+
+The `dsp` module now contains a deterministic CPU reference implementation of three aligned views: complex STFT, triangular ERB-rate band energy and triangular log-frequency band energy. Its radix-2 FFT preserves complex coefficients, and every derived frame retains the exact half-open source-sample support.
+
+The ERB filterbank is an ERB-axis triangular power partition, **not** a gammatone cochlear filterbank. The log-frequency representation is a re-binning of the fixed-grid STFT spectrum, **not** a true constant-Q transform. A true variable-window CQT and stateful auditory filters should be added as separate implementations with matched tests rather than silently relabeling these baselines.
+
+Known-answer tests use a bin-centred 1 kHz sinusoid at 8.192 kHz. They verify peak-bin location, recovered amplitude, complex phase, ERB-band localization, log-frequency localization, invalid geometry rejection, non-finite input rejection and exact support alignment across views.
