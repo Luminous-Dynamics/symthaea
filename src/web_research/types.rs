@@ -187,7 +187,7 @@ pub struct WebResearchResult {
     pub relevance: f32,
     /// Overall confidence score (0.0 - 1.0)
     pub confidence: f32,
-    /// Epistemic status after verification
+    /// Epistemic status after assessment of explicit claim-specific evidence
     pub epistemic_status: EpistemicStatus,
     /// Status of the research operation
     pub status: ResearchStatus,

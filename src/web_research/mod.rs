@@ -7,13 +7,13 @@
 //!
 //! 1. **Epistemic Consciousness** - The system knows what it knows and doesn't know
 //! 2. **Autonomous Research** - Automatically researches when uncertainty is detected
-//! 3. **Hallucination Prevention** - All claims are epistemically verified
+//! 3. **Epistemic transparency** - Unclassified sources remain neutral; retrieval is not claim support
 //! 4. **Meta-Learning** - The system improves its verification over time
 //!
 //! # Architecture
 //!
 //! ```text
-//! Query → Φ Detection → Research → Extraction → Verification
+//! Query → Retrieval → Extraction → Claim-support classification → Epistemic assessment
 //!                                                     ↓
 //!                                                Integration
 //!                                                     ↓

@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Web Research Orchestrator
 //!
-//! Coordinates the research pipeline: query planning, fetching,
-//! extraction, verification, and integration. This is the main
-//! entry point for autonomous web research.
+//! Coordinates query planning, retrieval, extraction, epistemic assessment,
+//! and knowledge integration. Retrieved pages are evidence candidates; they are
+//! not claim support until an upstream claim-specific classifier labels them.
 
 use anyhow::{Context, Result};
 use serde_json::Value;
@@ -54,10 +54,10 @@ impl WebResearcher {
         })
     }
 
-    /// Research and verify a query
+    /// Research a query and assess claims against explicit support classifications.
     ///
-    /// This is the main entry point for epistemic research.
-    /// Returns a research result with verified claims.
+    /// Retrieved pages remain evidence candidates until a claim-specific
+    /// support classifier labels them. Topical similarity alone is not entailment.
     pub async fn research_and_verify(&self, query: &str) -> Result<WebResearchResult> {
         // Build search queries
         let search_queries = self.plan_queries(query);
@@ -95,9 +95,16 @@ impl WebResearcher {
                                 source_type: self
                                     .classify_source(url, extraction.metadata.content_type),
                                 relevant_text: extraction.summary.clone(),
-                                supports: Some(true), // Will be refined by verifier
+                                // Retrieval establishes provenance and topical
+                                // relevance, not support for every extracted claim.
+                                // Leave claim-level support unclassified until a
+                                // separate entailment/adjudication stage supplies it.
+                                supports: None,
                                 similarity: self.calculate_similarity(&extraction.body_text, query),
-                                credibility: extraction.quality,
+                                // Extraction quality is not source authority.
+                                // Leave source credibility neutral until it is
+                                // assessed independently by the existing verifier.
+                                credibility: 0.5,
                             };
 
                             all_sources.push(source);

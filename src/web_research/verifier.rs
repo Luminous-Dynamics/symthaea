@@ -3,9 +3,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Epistemic Verification Module
 //!
-//! Verifies claims against multiple sources and assigns epistemic status.
-//! This is the core of hallucination prevention - every claim must be
-//! epistemically verified before being presented.
+//! Aggregates explicit claim-to-source support classifications and assigns epistemic status.
+//!
+//! Retrieval relevance is not claim entailment. Unclassified sources remain
+//! neutral; this module does not independently infer whether arbitrary source
+//! text entails a claim. A separate claim-support classifier or adjudicator
+//! must provide `Some(true)` / `Some(false)` before a source counts as support.
 
 use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
 use std::collections::HashMap;
@@ -59,9 +62,9 @@ pub struct SourceEvidence {
     pub source_type: ResearchSource,
     /// Relevant text from the source
     pub relevant_text: String,
-    /// Does this source support the claim?
+    /// Claim-specific support classification; `None` means unclassified/neutral.
     pub supports: Option<bool>,
-    /// Similarity score to the claim (0.0 - 1.0)
+    /// Topical similarity to the research query (0.0 - 1.0); not claim entailment.
     pub similarity: f32,
     /// Credibility score of the source (0.0 - 1.0)
     pub credibility: f32,
@@ -165,18 +168,15 @@ impl EpistemicVerifier {
             match source.supports {
                 Some(true) => {
                     supporting.push(source.url.clone());
-                    total_support_score += credibility * source.similarity;
+                    total_support_score += credibility;
                 }
                 Some(false) => {
                     contradicting.push(source.url.clone());
-                    total_contradict_score += credibility * source.similarity;
+                    total_contradict_score += credibility;
                 }
-                None => {
-                    // Neutral/unclear - slight support if similarity is high
-                    if source.similarity > 0.7 {
-                        total_support_score += credibility * source.similarity * 0.3;
-                    }
-                }
+                // Unclassified evidence is neutral. Query relevance
+                // cannot be substituted for claim-level support or contradiction.
+                None => {}
             }
         }
 
@@ -199,7 +199,9 @@ impl EpistemicVerifier {
         }
     }
 
-    /// Verify a claim from research results
+    /// Assess a claim against explicit support labels already present in research results.
+    ///
+    /// Aggregate result confidence is not reused as claim-specific support.
     pub fn verify_from_results(&self, claim: &str, results: &[WebResearchResult]) -> VerifiedClaim {
         // Build verification context from results
         let sources: Vec<SourceEvidence> = results
@@ -209,9 +211,11 @@ impl EpistemicVerifier {
                 domain: self.extract_domain(&r.url),
                 source_type: r.source_type,
                 relevant_text: r.summary.clone(),
-                supports: Some(r.confidence > 0.5),
+                // A prior result's aggregate confidence is not a
+                // claim-specific support classification or source authority.
+                supports: None,
                 similarity: r.relevance,
-                credibility: r.confidence,
+                credibility: 0.5,
             })
             .collect();
 
@@ -373,6 +377,93 @@ mod tests {
     }
 
     #[test]
+    fn unclassified_topical_sources_do_not_count_as_claim_support() {
+        let verifier = EpistemicVerifier::new();
+        let sources = (0..3)
+            .map(|index| SourceEvidence {
+                url: format!("https://source{index}.example/relevant"),
+                domain: format!("source{index}.example"),
+                source_type: ResearchSource::Web,
+                relevant_text: "A page relevant to the broad research query".to_owned(),
+                supports: None,
+                similarity: 1.0,
+                credibility: 1.0,
+            })
+            .collect();
+        let context = VerificationContext {
+            sources,
+            query: "What is the mechanism?".to_owned(),
+            domain: "science".to_owned(),
+        };
+
+        let result = verifier.verify_claim("A specific extracted mechanism claim", &context);
+        assert!(result.supporting_sources.is_empty());
+        assert!(result.contradicting_sources.is_empty());
+        assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+        assert_eq!(result.confidence, 0.2);
+    }
+
+    #[test]
+    fn unclassified_topical_sources_do_not_attenuate_an_explicit_contradiction() {
+        let verifier = EpistemicVerifier::new();
+        let mut sources = vec![SourceEvidence {
+            url: "https://counter.example/measurement".to_owned(),
+            domain: "counter.example".to_owned(),
+            source_type: ResearchSource::Academic,
+            relevant_text: "An explicit claim-specific contradiction".to_owned(),
+            supports: Some(false),
+            similarity: 1.0,
+            credibility: 1.0,
+        }];
+        for index in 0..3 {
+            sources.push(SourceEvidence {
+                url: format!("https://topic{index}.example/relevant"),
+                domain: format!("topic{index}.example"),
+                source_type: ResearchSource::Web,
+                relevant_text: "Topically relevant but not claim-classified".to_owned(),
+                supports: None,
+                similarity: 1.0,
+                credibility: 1.0,
+            });
+        }
+        let context = VerificationContext {
+            sources,
+            query: "A broad research topic".to_owned(),
+            domain: "science".to_owned(),
+        };
+
+        let result = verifier.verify_claim("The claim under test", &context);
+        assert_eq!(result.status, EpistemicStatus::Contradicted);
+        assert_eq!(
+            result.contradicting_sources,
+            vec!["https://counter.example/measurement".to_owned()]
+        );
+        assert!(result.supporting_sources.is_empty());
+    }
+
+    #[test]
+    fn aggregate_research_result_confidence_is_not_claim_support() {
+        let verifier = EpistemicVerifier::new();
+        let result = WebResearchResult {
+            url: "https://research.example/topic".to_owned(),
+            summary: "A highly relevant summary from an earlier retrieval".to_owned(),
+            relevance: 1.0,
+            confidence: 0.99,
+            ..WebResearchResult::default()
+        };
+
+        let verified = verifier.verify_from_results(
+            "A new, specific claim that has not been classified against the source",
+            &[result],
+        );
+
+        assert!(verified.supporting_sources.is_empty());
+        assert!(verified.contradicting_sources.is_empty());
+        assert_eq!(verified.status, EpistemicStatus::InsufficientEvidence);
+        assert_eq!(verified.confidence, 0.2);
+    }
+
+    #[test]
     fn test_verify_with_supporting_sources() {
         let verifier = EpistemicVerifier::new();
         let context = VerificationContext {
@@ -412,6 +503,31 @@ mod tests {
         let result = verifier.verify_claim("Rust provides memory safety", &context);
         assert_eq!(result.status, EpistemicStatus::HighConfidence);
         assert!(result.confidence > 0.8);
+    }
+
+    #[test]
+    fn explicit_claim_support_is_not_reweighted_by_query_similarity() {
+        let verifier = EpistemicVerifier::new();
+        let sources = (0..3)
+            .map(|index| SourceEvidence {
+                url: format!("https://support{index}.example/claim"),
+                domain: format!("support{index}.example"),
+                source_type: ResearchSource::Academic,
+                relevant_text: "An upstream claim-specific classifier marked this as supporting".to_owned(),
+                supports: Some(true),
+                similarity: 0.0,
+                credibility: 0.95,
+            })
+            .collect();
+        let context = VerificationContext {
+            sources,
+            query: "A broad topic with little lexical overlap".to_owned(),
+            domain: "science".to_owned(),
+        };
+
+        let result = verifier.verify_claim("The independently classified claim", &context);
+        assert_eq!(result.status, EpistemicStatus::HighConfidence);
+        assert_eq!(result.supporting_sources.len(), 3);
     }
 
     #[test]
