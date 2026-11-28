@@ -39,7 +39,8 @@
       "reference_visibility_audit_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
       "reference_label_exposed": false,
       "prediction": "Same",
-      "prediction_confidence": 0.99
+      "prediction_confidence": 0.99,
+      "question_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "kind": "audio_derived_symbolic",
@@ -61,7 +62,8 @@
       "reference_visibility_audit_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "reference_label_exposed": false,
       "prediction": "Different",
-      "prediction_confidence": 0.83
+      "prediction_confidence": 0.83,
+      "question_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "kind": "raw_audio",
@@ -83,7 +85,8 @@
       "reference_visibility_audit_sha256": "2626262626262626262626262626262626262626262626262626262626262626",
       "reference_label_exposed": false,
       "prediction": "Same",
-      "prediction_confidence": 0.80
+      "prediction_confidence": 0.8,
+      "question_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "kind": "audio_plus_predicted_structure",
@@ -105,7 +108,8 @@
       "reference_visibility_audit_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
       "reference_label_exposed": false,
       "prediction": "Same",
-      "prediction_confidence": 0.91
+      "prediction_confidence": 0.91,
+      "question_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "kind": "no_evidence_control",
@@ -127,7 +131,8 @@
       "reference_visibility_audit_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
       "reference_label_exposed": false,
       "prediction": "Different",
-      "prediction_confidence": 0.65
+      "prediction_confidence": 0.65,
+      "question_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     }
   ]
 }
