@@ -480,7 +480,7 @@ pub enum OrbitError {
 }
 
 /// Verify one representative/member lift against the original candidate.
-pub const fn verify_chord_lift(
+pub fn verify_chord_lift(
     representative: Chord,
     witness: ChordLiftWitness,
     candidate: Chord,
