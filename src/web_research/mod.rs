@@ -109,6 +109,9 @@ pub mod stratified_audit;
 // Design-based risk estimation for stratified randomized audits
 pub mod stratified_risk;
 
+// Fixed-horizon finite-sample risk control under selective observation
+pub mod sowrc;
+
 // Re-exports for ergonomic access
 pub use conjecture_feed::{
     ConjectureFeedError, ConjectureFeeder, ProvenancedConjecture, ResearchNumericDataset,
@@ -144,6 +147,7 @@ pub use stratified_risk::{
     evaluate_stratified_audit_risk, ApproximateRiskInterval, DesignBasedRiskEstimate,
     StratifiedRiskError, StratifiedRiskReport,
 };
+pub use sowrc::{evaluate_sowrc, SowrcConfig, SowrcError, SowrcObservation, SowrcReport};
 pub use types::*;
 pub use verifier::{
     EpistemicVerifier, SourceEvidence, VerificationContext, VerificationResult, VerifierConfig,
