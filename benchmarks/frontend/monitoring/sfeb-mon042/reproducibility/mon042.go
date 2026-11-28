@@ -35,7 +35,13 @@ const (
 )
 
 type Observation struct {
+ UnitID string `json:"unit_id"`
  ReplayID string `json:"replay_id"`
+ TrialID string `json:"trial_id"`
+ ScenarioSHA256 string `json:"scenario_sha256"`
+ RecoveryBoundarySHA256 string `json:"recovery_boundary_sha256"`
+ FaultSetSHA256 string `json:"fault_set_sha256"`
+ CodeRevision string `json:"code_revision"`
  Seed int64 `json:"seed"`
  Verdict Verdict `json:"verdict"`
  FailureSignatureSHA256 string `json:"failure_signature_sha256"`
@@ -57,7 +63,12 @@ type Input struct {
  Mode Mode `json:"mode"`
  EvaluatedAt time.Time `json:"evaluated_at"`
  TrialID string `json:"trial_id"`
+ ScenarioSHA256 string `json:"scenario_sha256"`
+ RecoveryBoundarySHA256 string `json:"recovery_boundary_sha256"`
+ FaultSetSHA256 string `json:"fault_set_sha256"`
+ CodeRevision string `json:"code_revision"`
  TargetFailureSignatureSHA256 string `json:"target_failure_signature_sha256"`
+ RequiredSeeds []int64 `json:"required_seeds"`
  RequiredDomainClasses []string `json:"required_domain_classes"`
  ExpectedUnitCount int `json:"expected_unit_count"`
  RequiredRunsPerUnit int `json:"required_runs_per_unit"`
@@ -69,6 +80,7 @@ type Input struct {
 type ClusterResult struct {
  ClusterID string `json:"cluster_id"`
  UnitIDs []string `json:"unit_ids"`
+ ExecutionUnitCount int `json:"execution_unit_count"`
  SharedDomains []string `json:"shared_domains"`
  RequiredRuns int `json:"required_runs"`
  ObservedRuns int `json:"observed_runs"`
@@ -109,7 +121,8 @@ func validID(s string)bool{return s!=""&&len(s)<=MaxIDLength&&!strings.ContainsA
 func validDigest(s string)bool{if len(s)!=64||s!=strings.ToLower(s){return false};_,e:=hex.DecodeString(s);return e==nil}
 func digestJSON(v any)string{b,e:=json.Marshal(v);if e!=nil{return ""};h:=sha256.Sum256(b);return hex.EncodeToString(h[:])}
 func ObservationReceiptDigest(o Observation)string{o.OutcomeReceiptSHA256="";return digestJSON(o)}
-func DomainManifestDigest(domains map[string]string)string{return digestJSON(domains)}
+func DomainManifestDigest(unitID string,domains map[string]string)string{return digestJSON(struct{UnitID string `json:"unit_id"`;Domains map[string]string `json:"domains"`}{unitID,domains})}
+func validRevision(s string)bool{if len(s)!=40&&len(s)!=64{return false};if s!=strings.ToLower(s){return false};_,e:=hex.DecodeString(s);return e==nil}
 
 type disjointSet struct{ parent, rank []int }
 func newDisjointSet(n int)*disjointSet{p:=make([]int,n);r:=make([]int,n);for i:=range p{p[i]=i};return &disjointSet{p,r}}
@@ -146,9 +159,16 @@ func Evaluate(in Input)Result{
  if !validID(in.TrialID){f.block("trial_id_invalid")}
  if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
  if !validDigest(in.TargetFailureSignatureSHA256){f.block("target_signature_digest_invalid")}
+ if !validDigest(in.ScenarioSHA256){f.block("scenario_digest_invalid")}
+ if !validDigest(in.RecoveryBoundarySHA256){f.block("recovery_boundary_digest_invalid")}
+ if !validDigest(in.FaultSetSHA256){f.block("fault_set_digest_invalid")}
+ if !validRevision(in.CodeRevision){f.block("code_revision_invalid")}
  if in.ExpectedUnitCount<1||in.ExpectedUnitCount>MaxUnits{f.block("expected_unit_count_out_of_range")}
  if in.RequiredIndependentClusters<1||in.RequiredIndependentClusters>MaxUnits{f.block("required_cluster_count_out_of_range")}
  if in.RequiredRunsPerUnit<1||in.RequiredRunsPerUnit>MaxRunsPerUnit{f.block("required_runs_per_unit_out_of_range")}
+ if len(in.RequiredSeeds)!=in.RequiredRunsPerUnit{f.block("required_seed_count_mismatch")}
+ requiredSeeds:=map[int64]struct{}{}
+ for _,seed:=range in.RequiredSeeds{if seed<0{f.block("required_seed_invalid")};if _,ok:=requiredSeeds[seed];ok{f.block("required_seed_duplicated")};requiredSeeds[seed]=struct{}{}}
  if in.MinimumReliability<=0||in.MinimumReliability>1||math.IsNaN(in.MinimumReliability){f.block("minimum_reliability_invalid")}
  if in.ConfidenceLevel<=0||in.ConfidenceLevel>=1||math.IsNaN(in.ConfidenceLevel){f.block("confidence_level_invalid")}
  if len(in.RequiredDomainClasses)==0||len(in.RequiredDomainClasses)>MaxDomains{f.block("required_domain_classes_out_of_range")}
@@ -162,7 +182,7 @@ func Evaluate(in Input)Result{
  if f.blocked{out.DesignVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
  if len(in.Units)==0{f.hold("execution_units_missing");out.DesignVerdict=f.verdict();out.ReasonCodes=f.sorted();return out}
 
- seenUnits:=map[string]struct{}{};stratum:=""
+ seenUnits:=map[string]struct{}{};globalReplayIDs:=map[string]struct{}{};stratum:=""
  for i:=range in.Units{
   u:=&in.Units[i]
   if !validID(u.UnitID)||!validID(u.StratumID){f.block("unit_identity_invalid")}
@@ -171,18 +191,22 @@ func Evaluate(in Input)Result{
   if !u.DomainInventoryComplete{f.hold("domain_inventory_incomplete:"+u.UnitID)}
   if len(u.DependencyDomains)>MaxDomains{f.block("unit_domain_limit_exceeded:"+u.UnitID)}
   for name:=range required{value,ok:=u.DependencyDomains[name];if !ok||!validID(value){f.hold("required_domain_missing:"+u.UnitID+":"+name)}}
-  if !validDigest(u.DomainManifestSHA256){f.hold("domain_manifest_digest_missing:"+u.UnitID)}else if u.DomainManifestSHA256!=DomainManifestDigest(u.DependencyDomains){f.block("domain_manifest_digest_mismatch:"+u.UnitID)}
+  if !validDigest(u.DomainManifestSHA256){f.hold("domain_manifest_digest_missing:"+u.UnitID)}else if u.DomainManifestSHA256!=DomainManifestDigest(u.UnitID,u.DependencyDomains){f.block("domain_manifest_digest_mismatch:"+u.UnitID)}
   if u.RequiredRuns!=in.RequiredRunsPerUnit{f.block("unit_preregistered_run_count_mismatch:"+u.UnitID)}
   if len(u.Observations)>in.RequiredRunsPerUnit{f.block("unit_observation_count_exceeds_preregistered:"+u.UnitID)}
   if len(u.Observations)<in.RequiredRunsPerUnit{f.hold("unit_observation_count_incomplete:"+u.UnitID)}
   replayIDs,seeds:=map[string]struct{}{},map[int64]struct{}{}
   for _,o:=range u.Observations{
    if !validID(o.ReplayID)||o.Seed<0||!validVerdict(o.Verdict)||!validDigest(o.FailureSignatureSHA256){f.block("observation_identity_or_result_invalid:"+u.UnitID)}
-   if _,ok:=replayIDs[o.ReplayID];ok{f.block("replay_id_duplicated:"+u.UnitID)};replayIDs[o.ReplayID]=struct{}{}
+   if _,ok:=replayIDs[o.ReplayID];ok{f.block("replay_id_duplicated_within_unit:"+u.UnitID)};replayIDs[o.ReplayID]=struct{}{}
+   if _,ok:=globalReplayIDs[o.ReplayID];ok{f.block("replay_id_duplicated_across_units:"+u.UnitID)};globalReplayIDs[o.ReplayID]=struct{}{}
    if _,ok:=seeds[o.Seed];ok{f.block("seed_duplicated_within_unit:"+u.UnitID)};seeds[o.Seed]=struct{}{}
+   if _,ok:=requiredSeeds[o.Seed];!ok{f.block("observation_seed_not_preregistered:"+u.UnitID)}
+   if o.UnitID!=u.UnitID||o.TrialID!=in.TrialID||o.ScenarioSHA256!=in.ScenarioSHA256||o.RecoveryBoundarySHA256!=in.RecoveryBoundarySHA256||o.FaultSetSHA256!=in.FaultSetSHA256||o.CodeRevision!=in.CodeRevision{f.block("observation_scope_mismatch:"+u.UnitID)}
    if !validDigest(o.OutcomeReceiptSHA256){f.block("observation_receipt_digest_invalid:"+u.UnitID)}else if o.OutcomeReceiptSHA256!=ObservationReceiptDigest(o){f.block("observation_receipt_digest_mismatch:"+u.UnitID)}
    if !o.Complete{f.hold("observation_incomplete:"+u.UnitID)}
   }
+  if len(seeds)!=len(requiredSeeds){f.hold("unit_seed_schedule_incomplete:"+u.UnitID)}
  }
  if f.blocked{out.DesignVerdict=Blocked;out.ReasonCodes=f.sorted();return out}
  domainComplete:=true
@@ -209,14 +233,17 @@ func Evaluate(in Input)Result{
    for _,o:=range u.Observations{observedRuns++;if o.Complete&&o.Verdict==Blocked&&o.FailureSignatureSHA256==in.TargetFailureSignatureSHA256{matches++}else{success=false}}
   }
   sort.Strings(ids);shared:=make([]string,0,len(build.shared));for s:=range build.shared{shared=append(shared,s)};sort.Strings(shared)
-  out.Clusters=append(out.Clusters,ClusterResult{ClusterID:fmt.Sprintf("cluster-%03d",index+1),UnitIDs:ids,SharedDomains:shared,RequiredRuns:requiredRuns,ObservedRuns:observedRuns,ExactMatches:matches,ClusterSuccess:success})
+  out.Clusters=append(out.Clusters,ClusterResult{ClusterID:fmt.Sprintf("cluster-%03d",index+1),UnitIDs:ids,ExecutionUnitCount:len(build.indices),SharedDomains:shared,RequiredRuns:requiredRuns,ObservedRuns:observedRuns,ExactMatches:matches,ClusterSuccess:success})
   if success{clusterSuccesses++}
  }
  out.ObservedIndependentClusters=len(ordered);out.SuccessfulClusters=clusterSuccesses;out.FailedClusters=len(ordered)-clusterSuccesses
  if len(ordered)>0{out.ObservedClusterSuccessRate=float64(clusterSuccesses)/float64(len(ordered))}
  if len(ordered)>in.RequiredIndependentClusters{f.block("independent_cluster_count_exceeds_preregistered_design")}else if len(ordered)<in.RequiredIndependentClusters{f.hold("independent_cluster_count_below_preregistered_target")}
  if len(in.Units)!=in.ExpectedUnitCount{f.hold("execution_unit_frame_not_complete")}
- if len(ordered)==in.RequiredIndependentClusters&&len(in.Units)==in.ExpectedUnitCount{
+ uniformClusterSize:=true
+ if len(ordered)>1{baseSize:=len(ordered[0].indices);for _,build:=range ordered[1:]{if len(build.indices)!=baseSize{uniformClusterSize=false}}}
+ if !uniformClusterSize{f.hold("unequal_dependency_cluster_sizes_require_stratified_analysis")}
+ if len(ordered)==in.RequiredIndependentClusters&&len(in.Units)==in.ExpectedUnitCount&&uniformClusterSize{
   out.OneSidedConfidenceLowerBound=OneSidedClopperPearsonLower(clusterSuccesses,len(ordered),in.ConfidenceLevel)
   if out.OneSidedConfidenceLowerBound>=in.MinimumReliability&&!f.blocked&&!f.unknown{out.StatisticalVerdict=Qualified}else if !f.unknown&&out.OneSidedConfidenceLowerBound<in.MinimumReliability{out.StatisticalVerdict=Blocked;f.block("cluster_reproducibility_below_preregistered_threshold")}else{out.StatisticalVerdict=Indeterminate}
  }else{out.StatisticalVerdict=Indeterminate}
