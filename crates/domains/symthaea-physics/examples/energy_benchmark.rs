@@ -1,10 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Energy Efficiency Measurement Benchmark
+//! HDC+CfC throughput and scenario-energy diagnostic
 //!
-//! Measures the computational cost of the HDC+CfC pipeline and compares
-//! energy-per-inference against published transformer baselines.
+//! Measures wall-clock throughput and memory for the synthetic HDC+CfC
+//! workload. The optional energy fields are scenario estimates formed from
+//! assumed CPU power multiplied by measured latency. They are NOT hardware
+//! energy measurements, do not represent whole-system energy, and must not be
+//! compared with other models or systems.
+//!
+//! For hardware-backed energy receipts and matched-quality comparisons, use
+//! the EnergyMeter and EnergyRunReceipt qualification path.
 //!
 //! Run: `cargo run -p symthaea-physics --example energy_benchmark --release`
 
@@ -27,34 +33,11 @@ const WARMUP_ITERATIONS: usize = 100;
 const ENCODING_SAMPLES: usize = 10_000;
 const PREDICTION_ITERATIONS: usize = 1000;
 
-// Assumed CPU TDP values (watts)
-const TDP_DESKTOP: f64 = 65.0;
-const TDP_LAPTOP: f64 = 15.0;
-
-// Published transformer reference points
-struct TransformerRef {
-    name: &'static str,
-    power_watts: f64,
-    time_per_inference_ms: f64,
-}
-
-const TRANSFORMER_REFS: &[TransformerRef] = &[
-    TransformerRef {
-        name: "GPT-3 175B",
-        power_watts: 355.0,
-        time_per_inference_ms: 100.0,
-    },
-    TransformerRef {
-        name: "Llama 7B",
-        power_watts: 50.0,
-        time_per_inference_ms: 30.0,
-    },
-    TransformerRef {
-        name: "Mistral 7B",
-        power_watts: 45.0,
-        time_per_inference_ms: 25.0,
-    },
-];
+// Illustrative CPU-power scenarios only (watts). These values are not
+// measurements, do not represent whole-system power, and are not TDP-derived
+// claims about actual workload draw.
+const ASSUMED_DESKTOP_CPU_POWER_WATTS: f64 = 65.0;
+const ASSUMED_LAPTOP_CPU_POWER_WATTS: f64 = 15.0;
 
 #[derive(Debug, Clone, Serialize)]
 struct ThroughputResult {
@@ -74,12 +57,14 @@ struct MemoryResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct EnergyComparison {
-    system: String,
-    power_watts: f64,
-    time_per_inference_ms: f64,
-    energy_per_inference_joules: f64,
-    ratio_vs_gpt3: f64,
+struct ScenarioEnergyEstimate {
+    system_label: String,
+    measurement_status: String,
+    physical_scope: String,
+    claim_ceiling: String,
+    assumed_power_watts: f64,
+    observed_pipeline_latency_ms: f64,
+    scenario_energy_joules_not_measured: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,8 +84,8 @@ struct EnergyReport {
     cfc_predictions: Vec<PredictionThroughput>,
     full_pipeline: ThroughputResult,
     memory_usage: Vec<MemoryResult>,
-    energy_comparison_desktop: Vec<EnergyComparison>,
-    energy_comparison_laptop: Vec<EnergyComparison>,
+    scenario_energy_estimate_desktop: ScenarioEnergyEstimate,
+    scenario_energy_estimate_laptop: ScenarioEnergyEstimate,
     total_wall_clock_seconds: f64,
 }
 
@@ -161,70 +146,53 @@ fn measure_with_stats(
     }
 }
 
-fn energy_per_inference(tdp_watts: f64, time_ms: f64) -> f64 {
-    tdp_watts * time_ms / 1000.0 // joules
+fn scenario_energy_from_assumed_power(assumed_power_watts: f64, observed_latency_ms: f64) -> f64 {
+    // Dimensional scenario calculation: assumed W × measured s = scenario J.
+    // This is not a meter reading and does not include unmeasured power domains.
+    assumed_power_watts * observed_latency_ms / 1000.0
 }
 
-fn build_energy_comparisons(
-    symthaea_pipeline_time_ms: f64,
-    tdp: f64,
-    tdp_label: &str,
-) -> Vec<EnergyComparison> {
-    let gpt3_energy = energy_per_inference(
-        TRANSFORMER_REFS[0].power_watts,
-        TRANSFORMER_REFS[0].time_per_inference_ms,
-    );
-
-    let mut comparisons = Vec::new();
-
-    // Symthaea entry
-    let sym_energy = energy_per_inference(tdp, symthaea_pipeline_time_ms);
-    comparisons.push(EnergyComparison {
-        system: format!("Symthaea HDC+CfC ({tdp_label})"),
-        power_watts: tdp,
-        time_per_inference_ms: symthaea_pipeline_time_ms,
-        energy_per_inference_joules: sym_energy,
-        ratio_vs_gpt3: sym_energy / gpt3_energy,
-    });
-
-    // Transformer references
-    for t in TRANSFORMER_REFS {
-        let e = energy_per_inference(t.power_watts, t.time_per_inference_ms);
-        comparisons.push(EnergyComparison {
-            system: t.name.to_string(),
-            power_watts: t.power_watts,
-            time_per_inference_ms: t.time_per_inference_ms,
-            energy_per_inference_joules: e,
-            ratio_vs_gpt3: e / gpt3_energy,
-        });
+fn build_scenario_energy_estimate(
+    observed_pipeline_latency_ms: f64,
+    assumed_power_watts: f64,
+    scenario_label: &str,
+) -> ScenarioEnergyEstimate {
+    ScenarioEnergyEstimate {
+        system_label: scenario_label.to_string(),
+        measurement_status: "SCENARIO_ESTIMATE_NOT_MEASURED".to_string(),
+        physical_scope: "assumed CPU-power input only; no sensor coverage".to_string(),
+        claim_ceiling: "not comparable to another system and not a hardware energy receipt"
+            .to_string(),
+        assumed_power_watts,
+        observed_pipeline_latency_ms,
+        scenario_energy_joules_not_measured: scenario_energy_from_assumed_power(
+            assumed_power_watts,
+            observed_pipeline_latency_ms,
+        ),
     }
-
-    comparisons
 }
 
-fn print_energy_table(comparisons: &[EnergyComparison]) {
+fn print_scenario_energy_estimate(estimate: &ScenarioEnergyEstimate) {
+    println!("  Scenario: {}", estimate.system_label);
     println!(
-        "  {:<35} {:>10} {:>15} {:>18} {:>14}",
-        "System", "Power (W)", "Time/Inf (ms)", "Energy/Inf (J)", "Ratio vs GPT-3"
+        "  Assumed CPU power: {:.1} W (scenario input, not measured)",
+        estimate.assumed_power_watts
     );
-    println!("  {}", "-".repeat(96));
-    for c in comparisons {
-        println!(
-            "  {:<35} {:>10.1} {:>15.3} {:>18.6} {:>14.6}",
-            c.system,
-            c.power_watts,
-            c.time_per_inference_ms,
-            c.energy_per_inference_joules,
-            c.ratio_vs_gpt3,
-        );
-    }
+    println!(
+        "  Observed pipeline latency: {:.3} ms",
+        estimate.observed_pipeline_latency_ms
+    );
+    println!(
+        "  Scenario energy: {:.6} J (NOT MEASURED; assumed power × observed latency)",
+        estimate.scenario_energy_joules_not_measured
+    );
 }
 
 fn main() {
     let total_start = Instant::now();
 
     println!("==========================================================");
-    println!("  Energy Efficiency Measurement Benchmark");
+    println!("  HDC+CfC Throughput and Scenario-Energy Diagnostic");
     println!("  HDC Dimension: {}", HDC_DIMENSION);
     println!("==========================================================");
 
@@ -417,55 +385,48 @@ fn main() {
         HDC_DIMENSION as f64 * 4.0 / 1024.0,
     );
 
-    // ── 5. Energy Comparison ─────────────────────────────────────────
+    // ── 5. Scenario energy estimates (not hardware measurements) ─────
     let pipeline_time_ms = pipeline_result.us_per_op / 1000.0;
 
-    println!("\n--- Phase 5: Energy Efficiency Comparison ---");
-    println!("\n  Desktop CPU ({TDP_DESKTOP}W TDP):");
-    let desktop_comparisons = build_energy_comparisons(pipeline_time_ms, TDP_DESKTOP, "desktop");
-    print_energy_table(&desktop_comparisons);
+    println!("\n--- Phase 5: Scenario Energy Estimates (NOT MEASURED) ---");
+    println!("These estimates multiply assumed CPU power by observed latency.");
+    println!("They are not hardware-counter readings and are not comparable to other systems.");
 
-    println!("\n  Laptop CPU ({TDP_LAPTOP}W TDP):");
-    let laptop_comparisons = build_energy_comparisons(pipeline_time_ms, TDP_LAPTOP, "laptop");
-    print_energy_table(&laptop_comparisons);
-
-    // Highlight the efficiency gain
-    let gpt3_energy = energy_per_inference(
-        TRANSFORMER_REFS[0].power_watts,
-        TRANSFORMER_REFS[0].time_per_inference_ms,
+    let desktop_estimate = build_scenario_energy_estimate(
+        pipeline_time_ms,
+        ASSUMED_DESKTOP_CPU_POWER_WATTS,
+        "desktop CPU-power scenario",
     );
-    let symthaea_desktop_energy = energy_per_inference(TDP_DESKTOP, pipeline_time_ms);
-    let symthaea_laptop_energy = energy_per_inference(TDP_LAPTOP, pipeline_time_ms);
+    print_scenario_energy_estimate(&desktop_estimate);
+
+    let laptop_estimate = build_scenario_energy_estimate(
+        pipeline_time_ms,
+        ASSUMED_LAPTOP_CPU_POWER_WATTS,
+        "laptop CPU-power scenario",
+    );
+    print_scenario_energy_estimate(&laptop_estimate);
 
     println!("\n==========================================================");
-    println!("  ENERGY EFFICIENCY SUMMARY");
+    println!("  THROUGHPUT AND SCENARIO-DIAGNOSTIC SUMMARY");
     println!("==========================================================");
     println!(
-        "  Pipeline time:        {:.3} ms ({:.2} us)",
+        "  Observed pipeline latency: {:.3} ms ({:.2} us)",
         pipeline_time_ms, pipeline_result.us_per_op
     );
     println!(
-        "  Desktop energy:       {:.6} J/inference",
-        symthaea_desktop_energy
+        "  Desktop scenario energy:   {:.6} J (not measured)",
+        desktop_estimate.scenario_energy_joules_not_measured
     );
     println!(
-        "  Laptop energy:        {:.6} J/inference",
-        symthaea_laptop_energy
+        "  Laptop scenario energy:    {:.6} J (not measured)",
+        laptop_estimate.scenario_energy_joules_not_measured
     );
     println!(
-        "  vs GPT-3 (desktop):   {:.0}x more efficient",
-        gpt3_energy / symthaea_desktop_energy
-    );
-    println!(
-        "  vs GPT-3 (laptop):    {:.0}x more efficient",
-        gpt3_energy / symthaea_laptop_energy
-    );
-    println!(
-        "  Encoding throughput:  {:.0} samples/sec",
+        "  Encoding throughput:       {:.0} samples/sec",
         encoding_result.ops_per_second
     );
     println!(
-        "  Pipeline throughput:  {:.0} inferences/sec",
+        "  Pipeline throughput:       {:.0} inferences/sec",
         pipeline_result.ops_per_second
     );
     println!("==========================================================");
@@ -481,8 +442,8 @@ fn main() {
         cfc_predictions: pred_results,
         full_pipeline: pipeline_result,
         memory_usage: memory_results,
-        energy_comparison_desktop: desktop_comparisons,
-        energy_comparison_laptop: laptop_comparisons,
+        scenario_energy_estimate_desktop: desktop_estimate,
+        scenario_energy_estimate_laptop: laptop_estimate,
         total_wall_clock_seconds: total_elapsed.as_secs_f64(),
     };
 
@@ -496,4 +457,32 @@ fn main() {
         "\nTotal benchmark wall-clock time: {:.2}s",
         total_elapsed.as_secs_f64()
     );
+}
+
+#[cfg(test)]
+mod scenario_energy_tests {
+    use super::*;
+
+    #[test]
+    fn scenario_energy_arithmetic_preserves_watt_millisecond_units() {
+        // 65 W × 100 ms = 6.5 J as a scenario calculation only.
+        assert!((scenario_energy_from_assumed_power(65.0, 100.0) - 6.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn zero_latency_produces_zero_scenario_energy() {
+        assert_eq!(scenario_energy_from_assumed_power(65.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn output_labels_the_energy_as_unmeasured() {
+        let estimate = build_scenario_energy_estimate(100.0, 65.0, "test scenario");
+        assert_eq!(
+            estimate.measurement_status,
+            "SCENARIO_ESTIMATE_NOT_MEASURED"
+        );
+        assert!(estimate.physical_scope.contains("no sensor coverage"));
+        assert!(estimate.claim_ceiling.contains("not comparable"));
+        assert_eq!(estimate.scenario_energy_joules_not_measured, 6.5);
+    }
 }

@@ -1,0 +1,73 @@
+name: Energy Benchmark Scenario-Estimate Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - 'crates/domains/symthaea-physics/examples/energy_benchmark.rs'
+      - '.github/workflows/energy-benchmark-example-qualification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exact-example:
+    name: Exact-head HDC energy benchmark example
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Assert exact source revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          echo "subject_sha=$(git rev-parse HEAD)"
+          echo "example_blob=$(git hash-object crates/domains/symthaea-physics/examples/energy_benchmark.rs)"
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Check exact example formatting
+        run: rustfmt +stable --check --edition 2024 crates/domains/symthaea-physics/examples/energy_benchmark.rs
+
+      - name: Compile the exact example
+        run: cargo +stable check --locked -p symthaea-physics --example energy_benchmark
+
+      - name: Run exact example unit tests
+        run: cargo +stable test --locked -p symthaea-physics --example energy_benchmark
+
+      - name: Strict Clippy for exact example
+        run: cargo +stable clippy --locked -p symthaea-physics --example energy_benchmark -- -D warnings
+
+      - name: Emit exact-head receipt
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "repository=Luminous-Dynamics/symthaea"
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "example_blob=$(git hash-object crates/domains/symthaea-physics/examples/energy_benchmark.rs)"
+            echo "workflow_run_id=${{ github.run_id }}"
+            echo "workflow_run_attempt=${{ github.run_attempt }}"
+            echo "rustc=$(rustc +stable --version)"
+            echo "cargo=$(cargo +stable --version)"
+          } > energy-benchmark-example-receipt.txt
+
+      - name: Upload exact-head receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: energy-benchmark-example-qualification
+          path: energy-benchmark-example-receipt.txt
+          retention-days: 30
