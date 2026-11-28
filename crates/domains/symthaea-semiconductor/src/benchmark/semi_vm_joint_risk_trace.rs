@@ -808,6 +808,18 @@ fn validate_aci_arm(
             )));
         };
         validate_aci_delivery(delivery, prediction, row)?;
+        if let Some(delivery_round_prediction) = evidence
+            .predictions
+            .iter()
+            .find(|candidate| candidate.round == delivery.delivered_round)
+            && delivery.delivered_at_unix_seconds
+                < delivery_round_prediction.prediction_time_unix_seconds
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} receives sample {} feedback before the delivery-round prediction",
+                arm.arm_id, delivery.sample_id
+            )));
+        }
         if deliveries_by_sample
             .insert(delivery.sample_id.as_str(), delivery)
             .is_some()
@@ -2301,6 +2313,21 @@ mod tests {
             report.comparison_scope,
             JointComparisonScopeV1::EndToEndPipeline
         );
+    }
+
+    #[test]
+    fn paired_trace_rejects_feedback_delivered_before_same_round_prediction() {
+        let mut input = paired_fixture();
+        input.population[0].label_delivered_at_unix_seconds = Some(1_900_000_030);
+        for arm in &mut input.arms {
+            if let JointControllerEvidenceV1::FixedDelayTauAci(evidence) =
+                &mut arm.controller_evidence
+            {
+                evidence.deliveries[0].delivered_at_unix_seconds = 1_900_000_030;
+            }
+        }
+        input.trace_sha256 = seal_joint_risk_trace_v1(&input).unwrap();
+        assert!(evaluate_joint_risk_trace_v1(&input).is_err());
     }
 
     #[test]
