@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-metamorphic-commutator-case-v1.schema.json",
+  "title": "Melothaea metamorphic commutator case v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "preregistration_sha256",
+    "evaluation_split",
+    "left_path_sha256",
+    "right_path_sha256",
+    "expected_to_commute",
+    "rationale",
+    "case_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-metamorphic-commutator-case-v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preregistration_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluation_split": {
+      "enum": ["train", "development", "test"]
+    },
+    "left_path_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "right_path_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "expected_to_commute": {
+      "type": "boolean"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
