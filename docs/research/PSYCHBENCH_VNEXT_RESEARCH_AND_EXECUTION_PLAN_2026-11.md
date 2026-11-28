@@ -330,9 +330,9 @@ A benchmark that is insensitive to the negative control or fails to distinguish 
 
 ### P0 — repair trust before expanding breadth
 
-1. Correct ICC implementation and add consistency-vs-agreement unit tests. **Partially implemented in this branch** (see commit history).
+1. Correct ICC implementation and add consistency-vs-agreement unit tests. **Implemented in this branch; Rust verification remains pending.**
 2. Explicitly label the current reliability battery as synthetic parameter-profile robustness, not human test-retest reliability. **Implemented in this branch.**
-3. Add bounded-metric confidence intervals (Wilson/Jeffreys for binomial proportions) and a CI validity audit over all stored baselines.
+3. Add bounded-metric confidence intervals (Wilson for binary outcomes; bounded bootstrap for other [0,1] observations) and a CI validity audit over all stored baselines. **Interval calculation is implemented in this branch; baseline regeneration/audit remains pending.**
 4. Create the canonical benchmark registry and generated count/inventory.
 5. Reconcile all README, crate docs, paper, supplement, examples, and baseline version labels.
 6. Make the human normative comparison fail closed on missing sample/population/protocol metadata.
