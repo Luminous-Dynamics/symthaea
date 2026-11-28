@@ -252,6 +252,29 @@ For a narrowly scoped pilot, preregister one primary business endpoint and prese
 
 These are project pilot goals, not industry standards or achieved results. If the baseline is already near a ceiling, use a pre-registered non-inferiority or efficiency endpoint instead.
 
+## 13a. Evaluator qualification is part of capability measurement
+
+A benchmark score is conditional on the integrity of its task set, reference, grader, and run accounting. Treat evaluator quality as a separate qualification object, not as an assumed property of a published leaderboard.
+
+Compose with the canonical owners:
+- CEB task admission and two-sided oracle qualification: #10607 / #10115;
+- benchmark evaluator-integrity attacks and stale-reference audit: #10138;
+- generic run accounting and anti-score-laundering: #10314;
+- CEB DSSE primary/pristine-regrade verification: #10167 / #10212;
+- layered evidence and receipt ownership: #10370;
+- judge/rubric/reference metrology: #9022, #9081, #9123.
+
+For each task/grader revision, retain the task universe and excluded denominator, reference identity, grader source/build digest, oracle confidence, positive/negative controls, and false-accept/false-reject observations. A valid reference must pass; an empty or deliberate wrong solution must fail when completion is required. A valid safe-hold reference must be accepted for tasks whose correct outcome is abstention/escalation. Do not force every task into a one-direction pass/fail oracle.
+
+A grader mutation campaign should include: accepting no-op, accepting the wrong entity/environment, accepting stale state, ignoring a required item, crediting unauthorized writes, rejecting a correct alternative, and reusing evidence from another task/revision. Report false accepts and false rejects separately, with the attack-family denominator and uncertainty. A passing candidate score cannot override a grader-integrity failure.
+
+Benchmark release changes have different effects:
+- task, environment, information, candidate budget or material model/harness changes generally require a new run;
+- grader-only correction requires regrading retained immutable outputs where possible;
+- metadata-only corrections may preserve prior results with an explicit lineage update.
+
+For LLM/human adjudication, retain initial independent judgments, abstentions, repeatability, order/prompt sensitivity, inter-rater agreement and adjudication provenance. LLM judges are not counted as human participants. Deterministic service-state, accounting and authorization oracles take precedence over narrative scoring.
+
 ## 13. Validity and anti-gaming controls
 
 - Freeze task, oracle, information frontier, resource budget, comparator versions, exclusions and analysis before scoring.
