@@ -114,7 +114,12 @@ fn coordinates_per_c058_pair(configurations: &[KernelExpertConfig]) -> u64 {
 
 fn parse_argument(args: &[String], name: &str, default: u64) -> Result<u64, Box<dyn Error>> {
     match args.iter().position(|value| value == name) {
-        Some(index) => Ok(args.get(index + 1).ok_or("missing argument value")?.parse()?),
+        Some(index) => {
+            let value = args.get(index + 1).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing argument value")
+            })?;
+            Ok(value.parse()?)
+        }
         None => Ok(default),
     }
 }
@@ -141,7 +146,12 @@ fn paired_bootstrap_mean_ci(
     scenario_id: &str,
     metric: &str,
 ) -> Result<(f64, f64, f64), Box<dyn Error>> {
-    if values.is_empty() { return Err("cannot bootstrap an empty paired sample".into()); }
+    if values.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "cannot bootstrap an empty paired sample",
+        ).into());
+    }
     let seed = paired_stream_seed(
         "cmaq-059-paired-bootstrap-v1",
         &format!("{scenario_id}-{metric}"),
@@ -200,7 +210,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let replicates = parse_argument(&args, "--replicates", 16)?;
     let horizon = parse_argument(&args, "--horizon", 128)?;
     if replicates == 0 || replicates > 10_000 || horizon == 0 || horizon > 1_024 {
-        return Err("replicates must be 1..=10000 and horizon 1..=1024".into());
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "replicates must be 1..=10000 and horizon 1..=1024",
+        ).into());
     }
 
     let configurations = configs()?;
