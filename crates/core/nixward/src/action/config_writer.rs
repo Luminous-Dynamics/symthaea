@@ -853,6 +853,35 @@ mod tests {
     }
 
     #[test]
+    fn nested_and_composed_option_bindings_are_not_rewritten_as_flat_paths() {
+        let nested = r#"{ config, pkgs, ... }:
+{
+  services = {
+    openssh = {
+      enable = true;
+    };
+  };
+}
+"#;
+        let (_dir, writer) = setup_temp_config(nested);
+        let error = writer
+            .set_option("services.openssh.enable", "false")
+            .expect_err("nested binding must require an AST-aware rewrite");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+
+        let composed = r#"{ config, pkgs, ... }:
+{
+  services.openssh.enable = true; services.nginx.enable = true;
+}
+"#;
+        let (_dir, writer) = setup_temp_config(composed);
+        let error = writer
+            .set_option("services.openssh.enable", "false")
+            .expect_err("same-line sibling definitions must not be removed");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
     fn duplicate_option_definitions_are_not_textually_replaced() {
         let duplicate = r#"{ config, pkgs, ... }:
 {
