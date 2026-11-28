@@ -265,6 +265,19 @@ mod tests {
     }
 
     #[test]
+    fn nback_signed_discrimination_interval_respects_declared_bounds() {
+        let config = BenchmarkConfig {
+            trials_per_condition: 5,
+            dimension: 256,
+            ..Default::default()
+        };
+        let result = NBackBenchmark.run(&config);
+        let metric = &result.metrics["nback_1::accuracy"];
+        assert!(metric.ci_lower >= -1.0);
+        assert!(metric.ci_upper <= 1.0);
+    }
+
+    #[test]
     fn test_nback_metrics_finite() {
         let config = BenchmarkConfig {
             trials_per_condition: 5,
