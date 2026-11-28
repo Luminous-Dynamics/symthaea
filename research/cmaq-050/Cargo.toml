@@ -1,0 +1,14 @@
+[package]
+name = "cmaq-050-product-fourier-conditional-pairs"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Continuous-covariate product Fourier paired conditional discrepancy e-process"
+
+[dependencies]
+cmaq-046-convex-target-approachability = { path = "../cmaq-046" }
+cmaq-048-fourier-kernel-approachability = { path = "../cmaq-048" }
+cmaq-049-contextual-paired-kernel = { path = "../cmaq-049" }
+
+[workspace]
