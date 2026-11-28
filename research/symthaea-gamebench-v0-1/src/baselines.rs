@@ -15,6 +15,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BaselineError {
     EmptyActionSet,
+    NoRemainingBudget,
     IncompleteMap,
     MissingGoal,
     InvalidDecision,
@@ -24,6 +25,7 @@ impl Display for BaselineError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyActionSet => write!(f, "no candidate actions were offered"),
+            Self::NoRemainingBudget => write!(f, "candidate was called with no remaining actions"),
             Self::IncompleteMap => write!(f, "greedy O1 baseline requires a complete map"),
             Self::MissingGoal => write!(f, "greedy O1 baseline requires a visible goal"),
             Self::InvalidDecision => write!(f, "baseline produced an invalid candidate decision"),
@@ -35,13 +37,17 @@ impl Error for BaselineError {}
 
 #[derive(Debug, Clone)]
 pub struct RandomLegalCandidate {
+    base_seed: u64,
     rng_state: u64,
+    episode_counter: u64,
 }
 
 impl RandomLegalCandidate {
     pub fn new(seed: u64) -> Self {
         Self {
+            base_seed: nonzero_seed(seed),
             rng_state: nonzero_seed(seed),
+            episode_counter: 0,
         }
     }
 
@@ -56,8 +62,11 @@ impl RandomLegalCandidate {
 impl InteractiveCandidate<Observation, Action> for RandomLegalCandidate {
     type Error = BaselineError;
 
-    fn reset(&mut self, episode_id: u64) -> Result<(), Self::Error> {
-        self.rng_state = nonzero_seed(episode_id);
+    fn reset(&mut self) -> Result<(), Self::Error> {
+        self.episode_counter = self.episode_counter.wrapping_add(1);
+        self.rng_state = nonzero_seed(
+            self.base_seed ^ self.episode_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+        );
         Ok(())
     }
 
@@ -65,6 +74,9 @@ impl InteractiveCandidate<Observation, Action> for RandomLegalCandidate {
         &mut self,
         input: CandidateInput<'_, Observation, Action>,
     ) -> Result<CandidateDecision<Action>, Self::Error> {
+        if input.remaining_actions == 0 {
+            return Err(BaselineError::NoRemainingBudget);
+        }
         if input.legal_actions.is_empty() {
             return Err(BaselineError::EmptyActionSet);
         }
@@ -93,7 +105,7 @@ pub struct GreedyManhattanCandidate;
 impl InteractiveCandidate<Observation, Action> for GreedyManhattanCandidate {
     type Error = BaselineError;
 
-    fn reset(&mut self, _episode_id: u64) -> Result<(), Self::Error> {
+    fn reset(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -101,6 +113,9 @@ impl InteractiveCandidate<Observation, Action> for GreedyManhattanCandidate {
         &mut self,
         input: CandidateInput<'_, Observation, Action>,
     ) -> Result<CandidateDecision<Action>, Self::Error> {
+        if input.remaining_actions == 0 {
+            return Err(BaselineError::NoRemainingBudget);
+        }
         let observation = input.observation;
         let goal = observation.known_goal.ok_or(BaselineError::MissingGoal)?;
         let area = usize::from(observation.width)
@@ -224,7 +239,7 @@ mod tests {
             episode_step: 0,
         };
         let first = candidate.decide(input).expect("random action");
-        candidate.reset(7).expect("reset");
+        candidate.reset().expect("reset");
         let replayed = candidate.decide(input).expect("replayed random action");
         assert_eq!(first.action, replayed.action);
     }
