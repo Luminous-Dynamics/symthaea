@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/eqc-run-receipt-v0.1.schema.json",
+  "title": "Evidence-Qualified Capability Run Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "task_id",
+    "task_digest_sha256",
+    "source_head",
+    "system",
+    "environment",
+    "authority_snapshot_sha256",
+    "input_digests",
+    "actions",
+    "observed_result",
+    "verifier",
+    "dimensions",
+    "qualified"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.eqc.run-receipt.v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^eqc-[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "task_digest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_head": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "version",
+        "harness_version"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "harness_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image_digest",
+        "runtime",
+        "network_policy",
+        "host"
+      ],
+      "properties": {
+        "image_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network_policy": {
+          "enum": [
+            "none",
+            "declared_endpoints_only",
+            "open"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gpu_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "authority_snapshot_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policy_digest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_digests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input_id",
+          "sha256"
+        ],
+        "properties": {
+          "input_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "action",
+          "resource_id",
+          "outcome",
+          "mutation_applied"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "enum": [
+              "allowed",
+              "denied",
+              "failed",
+              "unresolved"
+            ]
+          },
+          "mutation_applied": {
+            "type": "boolean"
+          },
+          "receipt_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "observed_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "state_mutation_count",
+        "result_digest_sha256"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "allow",
+            "deny",
+            "unresolved"
+          ]
+        },
+        "state_mutation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "result_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_id",
+        "verifier_digest_sha256",
+        "replay"
+      ],
+      "properties": {
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "replay": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "independent": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "authority",
+        "input_integrity",
+        "provenance",
+        "reproducibility",
+        "failure_containment"
+      ],
+      "properties": {
+        "capability": {
+          "type": "boolean"
+        },
+        "authority": {
+          "type": "boolean"
+        },
+        "input_integrity": {
+          "type": "boolean"
+        },
+        "provenance": {
+          "type": "boolean"
+        },
+        "reproducibility": {
+          "type": "boolean"
+        },
+        "failure_containment": {
+          "type": "boolean"
+        }
+      }
+    },
+    "qualified": {
+      "type": "boolean"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "qualified": {
+            "const": true
+          }
+        },
+        "required": [
+          "qualified"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dimensions": {
+            "properties": {
+              "capability": {
+                "const": true
+              },
+              "authority": {
+                "const": true
+              },
+              "input_integrity": {
+                "const": true
+              },
+              "provenance": {
+                "const": true
+              },
+              "reproducibility": {
+                "const": true
+              },
+              "failure_containment": {
+                "const": true
+              }
+            }
+          },
+          "verifier": {
+            "properties": {
+              "replay": {
+                "const": "passed"
+              },
+              "independent": {
+                "const": true
+              }
+            },
+            "required": [
+              "replay",
+              "independent"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
