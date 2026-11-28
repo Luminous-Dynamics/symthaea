@@ -154,23 +154,23 @@ impl FiniteEnumeratorBaseline {
         }
         let report = interaction::discover(&log, access)
             .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?;
+        let challenge_complete = next_unobserved_interaction_input(&log).is_none();
         if view.remaining_probe_actions == 0
-            || report.compatible_models.is_empty()
-            || (report.compatible_models.len() == 1
-                && next_unobserved_interaction_input(&log).is_none())
+            || ((report.compatible_models.is_empty() || report.compatible_models.len() == 1)
+                && challenge_complete)
         {
             return Ok(submit(
                 view,
                 AgentClaim::Interaction {
                     disposition: disposition_with_adequacy(
                         report.compatible_models.len(),
-                        next_unobserved_interaction_input(&log).is_none(),
+                        challenge_complete,
                     ),
                     compatible_models: report.compatible_models,
                 },
             ));
         }
-        if report.compatible_models.len() == 1 {
+        if report.compatible_models.is_empty() || report.compatible_models.len() == 1 {
             if let Some(input) = next_unobserved_interaction_input(&log) {
                 return Ok(probe(AgentIntervention::Pair(input)));
             }
