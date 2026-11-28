@@ -1,6 +1,6 @@
 # PsychBench Cognitive Ecology (PCE) — Specification v0.1
 
-**Status:** proposed benchmark family; deterministic environment-kernel slice implemented on the research branch; Rust validation pending  
+**Status:** proposed benchmark family; PCE kernel/evaluator v0.2 implemented on the research branch; Rust validation pending  
 **Programme:** PsychBench Next  
 **Design date:** 2026-11-28  
 **Primary purpose:** evaluate adaptive cognition in a partially observed, changing environment without collapsing distinct faculties into one score.
@@ -212,6 +212,7 @@ A PCE release is not qualified for confirmatory comparison until:
 - Scenario generator, state machine, event oracle, and replay are versioned and hashed.
 - Every scenario has an executable state-transition test.
 - Rejected/invalid actions are recorded and charged by the runner so action probing cannot be free.
+- Action classes have separately declared costs/budgets (including inspect calls) so invalid probes and repeated observations cannot bypass resource limits.
 - Positive/negative/sham controls demonstrate expected selectivity.
 - Independent scorer mutation tests pass.
 - At least one hidden split is untouched during design/tuning.
