@@ -923,3 +923,65 @@ mod decision_evidence_use_link_tests {
 }
 
 
+/// Test-only receipt fixture for sibling ingress modules. This helper deliberately
+/// bypasses the real verifier and is compiled only into test builds.
+#[cfg(test)]
+pub(crate) fn synthetic_verified_receipt_for_test(
+    event_id: u32,
+    scope: Scope,
+    valid_at_ms: i64,
+    known_at_ms: i64,
+    purpose_code: &str,
+    consumer_policy_sha256: &str,
+    source_trust_status: SourceTrustStatus,
+    lifecycle_status_as_known: SourceLifecycleStatus,
+    dependency_lineage_status: DependencyLineageStatusV1,
+) -> EvidenceUseReceiptV1 {
+    let mut receipt = EvidenceUseReceiptV1 {
+        event_id,
+        payload_sha256: "a".repeat(64),
+        canonical_event_hash: "b".repeat(64),
+        prior_raw_event_receipt_digest: "c".repeat(64),
+        current_raw_event_receipt_digest: "d".repeat(64),
+        current_authority_receipt_digest: "e".repeat(64),
+        prior_lineage_receipt_digest: "f".repeat(64),
+        current_lineage_receipt_digest: "1".repeat(64),
+        prior_snapshot_sha256: "2".repeat(64),
+        current_snapshot_sha256: "3".repeat(64),
+        occurred_at_ms: 170,
+        valid_from_ms: 100,
+        valid_until_ms: Some(300),
+        authority_received_at_ms: 220,
+        prior_valid_at_ms: 180,
+        prior_known_at_ms: 200,
+        valid_at_ms,
+        known_at_ms,
+        action: Action::A,
+        scope,
+        source_family: 7,
+        source_root_digest: SourceRootDigest::from_bytes([7; 32]),
+        upstream_source_id: "source-ledger-7".into(),
+        source_artifact_digest: "4".repeat(64),
+        transformation_digest: "5".repeat(64),
+        source_issuer_id: "did:key:fixture-issuer".into(),
+        source_trust_status,
+        source_trust_policy_sha256: "6".repeat(64),
+        lifecycle_status_as_known,
+        dependency_lineage_status,
+        dependency_manifest_sha256: Some("8".repeat(64)),
+        derived_from_event_ids: Vec::new(),
+        calibration_sha256: "9".repeat(64),
+        measurement_unit: "normalized_utility".into(),
+        measurement_error_bound_bits: 0.01_f64.to_bits(),
+        causal_assessment_sha256: "a".repeat(64),
+        semantic_estimand_sha256: "b".repeat(64),
+        outcome_sha256: "c".repeat(64),
+        purpose_code: purpose_code.into(),
+        consumer_policy_sha256: consumer_policy_sha256.into(),
+        canonical_sha256: String::new(),
+        verified_in_process: true,
+    };
+    receipt.canonical_sha256 = receipt.digest_without_commitment();
+    receipt
+}
+

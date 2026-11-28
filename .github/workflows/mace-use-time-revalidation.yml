@@ -8,6 +8,7 @@ on:
       - "research/broca-mace-transfer-bench-v0-1/policy/**"
       - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json"
       - "research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json"
+      - "research/broca-mace-transfer-bench-v0-1/schemas/evidence-set-selection-v1.schema.json"
       - "docs/research/MACE_USE_TIME_REVALIDATION_V0_1.md"
       - ".github/workflows/mace-use-time-revalidation.yml"
   push:
@@ -48,3 +49,5 @@ jobs:
         run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-use-receipt-v1.schema.json >/dev/null
       - name: Parse decision exposure link schema
         run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/decision-evidence-use-link-v1.schema.json >/dev/null
+      - name: Parse evidence-set selection schema
+        run: python3 -m json.tool research/broca-mace-transfer-bench-v0-1/schemas/evidence-set-selection-v1.schema.json >/dev/null
