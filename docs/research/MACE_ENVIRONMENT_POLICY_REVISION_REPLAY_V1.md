@@ -28,7 +28,7 @@ The resolver accepts an externally verified set of authority receipt digests. Ev
 
 ## ServeLearnBench experiment design
 
-Exercise A → B → A, delayed notices, temporary exceptions, partial rollout, scope disagreement, deceptive non-authoritative suggestions, revoked sources and changed procedure content with unchanged wording but different lineage.
+Exercise A → B → A, delayed notices, temporary exceptions, partial rollout, scope disagreement, deceptive non-authoritative suggestions, revoked sources and changed procedure content with unchanged wording but different lineage. A future unverified notice is ignored by an earlier as-known query, while retroactive effective-time insertion is rejected by V1.
 
 Compare static memory, append-only memory, naive newest-wins, retrieval-only, unconstrained continual update, and MACE bitemporal replay. Keep official ServeLearnBench hidden reward, Avg. FS and API cost separate. Add sidecar metrics for stale-policy execution, false updates, revision latency, rollback accuracy, exploration coverage and evidence acquisition cost.
 
@@ -36,7 +36,7 @@ Prospective target: improve hidden reward at matched API cost while preserving o
 
 ## Tests
 
-Fourteen deterministic Rust tests cover bitemporal valid/known-time resolution, delayed notices, A→B→A reversion, no implicit resurrection, authority receipt validation, scope, explicit reversion provenance, duplicate revisions, withdrawal target, hash-chain tampering/gaps/head mismatch, no-active state and resolution integrity.
+Fifteen deterministic Rust tests cover bitemporal valid/known-time resolution, delayed notices, A→B→A reversion, no implicit resurrection, authority receipt validation, scope, explicit reversion provenance, duplicate revisions, withdrawal target, hash-chain tampering/gaps/head mismatch, no-active state and resolution integrity.
 
 ## Run
 
