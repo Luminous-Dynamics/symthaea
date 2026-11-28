@@ -85,7 +85,7 @@ The test suite includes signature tampering, unknown key IDs, workflow-identity 
 
 **Critical boundary:** the verifier always returns `qualified=false`. It verifies a trusted key's signature and internal evidence consistency; it does not prove that the signer actually launched/isolate the SUT, that cgroup/network counters were truthful, or that before/after snapshots came from outside the SUT. A private test signing key exists only in tests. No production observer key is generated or embedded.
 
-The nonce ledger is process-local and is not concurrency-safe or durable across runs. It prevents duplicate use inside one verifier instance only. Production anti-replay requires a durable transactional ledger or an independently operated evaluation service.
+The Rust verifier library accepts an in-memory nonce ledger. Its CLI persists that ledger in a caller-selected JSON file, uses an adjacent exclusive-create lock to serialize local evaluator processes, and writes updates through a temporary file plus atomic rename. It is intended for one host/local filesystem. A stale lock fails closed and requires operator review; a shared network filesystem or multi-host deployment still requires a durable transactional replay service.
 
 ## 5. Anti-replay and anti-forgery rules
 
