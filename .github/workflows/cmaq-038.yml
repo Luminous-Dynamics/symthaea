@@ -2,6 +2,7 @@ name: CMAQ-038 and conditional rank dependence qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "research/cmaq-037/**"
       - "research/cmaq-031/**"
@@ -28,7 +29,7 @@ concurrency:
 jobs:
   rank-spectrum:
     name: CMAQ-038 multi-resolution rank spectrum
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-038-rank-spectrum-monitor-v0-1-20261127'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.pull_request.head.ref == 'research/cmaq-038-rank-spectrum-monitor-v0-1-20261127'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +54,7 @@ jobs:
 
   conditional-rank-dependence:
     name: CMAQ-045 conditional rank dependence
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'research/cmaq-045-conditional-rank-contexts-v0-1-20261127'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.pull_request.head.ref == 'research/cmaq-045-conditional-rank-contexts-v0-1-20261127'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
