@@ -920,12 +920,15 @@ mod tests {
 
     #[test]
     fn dyadic_start_prior_and_future_mass_sum_to_one_exactly_through_horizon_cap() {
-        let mut started_mass = Rational::new(0, 1).unwrap();
+        let mut started_mass = None;
         for sequence in 1..=MAX_RENEWAL_HORIZON {
-            started_mass = started_mass
-                .checked_add(weight_for_start(sequence).unwrap())
-                .unwrap();
+            let prior_weight = weight_for_start(sequence).unwrap();
+            started_mass = Some(match started_mass {
+                Some(previous) => previous.checked_add(prior_weight).unwrap(),
+                None => prior_weight,
+            });
             let total_mass = started_mass
+                .unwrap()
                 .checked_add(future_mass_after(sequence).unwrap())
                 .unwrap();
             assert_eq!(
