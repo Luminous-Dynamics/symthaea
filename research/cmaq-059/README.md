@@ -96,6 +96,23 @@ Current-outcome feature leakage, changed conditional means in a reference-calibr
 
 C055 and C058 are distinct procedures. C055 resets both policy state and capital at each start. C058 restarts capital while retaining one shared predictable policy state. Report their difference directly.
 
+## Faithful SCPT reproduction contract
+
+The SCPT arm is implemented in `src/scpt.rs` using the procedure in Zheng & Zhang (arXiv:2611.22886, 2026), not a static-kernel/static-bet simplification:
+
+- Gaussian response kernel, (K(x,y)=\exp(-\|x-y\|^2/(2\sigma^2))), with a fixed, recorded bandwidth.
+- Euclidean KNN neighborhoods over prior covariates only, (k_a(t)=\lceil a\sqrt t\rceil), capped by the eligible historical count, for (a\in\{2,4,6\}).
+- The sequential KNN RKHS witness payoff (~ S_t) uses both the current pair and the historical KNN witness norm with the published √2 and η truncation.
+- Each (a)-configuration estimates its betting fraction from past payoffs in the current covariate's neighborhood, using Equation (16) with (w(Z_t)=1).
+- The published equal-weight configuration mixture averages the three predictable factors at each time; it does not select the current maximum.
+- The SCPT implementation records KNN sizes, payoffs, betting fractions, factors and a chained trace.
+
+The paper sets the continuous-response Gaussian bandwidth from the first 50 observations and then holds it fixed. For a clean online comparison, C059 exposes a pre-monitoring warm-up constructor: the first 50 observations calibrate σ and initialize the previsible payoff history, but no e-capital is accumulated during warm-up. This is a validity-safe reproduction variant, not an assertion that the paper's reported protocol used a separately declared calibration split. The benchmark must label it `SCPT-first-50-warmup` and report the 50-observation warm-up explicitly.
+
+For the primary apples-to-apples table, use a second `SCPT-fixed-bandwidth` arm with σ estimated from a separate, preregistered calibration stream and held fixed for all test arms. Record the calibration-stream seed, response pool, median convention, resulting σ and stream digest. This prevents one comparator from silently consuming test observations for bandwidth fitting while the other arms use them as scored observations.
+
+SCPT's Theorem 1 states its time-uniform Type-I guarantee under the full conditional paired null; its main construction uses an additional conditional independence assumption for simplifying the method and power analysis. The paper's finite-history dependence extension is a separate variant and must be labelled separately. Do not generalize the SCPT baseline beyond the exact filtration and dependence treatment reproduced.
+
 ## Counts and horizons
 
 Initial primary grid:
