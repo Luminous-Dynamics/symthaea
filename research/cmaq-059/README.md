@@ -160,3 +160,18 @@ The comparison rule is therefore: same-null and same-filtration competitors belo
 - At H=1024, investigate a target of at least 10× lower p99 restart-bookkeeping time for C058 versus C055, measured on the same host and separately from factor generation.
 
 These are research targets. No SOTA, statistical qualification, physical safety, or deployment claim is permitted until faithful baselines, exact-head code, raw artifacts, and confidence intervals are independently reviewed.
+
+## Matched Monte Carlo runner
+
+`src/bin/matched_mc.rs` executes C058 and the SCPT reference on the same generated stream for every (scenario, replicate) pair. It uses a separate, independently seeded 50-observation calibration stream to estimate one fixed Gaussian bandwidth for the `SCPT-fixed-bandwidth` arm; the scored stream is not used to fit the bandwidth.
+
+The runner writes four machine-readable artifacts:
+
+1. `cmaq-059-matched-mc-raw.csv`: per-replicate first-alarm times, early/detection/miss classification, stream/seed digests, feature-coordinate or kernel-evaluation counts, and per-replicate p99 update latency.
+2. `cmaq-059-matched-mc-summary.csv`: pointwise exact false-alarm intervals for null cells; unconditional power and restricted-delay summaries for alternatives; operation counts and latency quantiles.
+3. `cmaq-059-matched-mc-null-family.csv`: one-sided simultaneous CP upper bounds over the frozen null arm × scenario family.
+4. `cmaq-059-matched-mc-paired-differences.csv`: deterministic paired bootstrap intervals for C058-minus-SCPT false-alarm rate, unconditional power, and restricted mean delay.
+
+The paired bootstrap resamples replicate indices, not time windows. Because each replicate's input stream is common to both arms, the comparison is paired by stream. External source data with common causes must resample by their source/common-cause block instead.
+
+The dedicated PR workflow executes only a **16-replicate × 128-observation smoke tranche** to verify the end-to-end runner and artifacts. Its intervals are intentionally not treated as precise calibration or benchmark results. Confirmatory qualification still requires the preregistered 10,000 independent full-horizon null paths and 5,000 alternative replicates per primary cell, or the separately preregistered larger precision tranche, plus faithful baseline review. The fixed-bandwidth SCPT arm is the main matched-horizon comparator; the paper-style first-50 warm-up variant remains a separate protocol.
