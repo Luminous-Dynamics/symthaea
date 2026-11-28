@@ -297,6 +297,23 @@ mod tests {
     }
 
     #[test]
+    fn causal_metric_intervals_respect_distinct_supports() {
+        let result = InterventionEffectBenchmark.run(&default_config());
+
+        let discrimination = &result.metrics["intervention_discrimination"];
+        assert!(discrimination.ci_lower >= 0.0);
+        assert!(discrimination.ci_upper <= 2.0);
+
+        let frontdoor = &result.metrics["frontdoor_accuracy"];
+        assert!(frontdoor.ci_lower >= -1.0);
+        assert!(frontdoor.ci_upper <= 1.0);
+
+        let causal_score = &result.metrics["causal_score"];
+        assert!(causal_score.ci_lower >= -0.3);
+        assert!(causal_score.ci_upper <= 1.4);
+    }
+
+    #[test]
     fn test_causal_score_bounded() {
         let bench = InterventionEffectBenchmark;
         let result = bench.run(&default_config());
