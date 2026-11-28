@@ -55,6 +55,7 @@ One controller is declared per trace:
 
 The feedback state is one of:
 - `NOT_SUBMITTED`;
+- `NO_PHYSICAL_OUTCOME` (prediction exists, but no operational physical label exists);
 - `PENDING`;
 - `RETAINED`;
 - `RECEIVED_QUALIFIED`;
@@ -129,13 +130,14 @@ The report explicitly emits:
 
 ## Independent validation
 
-The module has **18 unit tests** covering:
+The module has **19 unit tests** covering:
 - disjoint population partition and worst-case bounds;
 - unselected-label rejection;
 - independent/offline audit use and online-only exclusion;
 - audit-method separation from operational measurement;
 - fixed-delay τ-DACI receipt chronology;
 - valid CA-OCRC K1 feedback and expired-feedback no-update;
+- explicit NO_PHYSICAL_OUTCOME state distinct from capacity-denied, unsubmitted, pending, expired and evicted;
 - explicit capacity-denial state distinct from unsubmitted, pending, expired and evicted;
 - capacity K versus physical acquisition M;
 - per-stage resource budgets;
