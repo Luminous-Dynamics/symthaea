@@ -93,6 +93,9 @@ jobs:
             echo "target=$(rustc -vV | sed -n 's/^host: //p')"
             echo "cargo_lock_sha256=$(sha256sum tools/eqc-reference/Cargo.lock | cut -d' ' -f1)"
             echo "seed_sha256=$(sha256sum docs/research/eqc-seed-corpus-v0.1.json | cut -d' ' -f1)"
+            echo "task_schema_sha256=$(sha256sum docs/research/eqc-task-v0.1.schema.json | cut -d' ' -f1)"
+            echo "receipt_schema_sha256=$(sha256sum docs/research/eqc-run-receipt-v0.1.schema.json | cut -d' ' -f1)"
+            echo "receipt_fixture_sha256=$(sha256sum docs/research/eqc-run-receipt-schema-fixture-v0.1.json | cut -d' ' -f1)"
           } > "$RUNNER_TEMP/eqc-run-metadata.txt"
 
       - name: Preserve standalone qualification evidence
