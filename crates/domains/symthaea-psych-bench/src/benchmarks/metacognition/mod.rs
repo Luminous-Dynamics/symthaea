@@ -26,7 +26,8 @@ pub use selective_prediction_task::{
     ClarificationTarget, RuntimeConfidencePolicy, SelectivePolicyDecision,
     SelectivePredictionActionReceipt, SelectivePredictionBaseline, SelectivePredictionCostModel,
     SelectivePredictionEpisodeReceipt, SelectivePredictionObservation, SelectivePredictionStage,
-    SelectivePredictionTaskReport, SyntheticSelectivePredictionItem, evaluate_policy_with,
+    SelectivePredictionGroundTruth, SelectivePredictionTaskReport,
+    SyntheticSelectivePredictionItem, evaluate_policy_with,
     run_reference_suite as run_selective_prediction_reference_suite, verify_report_integrity,
     verify_report_receipts, verify_report_with_policy,
 };
