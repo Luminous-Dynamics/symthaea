@@ -155,6 +155,12 @@ impl DesignPoint {
         }
     }
 
+    /// KKT-selected subgradient for the active y=1 positive-part kink.
+    /// The optimal primal test value phi(1)=alpha/q_max is in [0,1].
+    fn active_kink_subgradient(self) -> Q {
+        self.test_phi_one()
+    }
+
     /// Exact derivative of alpha*p_min/q_max on the active smooth branch.
     fn smooth_derivative(self) -> Option<Q> {
         if self.u == HALF {
@@ -347,6 +353,14 @@ mod tests {
             Some(r(-7, 60))
         );
         assert_eq!(DesignPoint::new(HALF).smooth_derivative(), None);
+    }
+
+    #[test]
+    fn positive_part_kink_uses_the_primal_randomization_subgradient() {
+        let point = DesignPoint::new(HALF);
+        let subgradient = point.active_kink_subgradient();
+        assert_eq!(subgradient, r(2, 5));
+        assert!(Q::zero().is_le(subgradient) && subgradient.is_le(Q::one()));
     }
 
     #[test]
