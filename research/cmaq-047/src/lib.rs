@@ -95,10 +95,7 @@ impl ActionCatalog {
         }
         validate_digest(&target_sha256, "target_sha256")?;
         validate_digest(&catalog_sha256, "catalog_sha256")?;
-        validate_digest(
-            &authority_inventory_sha256,
-            "authority_inventory_sha256",
-        )?;
+        validate_digest(&authority_inventory_sha256, "authority_inventory_sha256")?;
 
         let mut action_ids = HashSet::with_capacity(actions.len());
         for action in &actions {
@@ -124,14 +121,8 @@ impl ActionCatalog {
             {
                 return Err(ControlledError::InvalidDiagnosticSignature);
             }
-            validate_digest(
-                &action.action_contract_sha256,
-                "action_contract_sha256",
-            )?;
-            validate_digest(
-                &action.authority_receipt_sha256,
-                "authority_receipt_sha256",
-            )?;
+            validate_digest(&action.action_contract_sha256, "action_contract_sha256")?;
+            validate_digest(&action.authority_receipt_sha256, "authority_receipt_sha256")?;
             validate_digest(&action.action_scope_sha256, "action_scope_sha256")?;
         }
 
@@ -210,7 +201,11 @@ impl ControlledBlackwellMonitor {
         target_sha256: String,
         catalog: ActionCatalog,
     ) -> Result<Self, ControlledError> {
-        if target.dimension() != catalog.actions.first().map_or(0, |a| a.null_mean_box.dimension())
+        if target.dimension()
+            != catalog
+                .actions
+                .first()
+                .map_or(0, |a| a.null_mean_box.dimension())
         {
             return Err(ControlledError::DimensionMismatch);
         }
@@ -261,13 +256,13 @@ impl ControlledBlackwellMonitor {
                 continue;
             }
             let alignment = dot(&normal, &action.diagnostic_signature)?;
-            let replace = best.as_ref().is_none_or(
-                |(best_action, _, _, best_alignment)| {
+            let replace = best
+                .as_ref()
+                .is_none_or(|(best_action, _, _, best_alignment)| {
                     alignment > *best_alignment + SUPPORT_TOLERANCE
                         || ((alignment - *best_alignment).abs() <= SUPPORT_TOLERANCE
                             && action.action_id < best_action.action_id)
-                },
-            );
+                });
             if replace {
                 best = Some((action, action_support, slack.max(0.0), alignment));
             }
@@ -307,7 +302,10 @@ impl ControlledBlackwellMonitor {
         returned_action_id: &str,
         observation: &[f64],
     ) -> Result<ControlledUpdate, ControlledError> {
-        let pending = self.pending.as_ref().ok_or(ControlledError::NoPendingAction)?;
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(ControlledError::NoPendingAction)?;
         if pending != plan {
             return Err(ControlledError::PlanMismatch);
         }
@@ -582,14 +580,8 @@ mod tests {
         );
         malformed.authority_receipt_sha256 = "bad".into();
         assert_eq!(
-            ActionCatalog::new(
-                SHA_A.into(),
-                SHA_B.into(),
-                SHA_C.into(),
-                vec![malformed],
-                2,
-            )
-            .err(),
+            ActionCatalog::new(SHA_A.into(), SHA_B.into(), SHA_C.into(), vec![malformed], 2)
+                .err(),
             Some(ControlledError::InvalidDigest("authority_receipt_sha256"))
         );
     }
