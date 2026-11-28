@@ -263,10 +263,6 @@ impl DecisionProblem {
         &self.prior
     }
 
-    pub fn interventions(&self) -> &[Intervention] {
-        &self.interventions
-    }
-
     /// Choose the best current decision under a normalized posterior.
     /// Equal-valued decisions preserve declaration order.
     pub fn best_current_decision(
