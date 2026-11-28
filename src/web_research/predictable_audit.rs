@@ -115,6 +115,8 @@ pub struct PredictableAuditDesign {
     pub random_stream_manifest_sha256: String,
     /// Deterministic lower bound on every conditional q_t in this horizon.
     pub minimum_inclusion_probability: DyadicInclusionProbability,
+    /// Frozen machine-readable rule for eventwise q_t.
+    pub q_policy: PredictableAuditQPolicy,
     /// Documents how the q-policy is computed from pre-label history.
     pub q_policy_id: String,
     pub q_policy_version: String,
