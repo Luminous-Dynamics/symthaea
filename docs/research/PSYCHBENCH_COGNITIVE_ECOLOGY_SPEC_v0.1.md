@@ -231,7 +231,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 - Deterministic `step`, runner-facing `attempt`, and evaluator-only `perturb` transitions. Rejected actions consume a tick and are recorded as `ActionRejected` events. Hard errors (step limit, manifest mismatch, serialization failure) fail closed.
 - Separate evaluator state from agent-visible inspected-site observations.
 - BLAKE3 state/manifest digests, manifest-mismatch rejection, deterministic trace replay and replay-receipt verification.
-- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery and action efficiency.
+- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery, action efficiency, and a manifest-bound action-cost ledger with goal completion per cost unit.
 - JSONL receipt export.
 - A scripted reference policy that solves both generated layouts, an intervention variant that recovers after gate failure, and a deterministic SplitMix64 random-action baseline.
 - Example runner: `cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines`; add `--jsonl` for JSONL summary records.
@@ -241,7 +241,7 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 - The seed currently selects only two layouts. This is a minimal deterministic variation, not a rich procedural world generator.
 - The scripted reference policy is optimal only for this hand-authored two-layout task; it is not a general oracle planner.
 - The random policy is a floor baseline, not a representative distribution of capable agents.
-- Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. Other per-action resource costs and rate limits remain to be formalized.
+- Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. The first `CostModel` uses benchmark-defined relative units (inspect=2, move=1, interaction=1, wait=1, invalid surcharge=1); these are not joules, latency, API tokens or dollars. External wrappers must add measured wall-clock, memory, token, energy and monetary costs. Per-action resource budgets and rate limits remain to be formalized.
 - JSONL export exists as a string serializer, but durable artifact writing, an external independent verifier binary, distractors, delayed transfer, and held-out topologies remain pending.
 
 **Next implementation sequence:**
