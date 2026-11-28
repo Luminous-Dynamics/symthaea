@@ -66,3 +66,10 @@ The `dsp` module now contains a deterministic CPU reference implementation of th
 The ERB filterbank is an ERB-axis triangular power partition, **not** a gammatone cochlear filterbank. The log-frequency representation is a re-binning of the fixed-grid STFT spectrum, **not** a true constant-Q transform. A true variable-window CQT and stateful auditory filters should be added as separate implementations with matched tests rather than silently relabeling these baselines.
 
 Known-answer tests use a bin-centred 1 kHz sinusoid at 8.192 kHz. They verify peak-bin location, recovered amplitude, complex phase, ERB-band localization, log-frequency localization, invalid geometry rejection, non-finite input rejection and exact support alignment across views.
+
+
+## True variable-window CQT implementation
+
+A separate direct complex constant-Q reference is now implemented. For bins-per-octave (B), its quality factor is (Q = 1/(2^{1/B}-1)), with centre frequencies (f_k=f_{min}2^{k/B}) and odd Hann-window lengths approximately (Q f_s/f_k). Each bin preserves its own exact sample support and complex coefficient. Only complete, valid source windows are emitted; no padding is synthesized at the boundaries.
+
+The CQT reference has an explicit operation budget because the direct projection is intentionally slower than an FFT-based production implementation. This is a known-answer baseline for frequency geometry, phase and support semantics. It is not evidence that CQT is perceptually superior; matched comparisons against STFT and log-frequency rebinning remain necessary.
