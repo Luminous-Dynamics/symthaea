@@ -20,7 +20,15 @@
     "max_peak_memory_bytes",
     "max_tool_calls",
     "network_policy",
-    "max_human_interventions"
+    "max_human_interventions",
+    "trust_policy_sha256",
+    "expected_source_sha256",
+    "expected_image_digest",
+    "expected_environment_sha256",
+    "expected_allowed_mutations_sha256",
+    "expected_verifier_id",
+    "expected_verifier_sha256",
+    "expected_verifier_environment_sha256"
   ],
   "properties": {
     "schema": {
@@ -107,6 +115,38 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
+    },
+    "trust_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_image_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "expected_environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_allowed_mutations_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_verifier_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_verifier_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_verifier_environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
