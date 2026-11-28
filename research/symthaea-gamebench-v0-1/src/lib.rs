@@ -16,6 +16,9 @@ pub use candidate::{
     FeatureForecast, ForecastMass, ForecastValue, InteractiveCandidate, validate_decision,
 };
 
+pub mod evaluator;
+pub use evaluator::{F1EpisodeReport, evaluate_f1};
+
 mod hidden_mechanics;
 pub use hidden_mechanics::{
     HiddenAction, HiddenMechanicsError, HiddenMechanicsGame, HiddenMechanicsObservation,
