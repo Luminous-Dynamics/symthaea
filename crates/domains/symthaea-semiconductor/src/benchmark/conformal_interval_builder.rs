@@ -585,7 +585,7 @@ mod tests {
     fn too_few_qualified_calibration_labels_returns_full_set_state() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let samples = (0..18)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10))
+            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.status, ConformalSetBuildStatusV1::FullSetRequired);
@@ -634,7 +634,7 @@ mod tests {
     fn calibration_window_is_capped_by_label_availability_order() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 19);
         let samples = (0..25)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10))
+            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
             .collect::<Vec<_>>();
         let output = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         assert_eq!(output.calibration_sample_count, 19);
@@ -646,7 +646,7 @@ mod tests {
     fn set_receipt_is_deterministic_under_input_order_permutation() {
         let policy = policy(ConformalScoreKindV1::AbsoluteResidual, 50);
         let mut samples = (0..19)
-            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10))
+            .map(|index| sample(index, index as f64 + 1.0, 1_800_000_000 + index as i64 * 10, &policy))
             .collect::<Vec<_>>();
         let first = build_conformal_interval_v1(&policy, &input(0.05), &samples).unwrap();
         samples.reverse();
