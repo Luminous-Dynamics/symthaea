@@ -43,19 +43,20 @@ successful results do not establish subjective experience:
 | Somatic Interference | Damasio | Emergent cascade degradation under neuromod distress | Cascade ratio |
 | Bistable Perception | Psychophysics | Heavy-tailed switching in ambiguous perception | CV of switch interval |
 | Unconscious Priming | GWT | Sub/supra-threshold processing dissociation | Priming dissociation |
-| Metacognitive Ignition | HOT+GWT | HOT spontaneously predicts GWT ignition | Tracking score |
+| Metacognitive Ignition | HOT+GWT | Shared-input HOT/GWT decision alignment under workspace competition | Tracking score |
 
 **Evidence boundary**: 6 of 7 benchmarks primarily validate properties the
-architecture was designed to exhibit. MetacognitiveIgnition is the most
-independent cross-module probe in this matrix, but it still uses synthetic
-competition stimuli and internal module mechanisms. It is not independent
-evidence of human-like cognition or subjective experience.
+architecture was designed to exhibit. MetacognitiveIgnition does not receive
+GWT's outcome or filler state, but HOT and GWT share the target activation
+signal; its ROC/AUC is therefore an input-score discrimination diagnostic,
+not an independent HOT-generated metacognitive readout. The suite provides no
+independent evidence of human-like cognition or subjective experience.
 
 ### Published Results
 
 | Version | Config | Composite | Level | Predictions |
 |---------|--------|-----------|-------|-------------|
-| v0.8.0 (2026-03-01) | seed=42, dim=512, trials=10 | 0.683 | MODERATE | 7/7 |
+| v0.8.0 (2026-03-01) | seed=42, dim=512, trials=10 | 0.683 (legacy composite) | Historical label only | 7/7 |
 
 Baseline snapshots are in `baselines/`. To compare against published results:
 
