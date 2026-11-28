@@ -6,6 +6,7 @@
 //! BLAKE3 digests are integrity commitments, not signatures or attestations.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const SIDECAR_SCHEMA_V1: &str = "mace_benchmark_governance_sidecar_v1";
 pub const COMPARISON_SCHEMA_V1: &str = "mace_benchmark_comparison_receipt_v1";
@@ -153,8 +154,16 @@ fn valid_git_sha(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn nonempty(value: &str) -> bool { !value.trim().is_empty() && value.len() <= 512 }
-fn digest_serialized<T: Serialize>(value: &T) -> Result<String, SidecarRejectV1> {
-    serde_json::to_vec(value).map(|bytes| blake3::hash(&bytes).to_hex().to_string())
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn digest_serialized<T: Serialize + ?Sized>(value: &T) -> Result<String, SidecarRejectV1> {
+    serde_json::to_vec(value)
+        .map(|bytes| sha256_hex(&bytes))
         .map_err(|_| SidecarRejectV1::SerializationFailure)
 }
 fn sidecar_digest(value: &BenchmarkGovernanceSidecarV1) -> Result<String, SidecarRejectV1> {
@@ -375,7 +384,7 @@ impl ComparisonGateV1 {
 mod tests {
     use super::*;
 
-    fn digest(value: &str) -> String { blake3::hash(value.as_bytes()).to_hex().to_string() }
+    fn digest(value: &str) -> String { sha256_hex(value.as_bytes()) }
 
     fn capsule() -> CapsuleBindingV1 {
         CapsuleBindingV1 {
