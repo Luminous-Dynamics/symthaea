@@ -436,3 +436,18 @@ MEL-DJ-005 therefore uses three explicit planes:
 - **Evidence plane:** source and decoder digests, device/profile settings, callback-time histograms, underruns/overruns, route state, controller receipts, clock drift and recording-integrity/replay evidence.
 
 Start with a deterministic offline two-deck graph and fault injection before opening a hardware device. Then qualify one named device/OS/driver/sample-rate/buffer profile at a time. Four decks, stems, hardware controllers, recording and live copilot are later gates, not implied by a two-deck playback result.
+
+
+## 24. Transition alignment must bind to selected beat-grid hypotheses
+
+The transition contract now carries source and target beat-grid hypothesis IDs whenever it contains an explicit alignment. Each ID resolves within the analysis evidence manifest attached to that side's source reference. This prevents a transition proposal from retaining only two frame anchors while losing which of several plausible pulse/tempo interpretations produced them.
+
+The resulting evidence chain is:
+
+1. Source audio hash and source-local sample clock.
+2. Versioned auditory/analysis evidence manifest from #14227.
+3. Versioned beat-grid report and its resolved/ambiguous hypothesis IDs from #14285 / MEL-DJ-007.
+4. Transition contract selects one source and one target hypothesis and records the aligned frame anchors.
+5. The runtime independently checks current authority, deck state, clock conversion and device constraints before executing anything.
+
+An ambiguous report can still support a DJ-authored choice, but the contract must preserve which hypothesis the DJ selected. The validator checks that the identifiers are present; the verifier that resolves them against their manifests remains a separate evidence-binding check before a contract is treated as fully grounded. Structural validation alone does not prove musical correctness or execution authority.
