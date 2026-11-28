@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_benchmark_comparison_receipt_v1.schema.json",
+  "title": "MACE Benchmark Matched Comparison Gate V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_run_id",
+    "baseline_run_id",
+    "matched",
+    "mismatches",
+    "benchmark_id",
+    "track_id",
+    "comparison_scope",
+    "gate_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace_benchmark_comparison_receipt_v1"
+    },
+    "candidate_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "matched": {
+      "type": "boolean"
+    },
+    "mismatches": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparison_scope": {
+      "enum": [
+        "same_benchmark_track",
+        "cross_benchmark_or_track_not_comparable"
+      ]
+    },
+    "gate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
