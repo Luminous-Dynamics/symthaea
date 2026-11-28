@@ -129,11 +129,17 @@ validation status and comparison eligibility.
 - `registry/psych_bench_registry_v0.1.json`
 - `registry/psych_bench_registry_v0.1.schema.json`
 
-This is deliberately **incomplete**: it is not yet the full crate inventory,
-does not generate README/paper counts, and is not wired into the runner or CI.
-Unknown/uncalibrated metrics are marked ineligible rather than assigned guessed
-human norms. Its current contents have had a structural JSON check, but the
-schema has not yet been integrated into automated CI validation.
+This is deliberately **incomplete**: it is not yet the full crate inventory
+and must not be used to publish total benchmark counts. A typed Rust loader is
+available as `registry::PsychBenchRegistry::pilot()` and validates the bundled
+definitions (stable/unique IDs, crate-local implementation paths, explicit
+metric selectors, bounds, evidence classes and human-norm claim boundaries).
+Unit tests cover those fail-closed rules and check that the listed implementation
+files exist. The JSON Schema is stored alongside the registry, but a standards-
+compliant JSON Schema validator, metric-key-to-code cross-check, runner
+integration, generated paper/README tables and full inventory coverage remain
+pending. Unknown/uncalibrated metrics are marked ineligible rather than assigned
+guessed human norms.
 
 ## Dependencies
 
