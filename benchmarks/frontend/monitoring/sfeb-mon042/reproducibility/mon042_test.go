@@ -22,7 +22,7 @@ func validInput(n int)Input{
   unitID:=fmt.Sprintf("unit-%03d",i)
   o:=Observation{UnitID:unitID,ReplayID:fmt.Sprintf("replay-%03d",i),TrialID:in.TrialID,ScenarioSHA256:in.ScenarioSHA256,RecoveryBoundarySHA256:in.RecoveryBoundarySHA256,FaultSetSHA256:in.FaultSetSHA256,CodeRevision:in.CodeRevision,Seed:1000,Verdict:Blocked,FailureSignatureSHA256:targetSHA,Complete:true}
   o.OutcomeReceiptSHA256=ObservationReceiptDigest(o)
-  u:=ExecutionUnit{UnitID:unitID,StratumID:"region-a-deployment-profile-v1",DomainInventoryComplete:true,DependencyDomains:domains,DomainManifestSHA256:DomainManifestDigest(unitID,domains),RequiredRuns:1,Observations:[]Observation{o}}
+  u:=ExecutionUnit{UnitID:unitID,StratumID:"workload-profile-v1",DomainInventoryComplete:true,DependencyDomains:domains,DomainManifestSHA256:DomainManifestDigest(unitID,domains),RequiredRuns:1,Observations:[]Observation{o}}
   in.Units[i]=u
  }
  return in
@@ -83,7 +83,7 @@ func TestDuplicateUnitIDBlocks(t *testing.T){
  if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("duplicate unit id must block: %+v",got)}
 }
 func TestMixedStrataMustBeAnalyzedSeparately(t *testing.T){
- in:=validInput(29);in.Units[1].StratumID="region-b-deployment-profile-v1"
+ in:=validInput(29);in.Units[1].StratumID="workload-profile-v2"
  if got:=Evaluate(in);got.DesignVerdict!=Blocked{t.Fatalf("mixed strata must block pooled estimate: %+v",got)}
 }
 func TestDuplicateSeedWithinUnitBlocks(t *testing.T){
