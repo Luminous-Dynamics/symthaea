@@ -30,5 +30,10 @@ qualification receipt.
 - Flow/cut disagreement is a hard error.
 - The exhaustive cut oracle is capped at 20 graph nodes in v0.1.
 
+The evaluator reports flow, min-cut, accepted edit count, declared edit cost and
+one-step edge-maintenance cost separately. Message bytes and controller updates
+are declared fixture budgets but are not charged to a policy until a controller
+actually emits message/update traces.
+
 This is a benchmark evaluator, not a learned controller. It does not model
 biological transport, bioelectricity, physical repair or industrial actuation.
