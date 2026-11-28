@@ -187,11 +187,15 @@ Use metric-specific estimands; never infer bounds from field names.
 
 **MSC (Minimum Semantic Content, 2026)** is the first visual anchor. It contains 10,426 natural-scene images, 100 human aesthetic ratings per image, and manipulated variants intended to broaden the rating distribution. Its reduced semantic content is useful for isolating some low-level visual factors, but it is not a universal art dataset, not a cross-cultural norm, and not evidence for music, literary, haptic, or architectural aesthetics. Use raw rating distributions, retain participant/item identifiers where licensing permits, and split by base-scene family so manipulated variants cannot leak across folds.
 
+**Poetry Assessment EEG Dataset 1 (NEMAR on006648 / OpenNeuro ds006648, 2026)** should be the first literary-aesthetics anchor and the first bridge between aesthetic response, affect, creativity, and physiology. It contains 64-channel EEG and behavioural ratings from 47 participants who evaluated 210 short English-language texts: 70 Haiku, 70 Senryu, and 70 non-poetic controls. Each text was rated on five 7-point dimensions: aesthetic appeal, vivid imagery, being moved/emotional impact, originality, and creativity. The release also includes participant-level trait measures including PANAS, openness, curiosity, visual/auditory imagery, MAAS mindfulness, and AReA aesthetic responsiveness. The dataset is CC0 and its versioned NEMAR record is v1.0.0 (DOI 10.82901/nemar.on006648). Preserve participant-by-item ratings rather than collapsing to mean labels. Use participant-held-out and text-held-out evaluation, with a crossed generalization split for unseen participants and unseen texts; cluster uncertainty by participant and stimulus. EEG can be evaluated as an auxiliary predictor of task-time judgments, but behavioural ratings—not a band-power heuristic—remain the outcome labels. The associated companion dataset on006647 has four additional participants whose segmented recordings were excluded from the primary PSD analyses; keep it separate for EEG/PSD claims and only consider its behavioural records after verifying the participant/item joins and their provenance. The two releases must not be silently pooled as if all recordings had equal technical status.
+
+This is a strong literary/affective aesthetics anchor, not a universal measure of poetry quality, general creativity, cross-cultural taste, or contemplative attainment. It is a single language/cultural sample and a finite set of short text forms. It does not cover spoken performance, music, visual art, architecture, or direct sensory taste.
+
 **Human Creativity Benchmark (2026 preprint)** is a process/evaluation precedent: its reported 15,000 professional judgements cover five creative domains and separate verifiable convergence from taste-driven divergence. Treat it as a comparator/protocol reference until dataset access, licence, task protocol, and replication conditions are confirmed.
 
 **Existing visual aesthetic datasets** (e.g. AVA/AADB) may be added only after confirming licence, annotation semantics, rater provenance, overlap/duplicate contamination, and comparability with MSC. A dataset's popularity does not make its labels a universal aesthetic truth.
 
-For non-visual modalities, start with new small preregistered panels rather than inventing external ground truth from datasets whose labels measure emotion, genre, engagement, or caption quality rather than aesthetic preference.
+For other non-visual modalities, start with new small preregistered panels rather than inventing external ground truth from datasets whose labels measure emotion, genre, engagement, or caption quality rather than aesthetic preference.
 
 ## 4. Domain B: Contemplative Practice & Ascetic Self-Regulation (CPASR)
 
@@ -230,18 +234,28 @@ Do not treat adherence alone as success. A system that follows a harmful or no-l
 
 Use NEMAR `on001787` / OpenNeuro `ds001787` as an initial external dataset adapter candidate. The record describes 24 participants performing a meditation task, with interruptions approximately every two minutes for self-ratings of concentration and mind-wandering; the NEMAR record lists 64 channels and three sessions. This is a small dataset suitable for a carefully bounded external-task pilot, not a population norm and not a basis for broad consciousness claims.
 
+**Important existing-code audit (main branch, 2026-11-28):** the current claims need to be downgraded before reuse.
+- `scripts/validate_meditation.py` uses the first 120 seconds as a supposed baseline and the signal after 180 seconds as "meditation", although the dataset description says participants were meditating and were interrupted about every two minutes to self-rate concentration and mind-wandering. The script counts stimulus events but does not use the self-ratings as supervised labels. Its five checks are broad feature-range / extraction checks and a simple direction-of-change rule, not participant-held-out classification, calibration, or external predictive validity.
+- `rust-sentinels/src/sentinels/meditation.rs` describes validation as "5/5 checks passed", but its visible unit tests use synthetic alpha/theta sine waves; the implementation computes a baseline-relative `(alpha + theta) / beta` index and a simplified alpha-derived stability proxy. This is a feature heuristic, not validated meditation-depth measurement.
+- `examples/benchmark_meditation_resting.rs` uses the internal `MeditationSimulator` to generate six labelled EEG categories from state-specific frequency amplitudes. Its 30 generated trials and six checks are a simulator/mechanism smoke test, not an OpenNeuro result or external validation.
+- `src/perception/physio/meditation_detector.rs` labels ratios of band powers as "alpha coherence" and "gamma synchrony"; these are power-similarity proxies, not cross-spectral coherence or phase synchrony. Its detection confidence is hard-coded to 0.85. These must be renamed as proxies or replaced by appropriate signal estimators, and confidence must be empirically calibrated.
+- `examples/meditation_phi_analysis.rs` reads subject/session event files but then constructs seeded random, small-world, and modular HDC topologies to calculate `Phi`; it does not derive those values from each participant's recorded EEG. Its output therefore cannot support an empirical statement that meditation increases EEG-derived `Phi`.
+
+Until those paths are corrected, label them `SyntheticMechanism` / exploratory feature-extraction only, remove wording that implies 5/5 external validation or empirical EEG-derived `Phi`, and do not use their outputs as evidence that Symthaea detects meditation states. This is a source-level audit; it does not claim to have executed the scripts or downloaded the dataset.
+
 Required protocol:
 - pin exact dataset version and digest;
+- align EEG windows to timestamped interruption/self-rating events and inspect the original paper, BIDS events, and questionnaire scales before defining labels;
 - split by participant (leave-one-participant-out or grouped folds), never by random EEG windows alone;
 - if sessions are used, report session-held-out evaluation separately;
-- keep participant self-report as the task label, not as infallible ground truth;
-- compare against class-prior, spectral-feature, regularized linear, and suitable temporal baselines;
+- keep participant self-report as the task label, not as infallible ground truth; predict concentration and mind-wandering ratings as separate constructs;
+- compare against class-prior, bandpower-only, regularized linear, and suitable temporal baselines;
 - report subject-level metrics and uncertainty, not only pooled windows;
-- include artefact/missing-channel robustness and temporal drift;
+- include artefact/missing-channel robustness, temporal drift, and event-alignment sensitivity;
 - never define meditation "depth" as a single alpha/theta ratio;
 - avoid inferring spiritual attainment, mental health, or subjective experience from EEG.
 
-The current MeditationSentinel is one system under test. Its existing validation notes should be re-audited against the pinned dataset and this participant-held-out protocol before stronger claims are made.
+The current MeditationSentinel is one system under test, not a qualified detector. First repair the label alignment and signal estimators, then compare it with participant-held-out baselines.
 
 ### 4.4 Asceticism-specific task design
 
@@ -300,7 +314,8 @@ Use the following comparator roles:
 | HCB 2026 preprint | Professional creativity evaluation and disagreement-preserving design | Peer-reviewed SOTA or universal creative quality |
 | AVA / AADB | Established visual-aesthetics model/data comparisons after licence and split audit | Direct equivalence to MSC or human taste in general |
 | AESTHEMOS / aesthetic emotion scales | Vocabulary and construct-development support | One-dimensional "beauty" ground truth |
-| NEMAR/OpenNeuro ds001787 | Participant-held-out attentional/mind-wandering EEG pilot | Meditation depth, enlightenment, consciousness, clinical prediction |
+| NEMAR/OpenNeuro ds001787 | Participant-held-out self-reported concentration/mind-wandering EEG pilot, after event-label alignment | Meditation depth, enlightenment, consciousness, clinical prediction |
+| NEMAR on006648 / ds006648 | 47-participant poetry preference, affect, creativity, EEG and trait-measure anchor | General aesthetics, cross-cultural norms, or meditation-state validation |
 | CogBench / AwarenessBench / HumanBaseline | Adjacent cognitive, affective, awareness, and human-reference comparisons | Interchangeable global psychology scores |
 | Classical signal baselines | Establish whether the architecture adds value beyond simple features | State-of-the-art neural comparison |
 | Contemporary multimodal models | Matched input/output and budget comparison on compatible tasks | Apples-to-apples where modalities, context, or tools differ |
@@ -370,10 +385,11 @@ These are proposed internal release gates, not claims about universal psychometr
 4. Add anti-claim checks preventing aesthetic or ascetic task scores from being reported as clinical, spiritual, or consciousness measurements.
 
 ### P1 — build the external adapters
-1. MSC visual preference adapter with base-scene-grouped splits and raw rating distributions.
-2. NEMAR/OpenNeuro `on001787` EEG/self-report adapter with participant-held-out splits.
-3. Human Creativity Benchmark access/protocol audit; no dependency until access and licence are confirmed.
-4. Dataset manifest, hash pinning, license/attribution, and frozen test split.
+1. NEMAR `on006648` poetry rating adapter first: 47 participants × 210 items, five ordinal ratings; preserve participant-item rows, pin files and stimuli, and test participant/text/crossed holdouts.
+2. MSC visual preference adapter with base-scene-grouped splits and raw rating distributions.
+3. NEMAR/OpenNeuro `on001787` concentration/mind-wandering adapter with label alignment to interruptions and participant-held-out splits.
+4. Human Creativity Benchmark access/protocol audit; no dependency until access and licence are confirmed.
+5. Dataset manifests, hash pinning, licence/attribution, and frozen test splits.
 
 ### P2 — connect existing Symthaea subsystems
 1. Evaluate outputs of `symthaea-aesthetic` as a candidate predictor; keep its internal score out of the evaluator's ground truth.
@@ -413,6 +429,8 @@ These are proposed internal release gates, not claims about universal psychometr
 - Penacchio, O. et al. (2026). *The Minimum Semantic Content (MSC) Dataset: A Large, Balanced Resource for Computational Aesthetics Research*. Scientific Data 13, 470. https://doi.org/10.1038/s41597-026-06816-0. Dataset project: https://osf.io/ZGSVJ/
 - Hopkins, A. et al. (2026). *The Human Creativity Benchmark*. arXiv:2606.30561. https://arxiv.org/abs/2606.30561. Treat as a preprint and confirm data access before direct replication.
 - Delorme, A. & Brandmeyer, T. (2026). *EEG meditation study*, NEMAR dataset on001787, DOI: https://doi.org/10.82901/nemar.on001787. Derived from OpenNeuro ds001787: https://doi.org/10.18112/openneuro.ds001787.v1.1.1.
+- Chaudhuri, S., & Bhattacharya, J. (2026). *Poetry Assessment EEG Dataset 1* (Version v1.0.0) [Data set]. NEMAR. https://doi.org/10.82901/nemar.on006648 (47-participant primary EEG cohort; associated OpenNeuro ds006648 v1.0.0).
+- Delorme, A., & Brandmeyer, T. (2026). *EEG meditation study* (Version v1.0.0) [Data set]. NEMAR. https://doi.org/10.82901/nemar.on001787 (24 participants; interruption-triggered concentration and mind-wandering self-ratings).
 - *Psychological, psychiatric, and behavioral sciences measurement scales: best practice guidelines for their development and validation* (2024). https://pmc.ncbi.nlm.nih.gov/articles/PMC11798685/
 - Bean, A. M. et al. (2025). *Measuring what Matters: Construct Validity in Large Language Model Benchmarks*. NeurIPS 2025 Datasets and Benchmarks Track. https://proceedings.neurips.cc/paper_files/paper/2025/hash/1967e0fc3aa6cbbace562f5cb8e3954e-Abstract-Datasets_and_Benchmarks_Track.html
 - *A validity-guided workflow for robust large language model research in psychology* (2026). https://pubmed.ncbi.nlm.nih.gov/42387246/
