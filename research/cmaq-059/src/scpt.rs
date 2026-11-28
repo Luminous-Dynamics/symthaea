@@ -135,10 +135,9 @@ impl ScptReferenceMonitor {
 
         for (j, a) in self.coefficients.iter().enumerate() {
             let neighbors = self.neighbors(sequence, covariate, *a);
-            let payoff = self.payoff(&obs, &neighbors)?;
             let (past_sum, past_squares) = self.past_moments(&neighbors, j);
-            // Equation (16), w(Z)=1. This is measurable from prior payoffs
-            // and the current covariate; the current X/Y are not used here.
+            // Equation (16), w(Z)=1. Finish the predictable bet decision
+            // using only prior payoffs and the pre-pair covariate.
             let positive_sum = past_sum.max(0.0);
             let denominator = past_sum + past_squares;
             let lambda = if positive_sum == 0.0 || denominator <= 0.0 {
@@ -147,6 +146,10 @@ impl ScptReferenceMonitor {
             if !lambda.is_finite() || !(0.0..1.0).contains(&lambda) {
                 return Err(ScptError::InvalidFactor);
             }
+
+            // Only after the predictable bet is fixed do current X/Y values
+            // enter the RKHS payoff calculation.
+            let payoff = self.payoff(&obs, &neighbors)?;
             let factor = 1.0 + lambda * payoff;
             if !factor.is_finite() || factor <= 0.0 { return Err(ScptError::InvalidFactor); }
             factor_sum += factor;
