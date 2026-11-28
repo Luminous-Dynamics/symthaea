@@ -80,9 +80,10 @@ Candidate policy baselines in the core crate:
 - F1–F6 deterministic environment fixtures: 41 tests.
 - Candidate-output contract: 7 tests.
 - Random and greedy policy baselines: 5 tests.
-- Core crate total: **58 authored tests**.
+- Evaluator-owned F1 runner: **6 tests**.
+- Core crate total: **59 authored tests**.
 - Separate candidate-adapter workspace: 6 FEP tests, 5 spatial HDC tests, 5 HDC-LTC tests (**16 authored tests**).
-- Combined source inventory: **74 authored Rust tests**.
+- Combined source inventory: **75 authored Rust tests**.
 
 These are authored counts, not observed execution results. Dedicated workflows run formatting, Cargo tests, and strict Clippy for each workspace. No pass is claimed until each exact-head workflow completes successfully.
 
