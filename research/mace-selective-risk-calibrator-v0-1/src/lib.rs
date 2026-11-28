@@ -51,6 +51,7 @@ pub struct CalibrationConfigV1 {
     pub cluster_sampling_design_sha256: String,
     pub cluster_workload_policy_sha256: String,
     pub cluster_assignment_manifest_sha256: String,
+    pub maximum_observations_per_cluster: usize,
     pub cluster_design_receipt_sha256: String,
     pub sufficiency_score_definition_sha256: String,
     pub decision_loss_definition_sha256: String,
@@ -175,6 +176,7 @@ pub struct CalibrationManifestV1 {
     pub cluster_sampling_design_sha256: String,
     pub cluster_workload_policy_sha256: String,
     pub cluster_assignment_manifest_sha256: String,
+    pub maximum_observations_per_cluster: usize,
     pub cluster_design_receipt_sha256: String,
     pub calibration_method: String,
     pub risk_target_alpha: f64,
@@ -222,6 +224,9 @@ pub enum CalibrationRejectV1 {
     ThresholdGridDigestMismatch,
     ThresholdGridPrecommitmentMismatch,
     ClusterDesignReceiptMismatch,
+    ClusterAssignmentManifestMismatch,
+    DuplicateOutcomeReceipt,
+    ClusterWorkloadLimitExceeded,
     SerializationFailure,
 }
 
@@ -325,6 +330,34 @@ struct ClusterDesignProjectionV1<'a> {
     cluster_sampling_design_sha256: &'a str,
     cluster_workload_policy_sha256: &'a str,
     cluster_assignment_manifest_sha256: &'a str,
+    maximum_observations_per_cluster: usize,
+}
+
+#[derive(Serialize)]
+struct ClusterAssignmentEntryV1<'a> {
+    outcome_receipt_sha256: &'a str,
+    group_id: &'a str,
+    independent_cluster_id: &'a str,
+}
+
+/// Recompute the row-to-cluster mapping from unique evaluator outcome receipts.
+pub fn compute_cluster_assignment_manifest_sha256_v1(
+    examples: &[CalibrationExampleV1],
+) -> Result<String, CalibrationRejectV1> {
+    let mut entries = Vec::with_capacity(examples.len());
+    let mut seen_receipts = BTreeSet::new();
+    for example in examples {
+        if !seen_receipts.insert(example.outcome_receipt_sha256.as_str()) {
+            return Err(CalibrationRejectV1::DuplicateOutcomeReceipt);
+        }
+        entries.push(ClusterAssignmentEntryV1 {
+            outcome_receipt_sha256: &example.outcome_receipt_sha256,
+            group_id: &example.group_id,
+            independent_cluster_id: &example.independent_cluster_id,
+        });
+    }
+    entries.sort_by(|left, right| left.outcome_receipt_sha256.cmp(right.outcome_receipt_sha256));
+    digest_serialized(&entries)
 }
 
 /// Recompute the threshold-grid precommitment. This binds the candidate grid
@@ -355,6 +388,7 @@ pub fn compute_cluster_design_receipt_sha256_v1(
         cluster_sampling_design_sha256: &config.cluster_sampling_design_sha256,
         cluster_workload_policy_sha256: &config.cluster_workload_policy_sha256,
         cluster_assignment_manifest_sha256: &config.cluster_assignment_manifest_sha256,
+        maximum_observations_per_cluster: config.maximum_observations_per_cluster,
     })
 }
 
@@ -367,6 +401,7 @@ fn validate_config(config: &CalibrationConfigV1) -> Result<(), CalibrationReject
         || !config.unacceptable_loss_threshold.is_finite()
         || !(0.0..=1.0).contains(&config.unacceptable_loss_threshold)
         || config.minimum_independent_clusters < 2
+        || config.maximum_observations_per_cluster == 0
         || config.thresholds.is_empty() {
         return Err(CalibrationRejectV1::InvalidConfig);
     }
@@ -632,6 +667,20 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         }
     }
 
+    let recomputed_cluster_assignment =
+        compute_cluster_assignment_manifest_sha256_v1(examples)?;
+    if recomputed_cluster_assignment != config.cluster_assignment_manifest_sha256 {
+        return Err(CalibrationRejectV1::ClusterAssignmentManifestMismatch);
+    }
+    let mut cluster_workloads: BTreeMap<&str, usize> = BTreeMap::new();
+    for example in examples {
+        let count = cluster_workloads.entry(example.independent_cluster_id.as_str()).or_default();
+        *count += 1;
+        if *count > config.maximum_observations_per_cluster {
+            return Err(CalibrationRejectV1::ClusterWorkloadLimitExceeded);
+        }
+    }
+
     let mut manifest=CalibrationManifestV1{
         schema_version:SCHEMA_VERSION_V1.into(),record_type:"calibration_manifest".into(),run_id:config.run_id.clone(),
         calibration_data_sha256:config.calibration_data_sha256.clone(),calibration_split_sha256:config.calibration_split_sha256.clone(),
@@ -639,6 +688,7 @@ pub fn calibrate_selective_evidence_v1(config:&CalibrationConfigV1,group_specs:&
         cluster_sampling_design_sha256:config.cluster_sampling_design_sha256.clone(),
         cluster_workload_policy_sha256:config.cluster_workload_policy_sha256.clone(),
         cluster_assignment_manifest_sha256:config.cluster_assignment_manifest_sha256.clone(),
+        maximum_observations_per_cluster:config.maximum_observations_per_cluster,
         cluster_design_receipt_sha256:config.cluster_design_receipt_sha256.clone(),
         calibration_cluster_count:examples.iter().map(|row|row.independent_cluster_id.as_str()).collect::<BTreeSet<_>>().len(),
         calibration_example_count:examples.len(),group_hierarchy_sha256:config.group_hierarchy_sha256.clone(),
@@ -876,7 +926,8 @@ mod tests{
             cluster_unit_definition_sha256:digest("person_profile"),
             cluster_sampling_design_sha256:digest("profile_cluster_sampling_v1"),
             cluster_workload_policy_sha256:digest("max_episodes_per_profile_20"),
-            cluster_assignment_manifest_sha256:digest("cluster-map-v1"),
+            cluster_assignment_manifest_sha256:compute_cluster_assignment_manifest_sha256_v1(rows).unwrap(),
+            maximum_observations_per_cluster:20,
             cluster_design_receipt_sha256:String::new(),
             sufficiency_score_definition_sha256:digest("score"),decision_loss_definition_sha256:digest("loss"),
             decision_policy_sha256:digest("policy"),candidate_code_sha256:digest("candidate"),
@@ -1136,6 +1187,7 @@ mod tests{
         let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
         let mut rows=examples(40,"root",0.9,0.0);
         let mut repeated=rows[0].clone();
+        repeated.outcome_receipt_sha256=digest("outcome-repeated");
         repeated.sufficiency_score=0.1;
         repeated.decision_loss=1.0;
         rows.push(repeated);
@@ -1214,6 +1266,36 @@ mod tests{
         let mut altered=cfg.clone();
         altered.cluster_assignment_manifest_sha256=digest("different cluster assignment");
         assert_ne!(compute_cluster_design_receipt_sha256_v1(&altered).unwrap(),cfg.cluster_design_receipt_sha256);
+    }
+
+
+    #[test]
+    fn calibration_recomputes_row_to_cluster_assignment_manifest() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let rows=examples(40,"root",0.9,0.0);
+        let cfg=config(&groups,&rows,vec![0.8,0.5,0.0],30);
+        let mut altered=rows.clone();
+        altered[0].independent_cluster_id="profile-swapped".into();
+        let mut altered_cfg=cfg;
+        altered_cfg.calibration_data_sha256=digest_serialized(&altered).unwrap();
+        assert_eq!(
+            calibrate_selective_evidence_v1(&altered_cfg,&groups,&altered),
+            Err(CalibrationRejectV1::ClusterAssignmentManifestMismatch)
+        );
+    }
+
+    #[test]
+    fn calibration_enforces_the_declared_per_cluster_workload_limit() {
+        let groups=vec![GroupSpecV1{group_id:"root".into(),parent_group_id:None,allow_parent_fallback:false,distribution_shift_detected:false}];
+        let mut rows=examples(2,"root",0.9,0.0);
+        rows[1].independent_cluster_id=rows[0].independent_cluster_id.clone();
+        let mut cfg=config(&groups,&rows,vec![0.8,0.5,0.0],2);
+        cfg.maximum_observations_per_cluster=1;
+        cfg.cluster_design_receipt_sha256=compute_cluster_design_receipt_sha256_v1(&cfg).unwrap();
+        assert_eq!(
+            calibrate_selective_evidence_v1(&cfg,&groups,&rows),
+            Err(CalibrationRejectV1::ClusterWorkloadLimitExceeded)
+        );
     }
 
 }
