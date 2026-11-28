@@ -1,10 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Unified psychometric assessment report.
+//! Unified benchmark diagnostic report (legacy module/type names retained).
 //!
-//! Orchestrates `CognitiveProfile`, `NeuromodCorrelationMatrix`, `StaircaseResult`,
-//! and `NormativeReport` into a single comprehensive markdown report.
+//! Orchestrates a heuristic dashboard, neuromodulation diagnostics, staircase
+//! results, and per-benchmark details. This report is not a validated
+//! psychometric assessment; its overall index is not a general ability score.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,10 +16,10 @@ use super::neuromod_correlation::NeuromodCorrelationMatrix;
 use super::report::{BenchmarkReport, key_metric_for_benchmark};
 use super::staircase::{StaircaseConfig, StaircaseResult, run_staircase};
 
-/// A full psychometric assessment combining all analysis modules.
+/// A legacy report container combining descriptive benchmark diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PsychometricReport {
-    /// Cognitive domain profile (8-domain radar).
+    /// Heuristic domain dashboard (not psychometrically calibrated).
     pub profile: CognitiveProfile,
     /// Summary statistics.
     pub summary: ReportSummary,
@@ -38,15 +39,15 @@ pub struct ReportSummary {
     pub n_benchmarks: usize,
     /// Total metrics collected.
     pub n_metrics: usize,
-    /// Overall composite score (0.0–1.0).
+    /// Legacy unweighted heuristic dashboard index (0.0–1.0), not a validated ability score.
     pub overall_score: f64,
-    /// Strongest cognitive domain.
+    /// Group with the highest heuristic dashboard index.
     pub strongest_domain: String,
-    /// Weakest cognitive domain.
+    /// Group with the lowest heuristic dashboard index.
     pub weakest_domain: String,
-    /// Number of metrics exceeding human baseline (if normative data available).
+    /// Number of metrics above the selected baseline mapping; compatibility is not fully enforced.
     pub n_above_human: usize,
-    /// Number of metrics below human baseline.
+    /// Number of metrics below the selected baseline mapping; compatibility is not fully enforced.
     pub n_below_human: usize,
 }
 
