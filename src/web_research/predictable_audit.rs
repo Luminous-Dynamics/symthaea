@@ -20,7 +20,9 @@
 //! externally. Selected-label nonresponse is not modelled.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+
+use super::sowrc::SowrcObservation;
 
 pub const PREDICTABLE_AUDIT_VERSION: &str = "symthaea-predictable-bernoulli-audit-v1";
 pub const DYADIC_DENOMINATOR: u128 = 1_u128 << 64;
@@ -105,6 +107,9 @@ impl PredictableAuditSelection {
     }
 }
 
+/// Custodian-private receipt. Do not send this object or its selected flags to
+/// the candidate researcher; its purpose is post-prediction audit execution
+/// and independent evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PredictableAuditReceipt {
     pub receipt_version: String,
@@ -140,6 +145,10 @@ pub enum PredictableAuditError {
     DuplicateRecordId(String),
     NonSequentialIndex { expected: usize, actual: usize },
     InvalidPrelabelHistoryDigest { sequence_number: usize },
+    MissingSelectedAdjudication(String),
+    NonSelectedRecordAdjudicated(String),
+    UnknownAdjudicationRecord(String),
+    InvalidNonconformityScore(String),
 }
 
 impl std::fmt::Display for PredictableAuditError {
@@ -181,6 +190,18 @@ impl std::fmt::Display for PredictableAuditError {
                 formatter,
                 "invalid pre-label history SHA-256 at sequence {sequence_number}"
             ),
+            Self::MissingSelectedAdjudication(id) => {
+                write!(formatter, "selected audit event has no independent label: {id}")
+            }
+            Self::NonSelectedRecordAdjudicated(id) => {
+                write!(formatter, "nonselected audit event unexpectedly has a label: {id}")
+            }
+            Self::UnknownAdjudicationRecord(id) => {
+                write!(formatter, "adjudication references unknown audit record: {id}")
+            }
+            Self::InvalidNonconformityScore(id) => {
+                write!(formatter, "true-label nonconformity is invalid for audit record: {id}")
+            }
         }
     }
 }
@@ -204,6 +225,65 @@ fn is_sha256_hex(value: &str) -> bool {
 /// an independent label and the external design satisfies conditional
 /// ignorability. Nonresponse is a separate selection mechanism and must not be
 /// silently treated as a successful audit.
+impl PredictableAuditReceipt {
+    /// Convert the custodian-only selection receipt and completed independent
+    /// labels into the exact ordered SOWRC input. Every selected event must
+    /// have one score, and nonselected events must not have one.
+    ///
+    /// The resulting vector is for the evaluator only, never the candidate.
+    pub fn to_sowrc_observations(
+        &self,
+        true_label_nonconformity_by_record: &BTreeMap<String, f64>,
+    ) -> Result<Vec<SowrcObservation>, PredictableAuditError> {
+        let selected_ids: HashSet<&str> = self
+            .selections
+            .iter()
+            .filter(|selection| selection.selected_for_adjudication)
+            .map(|selection| selection.record_id.as_str())
+            .collect();
+
+        for id in true_label_nonconformity_by_record.keys() {
+            if !self
+                .selections
+                .iter()
+                .any(|selection| selection.record_id == *id)
+            {
+                return Err(PredictableAuditError::UnknownAdjudicationRecord(id.clone()));
+            }
+            if !selected_ids.contains(id.as_str()) {
+                return Err(PredictableAuditError::NonSelectedRecordAdjudicated(
+                    id.clone(),
+                ));
+            }
+        }
+
+        let mut observations = Vec::with_capacity(self.selections.len());
+        for selection in &self.selections {
+            let score = true_label_nonconformity_by_record.get(&selection.record_id).copied();
+            if selection.selected_for_adjudication && score.is_none() {
+                return Err(PredictableAuditError::MissingSelectedAdjudication(
+                    selection.record_id.clone(),
+                ));
+            }
+            if let Some(value) = score {
+                if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                    return Err(PredictableAuditError::InvalidNonconformityScore(
+                        selection.record_id.clone(),
+                    ));
+                }
+            }
+            observations.push(SowrcObservation {
+                sequence_number: selection.sequence_number,
+                record_id: selection.record_id.clone(),
+                inclusion_probability: selection.inclusion_probability(),
+                label_observed: selection.selected_for_adjudication,
+                true_label_nonconformity: score,
+            });
+        }
+        Ok(observations)
+    }
+}
+
 pub fn build_predictable_audit_receipt(
     events: &[PredictableAuditEvent],
     design: &PredictableAuditDesign,
@@ -430,7 +510,7 @@ mod tests {
 
     #[test]
     fn event_sequence_and_record_identity_are_exact() {
-        let mut bad_sequence = event(1, 1_u128 << 63, 0);
+        let bad_sequence = event(1, 1_u128 << 63, 0);
         assert_eq!(
             build_predictable_audit_receipt(&[bad_sequence.clone()], &design()).unwrap_err(),
             PredictableAuditError::NonSequentialIndex {
@@ -438,7 +518,6 @@ mod tests {
                 actual: 1,
             }
         );
-        bad_sequence.sequence_number = 0;
         let duplicate = vec![
             event(0, 1_u128 << 63, 0),
             PredictableAuditEvent {
@@ -464,6 +543,77 @@ mod tests {
         assert!(serialized["selections"][0].get("random_word").is_none());
         assert!(serialized["selections"][0].get("selected_for_adjudication").is_some());
         assert!(serialized["selections"][0].get("prelabel_history_sha256").is_some());
+    }
+
+    #[test]
+    fn custodian_receipt_adapts_to_sowrc_only_with_complete_selected_labels() {
+        let receipt = build_predictable_audit_receipt(
+            &[
+                event(0, 1_u128 << 63, 0),
+                event(1, 1_u128 << 63, u64::MAX),
+                event(2, DYADIC_DENOMINATOR, u64::MAX),
+            ],
+            &design(),
+        )
+        .unwrap();
+        // Events 0 and 2 are selected by the external random words.
+        let labels = BTreeMap::from([
+            ("event-0".to_owned(), 0.1),
+            ("event-2".to_owned(), 0.9),
+        ]);
+        let observations = receipt.to_sowrc_observations(&labels).unwrap();
+        assert_eq!(observations.len(), 3);
+        assert_eq!(observations[0].inclusion_probability, 0.5);
+        assert_eq!(observations[0].true_label_nonconformity, Some(0.1));
+        assert!(!observations[1].label_observed);
+        assert_eq!(observations[1].true_label_nonconformity, None);
+        assert_eq!(observations[2].inclusion_probability, 1.0);
+        assert_eq!(observations[2].true_label_nonconformity, Some(0.9));
+    }
+
+    #[test]
+    fn sowrc_adapter_fails_closed_on_missing_extra_or_invalid_audit_labels() {
+        let receipt = build_predictable_audit_receipt(
+            &[
+                event(0, 1_u128 << 63, 0),
+                event(1, 1_u128 << 63, u64::MAX),
+            ],
+            &design(),
+        )
+        .unwrap();
+
+        let missing = BTreeMap::from([("event-0".to_owned(), 0.2)]);
+        assert_eq!(
+            receipt.to_sowrc_observations(&missing).unwrap_err(),
+            PredictableAuditError::MissingSelectedAdjudication("event-1".to_owned())
+        );
+
+        let nonselected = BTreeMap::from([
+            ("event-0".to_owned(), 0.2),
+            ("event-1".to_owned(), 0.3),
+        ]);
+        assert_eq!(
+            receipt.to_sowrc_observations(&nonselected).unwrap_err(),
+            PredictableAuditError::NonSelectedRecordAdjudicated("event-1".to_owned())
+        );
+
+        let unknown = BTreeMap::from([
+            ("event-0".to_owned(), 0.2),
+            ("stranger".to_owned(), 0.3),
+        ]);
+        assert_eq!(
+            receipt.to_sowrc_observations(&unknown).unwrap_err(),
+            PredictableAuditError::UnknownAdjudicationRecord("stranger".to_owned())
+        );
+
+        let invalid = BTreeMap::from([
+            ("event-0".to_owned(), f64::NAN),
+            ("event-1".to_owned(), 0.3),
+        ]);
+        assert_eq!(
+            receipt.to_sowrc_observations(&invalid).unwrap_err(),
+            PredictableAuditError::InvalidNonconformityScore("event-0".to_owned())
+        );
     }
 
     #[test]
