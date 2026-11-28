@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace_environment_policy_revision_replay_v1.schema.json",
+  "title": "MACE Environment Policy Revision Replay V1",
+  "description": "Append-only, bitemporal and authority-qualified environment-policy revision events and resolutions.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/event"
+    },
+    {
+      "$ref": "#/$defs/query"
+    },
+    {
+      "$ref": "#/$defs/resolution"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "optionalId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stream_id",
+        "environment_id",
+        "procedure_id",
+        "scope_id",
+        "sequence",
+        "event_id",
+        "kind",
+        "revision_id",
+        "target_revision_id",
+        "previous_revision_id",
+        "reversion_of_revision_id",
+        "policy_content_sha256",
+        "source_lineage_receipt_sha256",
+        "authority_receipt_sha256",
+        "effective_at_ms",
+        "recorded_at_ms",
+        "previous_event_sha256",
+        "event_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_environment_policy_revision_replay_v1"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/id"
+        },
+        "environment_id": {
+          "$ref": "#/$defs/id"
+        },
+        "procedure_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "activate",
+            "withdraw"
+          ]
+        },
+        "revision_id": {
+          "$ref": "#/$defs/optionalId"
+        },
+        "target_revision_id": {
+          "$ref": "#/$defs/optionalId"
+        },
+        "previous_revision_id": {
+          "$ref": "#/$defs/optionalId"
+        },
+        "reversion_of_revision_id": {
+          "$ref": "#/$defs/optionalId"
+        },
+        "policy_content_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "authority_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "effective_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recorded_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "event_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id",
+        "environment_id",
+        "procedure_id",
+        "scope_id",
+        "valid_at_ms",
+        "known_at_ms"
+      ],
+      "properties": {
+        "stream_id": {
+          "$ref": "#/$defs/id"
+        },
+        "environment_id": {
+          "$ref": "#/$defs/id"
+        },
+        "procedure_id": {
+          "$ref": "#/$defs/id"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/id"
+        },
+        "valid_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "known_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "active_revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_id",
+        "policy_content_sha256",
+        "source_lineage_receipt_sha256",
+        "authority_receipt_sha256",
+        "effective_at_ms",
+        "recorded_at_ms",
+        "revision_sequence",
+        "reversion_of_revision_id"
+      ],
+      "properties": {
+        "revision_id": {
+          "$ref": "#/$defs/id"
+        },
+        "policy_content_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "source_lineage_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "authority_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "effective_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recorded_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "revision_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reversion_of_revision_id": {
+          "$ref": "#/$defs/optionalId"
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "query",
+        "status",
+        "active_revision",
+        "applied_event_count",
+        "last_applied_sequence",
+        "applied_event_prefix_sha256",
+        "resolution_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace_environment_policy_revision_replay_v1"
+        },
+        "record_type": {
+          "const": "policy_resolution"
+        },
+        "query": {
+          "$ref": "#/$defs/query"
+        },
+        "status": {
+          "enum": [
+            "active_revision",
+            "no_active_revision"
+          ]
+        },
+        "active_revision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/active_revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_applied_sequence": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_event_prefix_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "resolution_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}
