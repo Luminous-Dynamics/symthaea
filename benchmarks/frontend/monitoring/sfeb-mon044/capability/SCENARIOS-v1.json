@@ -1,0 +1,91 @@
+{
+  "profile": "mon044-capture-capability-scenarios-v1",
+  "version": "1.0.0",
+  "classification": "public_synthetic_development_corpus",
+  "scenarios": [
+    {
+      "id": "MON044-P001",
+      "classification": "positive_control",
+      "name": "all_required_scope_supported",
+      "expected": "every mandatory capability has exact identity-bound passing conformance; offline coverage qualified, campaign indeterminate"
+    },
+    {
+      "id": "MON044-N001",
+      "classification": "negative_control",
+      "name": "postgres_ddl_not_in_logical_decode",
+      "expected": "required schema/DDL lane unsupported and coverage blocked"
+    },
+    {
+      "id": "MON044-N002",
+      "classification": "negative_control",
+      "name": "transaction_metadata_predeployment",
+      "expected": "transactions before connector metadata activation cannot be certified"
+    },
+    {
+      "id": "MON044-N003",
+      "classification": "negative_control",
+      "name": "generated_column_omission",
+      "expected": "required generated value without recomputation/extraction lane blocks"
+    },
+    {
+      "id": "MON044-N004",
+      "classification": "negative_control",
+      "name": "toast_placeholder_not_source_value",
+      "expected": "unavailable value cannot be treated as recovered source value"
+    },
+    {
+      "id": "MON044-N005",
+      "classification": "negative_control",
+      "name": "truncate_multi_partition_order",
+      "expected": "truncate ordering is not inferred globally across topic partitions"
+    },
+    {
+      "id": "MON044-N006",
+      "classification": "negative_control",
+      "name": "operation_filter_excludes_required_event",
+      "expected": "explicit exclusion of mandatory operation blocks"
+    },
+    {
+      "id": "MON044-N007",
+      "classification": "negative_control",
+      "name": "schema_history_drift",
+      "expected": "schema-history digest mismatch blocks capability identity"
+    },
+    {
+      "id": "MON044-N008",
+      "classification": "negative_control",
+      "name": "old_conformance_after_config_change",
+      "expected": "conformance report bound to prior identity blocks"
+    },
+    {
+      "id": "MON044-N009",
+      "classification": "negative_control",
+      "name": "missing_scope_source",
+      "expected": "required scope without independent provenance holds"
+    },
+    {
+      "id": "MON044-N010",
+      "classification": "negative_control",
+      "name": "conditional_missing_prerequisite",
+      "expected": "conditional support without all prerequisite proofs is indeterminate"
+    },
+    {
+      "id": "MON044-P002",
+      "classification": "positive_control",
+      "name": "optional_unknown_outside_required_scope",
+      "expected": "mandatory coverage can qualify while optional unknown remains visible"
+    },
+    {
+      "id": "MON044-N011",
+      "classification": "negative_control",
+      "name": "missing_required_capability_item",
+      "expected": "missing required declaration is indeterminate"
+    },
+    {
+      "id": "MON044-N012",
+      "classification": "negative_control",
+      "name": "duplicate_capability_item",
+      "expected": "duplicate item IDs block"
+    }
+  ]
+}
