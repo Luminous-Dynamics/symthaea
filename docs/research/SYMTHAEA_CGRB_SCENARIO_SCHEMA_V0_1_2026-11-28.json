@@ -1,0 +1,709 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cgrb-scenario-v0.1.schema.json",
+  "title": "Conversational Grounded Recovery Benchmark Scenario v0.1",
+  "description": "A frozen scenario manifest for a speech-driven action with independently verifiable external state. Gold labels must be kept out of model-visible inputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "scenario_id",
+    "task_family",
+    "split",
+    "environment",
+    "conversation",
+    "requester",
+    "authority",
+    "initial_state",
+    "goal",
+    "actions",
+    "interruptions",
+    "oracle",
+    "recovery",
+    "rights",
+    "gold_labels"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cgrb-scenario-v0.1"
+    },
+    "benchmark_id": {
+      "const": "CGRB-v0.1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_family": {
+      "enum": [
+        "create_update",
+        "append_send",
+        "reserve_allocate",
+        "cancel_revoke",
+        "multi_step"
+      ]
+    },
+    "split": {
+      "enum": [
+        "dev",
+        "test",
+        "hidden_test",
+        "challenge"
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment_id",
+        "snapshot_digest",
+        "seed",
+        "state_model_version"
+      ],
+      "properties": {
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "state_model_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "conversation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_mode",
+        "audio_digest",
+        "video_digest",
+        "session_token",
+        "capture_token",
+        "speaker_tokens"
+      ],
+      "properties": {
+        "input_mode": {
+          "enum": [
+            "audio_only",
+            "audio_video",
+            "transcript_oracle"
+          ]
+        },
+        "audio_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "video_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capture_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "speaker_tokens": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "requester": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "speaker_token",
+        "intended_addressee",
+        "intent_type"
+      ],
+      "properties": {
+        "speaker_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intended_addressee": {
+          "enum": [
+            "agent",
+            "other_participant",
+            "group",
+            "ambiguous",
+            "none"
+          ]
+        },
+        "intent_type": {
+          "enum": [
+            "explicit_request",
+            "implicit_request",
+            "other_directed",
+            "broadcast",
+            "ambiguous",
+            "human_resolution"
+          ]
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_digest",
+        "policy_version",
+        "grant_token",
+        "permitted_action_types",
+        "target_scope",
+        "purpose",
+        "destination",
+        "effective_from_tick",
+        "effective_until_tick"
+      ],
+      "properties": {
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "grant_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permitted_action_types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effective_from_tick": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effective_until_tick": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_version",
+        "state_digest",
+        "observed_tick"
+      ],
+      "properties": {
+        "state_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "observed_tick": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal_id",
+        "postconditions"
+      ],
+      "properties": {
+        "goal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "postconditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_type",
+          "target",
+          "preconditions",
+          "postconditions",
+          "idempotency_class",
+          "compensation_action_id"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/predicate"
+            }
+          },
+          "postconditions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/predicate"
+            }
+          },
+          "idempotency_class": {
+            "enum": [
+              "idempotent",
+              "keyed_idempotent",
+              "non_idempotent",
+              "reversible_with_compensation",
+              "irreversible"
+            ]
+          },
+          "compensation_action_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "interruptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "interrupt_id",
+          "trigger",
+          "lifecycle_phase",
+          "expected_response",
+          "offset_ms"
+        ],
+        "properties": {
+          "interrupt_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trigger": {
+            "enum": [
+              "user_barge_in",
+              "human_resolution",
+              "consent_revocation",
+              "authority_expiry",
+              "policy_change",
+              "tool_timeout",
+              "transport_loss",
+              "operator_cancel"
+            ]
+          },
+          "lifecycle_phase": {
+            "enum": [
+              "before_authorization",
+              "after_authorization",
+              "after_prepare",
+              "after_dispatch",
+              "after_acknowledgement",
+              "after_application",
+              "after_observation",
+              "between_steps",
+              "during_compensation"
+            ]
+          },
+          "expected_response": {
+            "enum": [
+              "prevent_dispatch",
+              "stop",
+              "reconcile",
+              "continue",
+              "compensate",
+              "ask_clarification",
+              "escalate",
+              "remain_silent"
+            ]
+          },
+          "offset_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_id",
+        "oracle_build_digest",
+        "state_model_digest",
+        "independence",
+        "consistency",
+        "max_age_ms"
+      ],
+      "properties": {
+        "oracle_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracle_build_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "state_model_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "independence": {
+          "enum": [
+            "separate_read_only_service",
+            "separate_process",
+            "same_process_reference_only",
+            "agent_self_report"
+          ]
+        },
+        "consistency": {
+          "enum": [
+            "linearizable",
+            "versioned_read",
+            "eventual",
+            "cached",
+            "unknown"
+          ]
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknown_outcome_policy",
+        "retry_policy",
+        "compensation_policy",
+        "human_escalation_available"
+      ],
+      "properties": {
+        "unknown_outcome_policy": {
+          "enum": [
+            "reconcile_before_retry",
+            "halt_and_escalate",
+            "remain_unknown"
+          ]
+        },
+        "retry_policy": {
+          "enum": [
+            "idempotency_key_required",
+            "retry_only_after_reconciliation",
+            "never_retry"
+          ]
+        },
+        "compensation_policy": {
+          "enum": [
+            "not_available",
+            "separately_authorized",
+            "preauthorized_bounded"
+          ]
+        },
+        "human_escalation_available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "license_record_digest",
+        "consent_scope_digest",
+        "capture_permitted",
+        "evaluation_permitted",
+        "publication_permitted"
+      ],
+      "properties": {
+        "license_record_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "consent_scope_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "capture_permitted": {
+          "type": "boolean"
+        },
+        "evaluation_permitted": {
+          "type": "boolean"
+        },
+        "publication_permitted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gold_labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "gold_intent",
+        "gold_addressee",
+        "allowed_action_ids",
+        "expected_outcome",
+        "expected_final_claim"
+      ],
+      "properties": {
+        "visibility": {
+          "const": "evaluator_only"
+        },
+        "gold_intent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gold_addressee": {
+          "enum": [
+            "agent",
+            "other_participant",
+            "group",
+            "ambiguous",
+            "none"
+          ]
+        },
+        "allowed_action_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_outcome": {
+          "enum": [
+            "committed",
+            "not_committed",
+            "compensated",
+            "unknown",
+            "rejected"
+          ]
+        },
+        "expected_final_claim": {
+          "enum": [
+            "completed",
+            "not_completed",
+            "compensated",
+            "unknown",
+            "clarification_required",
+            "silent"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "conversation": {
+            "properties": {
+              "input_mode": {
+                "const": "audio_only"
+              }
+            },
+            "required": [
+              "input_mode"
+            ]
+          }
+        },
+        "required": [
+          "conversation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "conversation": {
+            "properties": {
+              "video_digest": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "conversation": {
+            "properties": {
+              "input_mode": {
+                "const": "transcript_oracle"
+              }
+            },
+            "required": [
+              "input_mode"
+            ]
+          }
+        },
+        "required": [
+          "conversation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "conversation": {
+            "properties": {
+              "audio_digest": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "independence": {
+                "enum": [
+                  "same_process_reference_only",
+                  "agent_self_report"
+                ]
+              }
+            },
+            "required": [
+              "independence"
+            ]
+          }
+        },
+        "required": [
+          "oracle"
+        ]
+      },
+      "then": {
+        "properties": {
+          "oracle": {
+            "properties": {
+              "consistency": {
+                "const": "unknown"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^(sha256|blake3):[0-9a-f]{64}$"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predicate_id",
+        "subject",
+        "path",
+        "operator",
+        "expected"
+      ],
+      "properties": {
+        "predicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "greater_than",
+            "less_than",
+            "contains",
+            "exists",
+            "absent"
+          ]
+        },
+        "expected": {
+          "type": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "object",
+            "array",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
