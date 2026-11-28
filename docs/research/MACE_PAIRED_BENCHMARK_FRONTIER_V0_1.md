@@ -13,6 +13,7 @@ The matched-run contract proves that two arms declared the same benchmark, track
 - The actual scored task count and independent cluster count must match each manifest.
 - Within each cluster, task-level deltas are averaged first. Independent clusters—not tasks, turns, or repeated interventions—are the resampling unit.
 - Bootstrap uses a deterministic SplitMix64 stream with 2,000 cluster-level percentile replicates and a 95% interval.
+- Every arm, pairwise effect and report is explicitly labeled exploratory below 30 independent clusters; only 30 or more meets the prospective confirmatory cluster-count floor. This floor does not prove independence, exchangeability, power, or external validity.
 
 ## Direction-aware paired effects
 
@@ -38,7 +39,7 @@ cargo test --manifest-path research/mace-paired-benchmark-frontier-v0-1/Cargo.to
 cargo clippy --manifest-path research/mace-paired-benchmark-frontier-v0-1/Cargo.toml --all-targets -- -D warnings
 ```
 
-Twelve deterministic Rust tests cover oriented accuracy/latency/storage effects, a non-scalar Pareto tradeoff, cluster-level inference, incomplete task pairing, duplicate/non-finite/metric-set failures, receipt tampering, baseline resolution, manifest counts and diagnostic-only metrics.
+Thirteen deterministic Rust tests cover oriented accuracy/latency/storage effects, a non-scalar Pareto tradeoff, cluster-level inference, incomplete task pairing, duplicate/non-finite/metric-set failures, receipt tampering, baseline resolution, manifest counts, diagnostic-only metrics and the exploratory-versus-confirmatory cluster floor.
 
 ## Integration
 
