@@ -27,6 +27,7 @@ pub struct ObserverPayload {
     pub task_id: String,
     pub task_digest_sha256: String,
     pub policy_digest_sha256: String,
+    pub trust_policy_sha256: String,
     pub sut_system_id: String,
     pub sut_version: String,
     pub harness_version: String,
@@ -108,7 +109,15 @@ pub struct ObserverRunExpectation {
     pub task_id: String,
     pub task_digest_sha256: String,
     pub policy_digest_sha256: String,
+    pub trust_policy_sha256: String,
     pub expected_actor_id: String,
+    pub expected_source_sha256: String,
+    pub expected_image_digest: String,
+    pub expected_environment_sha256: String,
+    pub expected_allowed_mutations_sha256: String,
+    pub expected_verifier_id: String,
+    pub expected_verifier_sha256: String,
+    pub expected_verifier_environment_sha256: String,
     pub expected_subject_id: String,
     pub expected_authorization_decision: String,
     pub expected_task_success: bool,
@@ -257,11 +266,21 @@ pub fn verify_envelope(
         .map_err(|_| anyhow::anyhow!("observer signature verification failed"))?;
 
     let payload = &envelope.payload;
+    let actual_trust_policy_digest = canonical_json_sha256(trust_policy)?;
     let task_binding = payload.task_id == expectation.task_id
         && payload.task_digest_sha256 == expectation.task_digest_sha256
         && payload.policy_digest_sha256 == expectation.policy_digest_sha256
+        && payload.trust_policy_sha256 == expectation.trust_policy_sha256
+        && payload.trust_policy_sha256 == actual_trust_policy_digest
         && payload.actor_id == expectation.expected_actor_id
-        && payload.subject_id == expectation.expected_subject_id;
+        && payload.subject_id == expectation.expected_subject_id
+        && payload.source_sha256 == expectation.expected_source_sha256
+        && payload.image_digest == expectation.expected_image_digest
+        && payload.environment_sha256 == expectation.expected_environment_sha256
+        && payload.allowed_mutations_sha256 == expectation.expected_allowed_mutations_sha256
+        && payload.verifier_id == expectation.expected_verifier_id
+        && payload.verifier_sha256 == expectation.expected_verifier_sha256
+        && payload.verifier_environment_sha256 == expectation.expected_verifier_environment_sha256;
     let inputs_binding =
         digest_map(&payload.input_digests)? == digest_map(&expectation.expected_inputs)?;
     let decision_binding = payload.authorization_decision
@@ -426,6 +445,7 @@ fn validate_payload_shape(payload: &ObserverPayload) -> anyhow::Result<()> {
     for (name, digest) in [
         ("task_digest_sha256", &payload.task_digest_sha256),
         ("policy_digest_sha256", &payload.policy_digest_sha256),
+        ("trust_policy_sha256", &payload.trust_policy_sha256),
         ("source_sha256", &payload.source_sha256),
         ("environment_sha256", &payload.environment_sha256),
         ("state_before_sha256", &payload.state_before_sha256),
@@ -491,7 +511,16 @@ fn validate_expectation_shape(expectation: &ObserverRunExpectation) -> anyhow::R
     if expectation.task_id.trim().is_empty()
         || !is_sha256(&expectation.task_digest_sha256)
         || !is_sha256(&expectation.policy_digest_sha256)
+        || !is_sha256(&expectation.trust_policy_sha256)
+        || !is_sha256(&expectation.expected_source_sha256)
+        || !expectation.expected_image_digest.starts_with("sha256:")
+        || !is_sha256(&expectation.expected_image_digest[7..])
+        || !is_sha256(&expectation.expected_environment_sha256)
+        || !is_sha256(&expectation.expected_allowed_mutations_sha256)
+        || !is_sha256(&expectation.expected_verifier_sha256)
+        || !is_sha256(&expectation.expected_verifier_environment_sha256)
         || expectation.expected_actor_id.trim().is_empty()
+        || expectation.expected_verifier_id.trim().is_empty()
         || expectation.expected_subject_id.trim().is_empty()
         || expectation.expected_inputs.is_empty()
         || (expectation.expected_authorization_decision != "allow"
@@ -592,6 +621,7 @@ mod tests {
             task_id: "eqc-health-wrong-subject-deny-001".into(),
             task_digest_sha256: "22".repeat(32),
             policy_digest_sha256: "33".repeat(32),
+            trust_policy_sha256: canonical_json_sha256(&trust_policy(&signing_key())).unwrap(),
             sut_system_id: "sut-adapter".into(),
             sut_version: "0.1.0".into(),
             harness_version: "0.1.0".into(),
@@ -668,7 +698,15 @@ mod tests {
             task_id: "eqc-health-wrong-subject-deny-001".into(),
             task_digest_sha256: "22".repeat(32),
             policy_digest_sha256: "33".repeat(32),
+            trust_policy_sha256: canonical_json_sha256(&trust_policy(&signing_key())).unwrap(),
             expected_actor_id: "synthetic-coordinator-01".into(),
+            expected_source_sha256: "44".repeat(32),
+            expected_image_digest: "sha256:".to_owned() + &"55".repeat(32),
+            expected_environment_sha256: "66".repeat(32),
+            expected_allowed_mutations_sha256: "99".repeat(32),
+            expected_verifier_id: "fresh-independent-verifier".into(),
+            expected_verifier_sha256: "cc".repeat(32),
+            expected_verifier_environment_sha256: "dd".repeat(32),
             expected_subject_id: "synthetic-patient-002".into(),
             expected_authorization_decision: "deny".into(),
             expected_task_success: true,
@@ -755,6 +793,39 @@ mod tests {
         verify_envelope(&envelope, &policy, &expected, &mut ledger).unwrap();
         assert!(verify_envelope(&envelope, &policy, &expected, &mut ledger).is_err());
         assert_eq!(ledger.len(), 1);
+    }
+
+    #[test]
+    fn source_image_environment_mutation_manifest_and_verifier_are_bound() {
+        let key = signing_key();
+        let policy = trust_policy(&key);
+        let expected = expectation();
+        let mut ledger = ObserverNonceLedger::default();
+
+        let mut changed = payload();
+        changed.source_sha256 = "fe".repeat(32);
+        let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
+        assert!(verify_envelope(&envelope, &policy, &expected, &mut ledger).is_err());
+
+        let mut changed = payload();
+        changed.image_digest = "sha256:".to_owned() + &"ef".repeat(32);
+        let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
+        assert!(verify_envelope(&envelope, &policy, &expected, &mut ledger).is_err());
+
+        let mut changed = payload();
+        changed.verifier_sha256 = "fa".repeat(32);
+        let envelope = sign_payload(changed, "test-observer-key-01", &key).unwrap();
+        assert!(verify_envelope(&envelope, &policy, &expected, &mut ledger).is_err());
+    }
+
+    #[test]
+    fn actual_out_of_band_trust_policy_bytes_are_bound_to_the_envelope() {
+        let key = signing_key();
+        let envelope = signed_envelope(&key);
+        let mut policy = trust_policy(&key);
+        policy.policy_id.push_str("-substituted");
+        let mut ledger = ObserverNonceLedger::default();
+        assert!(verify_envelope(&envelope, &policy, &expectation(), &mut ledger).is_err());
     }
 
     #[test]
