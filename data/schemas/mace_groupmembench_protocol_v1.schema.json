@@ -88,16 +88,10 @@
         "benchmark_repository",
         "benchmark_commit_sha",
         "dataset_snapshot_sha256",
-        "split_manifest_sha256",
         "domain",
-        "reader_model_config_sha256",
-        "reader_prompt_sha256",
-        "judge_model_config_sha256",
-        "judge_prompt_sha256",
         "retrieval_config_sha256",
         "top_k",
         "context_budget_tokens",
-        "seed",
         "binding_sha256"
       ],
       "properties": {
@@ -117,9 +111,6 @@
         "dataset_snapshot_sha256": {
           "$ref": "#/$defs/sha256"
         },
-        "split_manifest_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
         "domain": {
           "enum": [
             "finance",
@@ -127,18 +118,6 @@
             "healthcare",
             "manufacturing"
           ]
-        },
-        "reader_model_config_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "reader_prompt_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "judge_model_config_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "judge_prompt_sha256": {
-          "$ref": "#/$defs/sha256"
         },
         "retrieval_config_sha256": {
           "$ref": "#/$defs/sha256"
@@ -151,10 +130,6 @@
         "context_budget_tokens": {
           "type": "integer",
           "minimum": 1
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": 0
         },
         "binding_sha256": {
           "$ref": "#/$defs/sha256"
