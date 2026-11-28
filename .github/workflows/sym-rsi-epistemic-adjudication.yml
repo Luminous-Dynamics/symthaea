@@ -1,0 +1,79 @@
+name: Sym-RSI Epistemic Adjudication
+
+on:
+  push:
+    branches:
+      - research/web-research-adjudication-guard-2026-11-27
+    paths:
+      - "src/web_research/types.rs"
+      - "src/web_research/meta_learning.rs"
+      - "src/web_research/mod.rs"
+      - "tests/epistemic_consciousness_tests.rs"
+      - "tools/sym-rsi-epistemic-adjudication/**"
+      - ".github/workflows/sym-rsi-epistemic-adjudication.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/web_research/types.rs"
+      - "src/web_research/meta_learning.rs"
+      - "src/web_research/mod.rs"
+      - "tests/epistemic_consciousness_tests.rs"
+      - "tools/sym-rsi-epistemic-adjudication/**"
+      - ".github/workflows/sym-rsi-epistemic-adjudication.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  adjudication:
+    name: Rust 1.96 epistemic adjudication contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Generate rustfmt preview
+        run: |
+          rustfmt --edition 2024 --config skip_children=true \
+            src/web_research/types.rs \
+            src/web_research/meta_learning.rs \
+            src/web_research/mod.rs \
+            tests/epistemic_consciousness_tests.rs \
+            tools/sym-rsi-epistemic-adjudication/src/lib.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-adjudication-rustfmt-preview
+          path: |
+            src/web_research/types.rs
+            src/web_research/meta_learning.rs
+            src/web_research/mod.rs
+            tests/epistemic_consciousness_tests.rs
+            tools/sym-rsi-epistemic-adjudication/src/lib.rs
+      - name: Restore exact committed sources
+        run: |
+          git checkout -- \
+            src/web_research/types.rs \
+            src/web_research/meta_learning.rs \
+            src/web_research/mod.rs \
+            tests/epistemic_consciousness_tests.rs \
+            tools/sym-rsi-epistemic-adjudication/src/lib.rs
+      - name: Check committed formatting
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true \
+            src/web_research/types.rs \
+            src/web_research/meta_learning.rs \
+            src/web_research/mod.rs \
+            tests/epistemic_consciousness_tests.rs \
+            tools/sym-rsi-epistemic-adjudication/src/lib.rs
+      - name: Run standalone production-source tests
+        run: cargo test --locked --manifest-path tools/sym-rsi-epistemic-adjudication/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path tools/sym-rsi-epistemic-adjudication/Cargo.toml --all-targets -- -D warnings

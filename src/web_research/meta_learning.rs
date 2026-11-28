@@ -180,8 +180,10 @@ pub struct EpistemicLearner {
     source_credibility: HashMap<String, SourceCredibility>,
     /// Verification strategies
     strategies: Vec<VerificationStrategy>,
-    /// Outcome history
+    /// Outcome history (bounded to the most recent 1,000 records)
     outcomes: VecDeque<VerificationOutcome>,
+    /// Adjudicated outcomes accumulated since the last Meta-Phi update.
+    adjudicated_since_meta_update: usize,
     /// Meta-Phi tracking
     meta_phi: MetaPhi,
     /// Domain expertise scores
@@ -202,6 +204,7 @@ impl EpistemicLearner {
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
             outcomes: VecDeque::new(),
+            adjudicated_since_meta_update: 0,
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
@@ -214,37 +217,64 @@ impl EpistemicLearner {
             source_credibility: HashMap::new(),
             strategies: Vec::new(),
             outcomes: VecDeque::new(),
+            adjudicated_since_meta_update: 0,
             meta_phi: MetaPhi::default(),
             domain_expertise: HashMap::new(),
         }
     }
 
-    /// Record a verification outcome for learning
+    /// Record a verification outcome for learning.
+    ///
+    /// Unadjudicated predictions are retained for audit/counting but never
+    /// update source credibility, domain expertise, accuracy or readiness.
     pub fn record_outcome(&mut self, outcome: VerificationOutcome) -> anyhow::Result<()> {
-        // Update source credibility
-        self.update_source_credibility(&outcome);
-
-        // Update domain expertise
-        self.update_domain_expertise(&outcome);
-
-        // Store outcome
-        self.outcomes.push_back(outcome);
-
-        // Trim old outcomes
-        if self.outcomes.len() > 1000 {
-            self.outcomes.pop_front();
+        let is_adjudicated = outcome.was_correct.is_some();
+        if is_adjudicated {
+            self.update_source_credibility(&outcome);
+            self.update_domain_expertise(&outcome);
+            self.adjudicated_since_meta_update += 1;
         }
 
-        // Periodically update meta-phi
-        if self.outcomes.len() % 10 == 0 {
+        self.outcomes.push_back(outcome);
+
+        // Bound history without allowing pending claims to evict measured
+        // outcomes. When full, discard the oldest unadjudicated record first;
+        // only evict an adjudicated record when no pending record remains.
+        if self.outcomes.len() > 1000 {
+            if let Some(index) = self
+                .outcomes
+                .iter()
+                .position(|record| record.was_correct.is_none())
+            {
+                self.outcomes.remove(index);
+            } else {
+                self.outcomes.pop_front();
+            }
+        }
+
+        // Update meta-phi after each ten new adjudicated outcomes.
+        // The counter is monotonic across bounded history eviction; pending
+        // records never advance it.
+        if self.adjudicated_since_meta_update >= 10 {
             self.update_meta_phi();
+            self.adjudicated_since_meta_update = 0;
         }
 
         Ok(())
     }
 
+    fn adjudicated_outcome_count(&self) -> usize {
+        self.outcomes
+            .iter()
+            .filter(|outcome| outcome.was_correct.is_some())
+            .count()
+    }
+
     /// Update source credibility based on outcome
     fn update_source_credibility(&mut self, outcome: &VerificationOutcome) {
+        let Some(was_correct) = outcome.was_correct else {
+            return;
+        };
         let domain = &outcome.source_domain;
 
         let credibility = self
@@ -254,12 +284,12 @@ impl EpistemicLearner {
 
         // Update counts
         credibility.outcome_count += 1;
-        if outcome.was_correct {
+        if was_correct {
             credibility.correct_count += 1;
         }
 
         // Update overall credibility (exponential moving average)
-        let target = if outcome.was_correct { 1.0 } else { 0.0 };
+        let target = if was_correct { 1.0 } else { 0.0 };
         credibility.credibility += self.config.learning_rate * (target - credibility.credibility);
         credibility.credibility = credibility.credibility.clamp(0.1, 0.99);
 
@@ -278,12 +308,15 @@ impl EpistemicLearner {
 
     /// Update domain expertise based on outcome
     fn update_domain_expertise(&mut self, outcome: &VerificationOutcome) {
+        let Some(was_correct) = outcome.was_correct else {
+            return;
+        };
         let domain = &outcome.domain;
 
         let current = self.domain_expertise.get(domain).copied().unwrap_or(0.5);
 
         // Expertise increases faster with correct outcomes
-        let adjustment = if outcome.was_correct {
+        let adjustment = if was_correct {
             self.config.learning_rate * 1.5
         } else {
             -self.config.learning_rate * 0.5
@@ -303,14 +336,112 @@ impl EpistemicLearner {
             .update(current_accuracy, domain_count, strategy_count);
     }
 
-    /// Calculate overall accuracy across all outcomes
+    /// Calculate accuracy over adjudicated outcomes only.
+    ///
+    /// Returns the neutral 0.5 prior when no independent correctness labels exist.
     fn calculate_overall_accuracy(&self) -> f32 {
-        if self.outcomes.is_empty() {
+        let adjudicated: Vec<bool> = self
+            .outcomes
+            .iter()
+            .filter_map(|outcome| outcome.was_correct)
+            .collect();
+        if adjudicated.is_empty() {
             return 0.5;
         }
 
-        let correct = self.outcomes.iter().filter(|o| o.was_correct).count();
-        correct as f32 / self.outcomes.len() as f32
+        let correct = adjudicated
+            .iter()
+            .filter(|was_correct| **was_correct)
+            .count();
+        correct as f32 / adjudicated.len() as f32
+    }
+
+    /// Number of adjudicated outcomes with a valid probability forecast.
+    fn calibration_outcome_count(&self) -> usize {
+        self.outcomes
+            .iter()
+            .filter(|outcome| {
+                outcome.was_correct.is_some()
+                    && outcome.predicted_confidence.is_finite()
+                    && (0.0..=1.0).contains(&outcome.predicted_confidence)
+            })
+            .count()
+    }
+
+    /// Mean Brier score over independently adjudicated outcomes only.
+    ///
+    /// Returns None until at least one valid adjudicated probability is available.
+    fn calculate_brier_score(&self) -> Option<f32> {
+        let mut squared_error = 0.0_f64;
+        let mut count = 0_usize;
+
+        for outcome in self
+            .outcomes
+            .iter()
+            .filter(|item| item.was_correct.is_some())
+        {
+            let probability = outcome.predicted_confidence;
+            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                continue;
+            }
+            let target = if outcome.was_correct == Some(true) {
+                1.0_f64
+            } else {
+                0.0_f64
+            };
+            let error = f64::from(probability) - target;
+            squared_error += error * error;
+            count += 1;
+        }
+
+        (count > 0).then_some((squared_error / count as f64) as f32)
+    }
+
+    /// Ten-bin expected calibration error over independently adjudicated outcomes.
+    ///
+    /// Each bin contributes its population weight times the absolute difference
+    /// between mean predicted confidence and empirical correctness frequency.
+    /// Pending outcomes and invalid probabilities do not enter either quantity.
+    fn calculate_expected_calibration_error(&self) -> Option<f32> {
+        const BIN_COUNT: usize = 10;
+        let mut counts = [0_usize; BIN_COUNT];
+        let mut confidence_sums = [0.0_f64; BIN_COUNT];
+        let mut correct_counts = [0_usize; BIN_COUNT];
+        let mut total = 0_usize;
+
+        for outcome in self
+            .outcomes
+            .iter()
+            .filter(|item| item.was_correct.is_some())
+        {
+            let probability = outcome.predicted_confidence;
+            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                continue;
+            }
+            let bin = ((probability * BIN_COUNT as f32).floor() as usize).min(BIN_COUNT - 1);
+            counts[bin] += 1;
+            confidence_sums[bin] += f64::from(probability);
+            if outcome.was_correct == Some(true) {
+                correct_counts[bin] += 1;
+            }
+            total += 1;
+        }
+
+        if total == 0 {
+            return None;
+        }
+
+        let weighted_error = (0..BIN_COUNT)
+            .filter(|&bin| counts[bin] > 0)
+            .map(|bin| {
+                let bin_count = counts[bin] as f64;
+                let mean_confidence = confidence_sums[bin] / bin_count;
+                let empirical_accuracy = correct_counts[bin] as f64 / bin_count;
+                (bin_count / total as f64) * (mean_confidence - empirical_accuracy).abs()
+            })
+            .sum::<f64>();
+
+        Some(weighted_error as f32)
     }
 
     /// Get source credibility for a domain
@@ -347,9 +478,15 @@ impl EpistemicLearner {
 
     /// Get learning statistics
     pub fn stats(&self) -> LearnerStats {
+        let adjudicated_outcomes = self.adjudicated_outcome_count();
         LearnerStats {
             total_outcomes: self.outcomes.len(),
+            adjudicated_outcomes,
+            unadjudicated_outcomes: self.outcomes.len() - adjudicated_outcomes,
             accuracy: self.calculate_overall_accuracy(),
+            calibration_outcomes: self.calibration_outcome_count(),
+            brier_score: self.calculate_brier_score(),
+            expected_calibration_error: self.calculate_expected_calibration_error(),
             source_count: self.source_credibility.len(),
             domain_count: self.domain_expertise.len(),
             strategy_count: self.strategies.len(),
@@ -360,7 +497,7 @@ impl EpistemicLearner {
 
     /// Check if the learner has enough data to make recommendations
     pub fn is_ready(&self) -> bool {
-        self.outcomes.len() >= self.config.min_outcomes_threshold
+        self.adjudicated_outcome_count() >= self.config.min_outcomes_threshold
     }
 
     /// Get verification strategy recommendation for a domain
@@ -402,10 +539,20 @@ impl EpistemicLearner {
 /// Statistics about the epistemic learner
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearnerStats {
-    /// Total outcomes recorded
+    /// Total verification records, including unadjudicated predictions
     pub total_outcomes: usize,
-    /// Overall accuracy
+    /// Records with an independent correctness label
+    pub adjudicated_outcomes: usize,
+    /// Records still awaiting an independent correctness label
+    pub unadjudicated_outcomes: usize,
+    /// Accuracy over adjudicated outcomes only; 0.5 is the neutral prior when none exist
     pub accuracy: f32,
+    /// Adjudicated probability forecasts included in Brier/ECE calculations
+    pub calibration_outcomes: usize,
+    /// Mean Brier score over adjudicated outcomes; None when no valid labels exist
+    pub brier_score: Option<f32>,
+    /// Ten-bin expected calibration error over adjudicated outcomes
+    pub expected_calibration_error: Option<f32>,
     /// Number of tracked sources
     pub source_count: usize,
     /// Number of domains with expertise
@@ -440,7 +587,7 @@ mod tests {
             claim: "Test claim".to_string(),
             source_domain: source.to_string(),
             source_type: ResearchSource::Documentation,
-            was_correct: correct,
+            was_correct: Some(correct),
             predicted_confidence: 0.8,
             domain: domain.to_string(),
         }
@@ -467,6 +614,197 @@ mod tests {
             stats.accuracy
         );
         assert_eq!(stats.source_count, 1);
+    }
+
+    #[test]
+    fn unadjudicated_records_do_not_change_learning_or_readiness() {
+        let mut learner = EpistemicLearner::new();
+
+        for index in 0..12 {
+            let outcome = VerificationOutcome::unadjudicated(
+                format!("Unresolved claim {index}"),
+                "self-referential.example",
+                ResearchSource::Web,
+            )
+            .with_domain("science")
+            .with_confidence(0.99);
+            learner.record_outcome(outcome).unwrap();
+        }
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 12);
+        assert_eq!(stats.adjudicated_outcomes, 0);
+        assert_eq!(stats.unadjudicated_outcomes, 12);
+        assert_eq!(stats.accuracy, 0.5);
+        assert_eq!(stats.source_count, 0);
+        assert_eq!(stats.domain_count, 0);
+        assert!(!learner.is_ready());
+        assert_eq!(
+            learner.get_domain_expertise("science"),
+            0.5,
+            "unadjudicated predictions must not train domain expertise"
+        );
+        assert!(
+            learner
+                .get_source_credibility("self-referential.example")
+                .is_none(),
+            "unadjudicated predictions must not train source credibility"
+        );
+    }
+
+    #[test]
+    fn meta_phi_updates_after_ten_new_adjudications() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..9 {
+            learner
+                .record_outcome(make_outcome(
+                    "science",
+                    "adjudicated.example",
+                    index % 2 == 0,
+                ))
+                .unwrap();
+        }
+        assert_eq!(learner.meta_phi().cycles, 0);
+
+        learner
+            .record_outcome(make_outcome("science", "adjudicated.example", true))
+            .unwrap();
+        assert_eq!(learner.meta_phi().cycles, 1);
+    }
+
+    #[test]
+    fn pending_outcomes_cannot_evict_adjudicated_calibration_history() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..10 {
+            learner
+                .record_outcome(make_outcome(
+                    "science",
+                    "adjudicated.example",
+                    index % 2 == 0,
+                ))
+                .unwrap();
+        }
+        for index in 0..1000 {
+            learner
+                .record_outcome(VerificationOutcome::unadjudicated(
+                    format!("Pending claim {index}"),
+                    "pending.example",
+                    ResearchSource::Web,
+                ))
+                .unwrap();
+        }
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 1000);
+        assert_eq!(stats.adjudicated_outcomes, 10);
+        assert_eq!(stats.unadjudicated_outcomes, 990);
+        assert!(learner.is_ready());
+        assert_eq!(stats.accuracy, 0.5);
+        assert!(
+            learner
+                .get_source_credibility("adjudicated.example")
+                .is_some(),
+            "pending records must not evict the measured source calibration"
+        );
+    }
+
+    #[test]
+    fn proper_scores_use_only_independently_adjudicated_outcomes() {
+        let mut learner = EpistemicLearner::new();
+        for index in 0..10 {
+            let correct = index < 8;
+            let outcome =
+                make_outcome("science", "calibration.example", correct).with_confidence(0.9);
+            learner.record_outcome(outcome).unwrap();
+        }
+        let baseline = learner.stats();
+        assert!((baseline.brier_score.unwrap() - 0.17).abs() < 1e-6);
+        assert!((baseline.expected_calibration_error.unwrap() - 0.1).abs() < 1e-6);
+
+        learner
+            .record_outcome(
+                VerificationOutcome::unadjudicated(
+                    "Pending high-confidence claim",
+                    "calibration.example",
+                    ResearchSource::Web,
+                )
+                .with_confidence(0.99),
+            )
+            .unwrap();
+        let with_pending = learner.stats();
+        assert_eq!(
+            with_pending.calibration_outcomes,
+            baseline.calibration_outcomes
+        );
+        assert_eq!(with_pending.brier_score, baseline.brier_score);
+        assert_eq!(
+            with_pending.expected_calibration_error,
+            baseline.expected_calibration_error
+        );
+    }
+
+    #[test]
+    fn malformed_confidence_is_excluded_from_calibration_scores() {
+        let mut learner = EpistemicLearner::new();
+        learner
+            .record_outcome(VerificationOutcome {
+                claim: "Invalid confidence".to_owned(),
+                source_domain: "invalid.example".to_owned(),
+                source_type: ResearchSource::Web,
+                was_correct: Some(true),
+                predicted_confidence: f32::NAN,
+                domain: "science".to_owned(),
+            })
+            .unwrap();
+
+        let stats = learner.stats();
+        assert_eq!(stats.adjudicated_outcomes, 1);
+        assert_eq!(stats.calibration_outcomes, 0);
+        assert_eq!(stats.brier_score, None);
+        assert_eq!(stats.expected_calibration_error, None);
+    }
+
+    #[test]
+    fn calibration_metrics_remain_unknown_without_adjudication() {
+        let mut learner = EpistemicLearner::new();
+        learner
+            .record_outcome(
+                VerificationOutcome::unadjudicated(
+                    "Pending claim",
+                    "pending.example",
+                    ResearchSource::Web,
+                )
+                .with_confidence(0.95),
+            )
+            .unwrap();
+
+        let stats = learner.stats();
+        assert_eq!(stats.brier_score, None);
+        assert_eq!(stats.expected_calibration_error, None);
+    }
+
+    #[test]
+    fn accuracy_uses_only_independently_adjudicated_outcomes() {
+        let mut learner = EpistemicLearner::new();
+        learner
+            .record_outcome(make_outcome("science", "source.example", true))
+            .unwrap();
+        learner
+            .record_outcome(VerificationOutcome::unadjudicated(
+                "Pending claim",
+                "source.example",
+                ResearchSource::Web,
+            ))
+            .unwrap();
+        learner
+            .record_outcome(make_outcome("science", "source.example", false))
+            .unwrap();
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 3);
+        assert_eq!(stats.adjudicated_outcomes, 2);
+        assert_eq!(stats.unadjudicated_outcomes, 1);
+        assert_eq!(stats.accuracy, 0.5);
     }
 
     #[test]

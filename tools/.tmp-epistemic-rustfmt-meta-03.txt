@@ -1,0 +1,196 @@
+        self.source_credibility.get(domain)
+    }
+
+    /// Get recommended sources for a topic domain
+    pub fn recommend_sources(&self, topic_domain: &str) -> Vec<(String, f32)> {
+        let mut recommendations: Vec<_> = self
+            .source_credibility
+            .values()
+            .map(|s| {
+                let credibility = s.credibility_for_domain(topic_domain);
+                (s.domain.clone(), credibility)
+            })
+            .collect();
+
+        // Sort by credibility (descending)
+        recommendations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        recommendations.truncate(10);
+        recommendations
+    }
+
+    /// Get domain expertise level
+    pub fn get_domain_expertise(&self, domain: &str) -> f32 {
+        self.domain_expertise.get(domain).copied().unwrap_or(0.5)
+    }
+
+    /// Get current meta-phi
+    pub fn meta_phi(&self) -> &MetaPhi {
+        &self.meta_phi
+    }
+
+    /// Get learning statistics
+    pub fn stats(&self) -> LearnerStats {
+        let adjudicated_outcomes = self.adjudicated_outcome_count();
+        LearnerStats {
+            total_outcomes: self.outcomes.len(),
+            adjudicated_outcomes,
+            unadjudicated_outcomes: self.outcomes.len() - adjudicated_outcomes,
+            accuracy: self.calculate_overall_accuracy(),
+            source_count: self.source_credibility.len(),
+            domain_count: self.domain_expertise.len(),
+            strategy_count: self.strategies.len(),
+            meta_phi: self.meta_phi.value,
+            improvement_rate: self.meta_phi.improvement_rate,
+        }
+    }
+
+    /// Check if the learner has enough data to make recommendations
+    pub fn is_ready(&self) -> bool {
+        self.adjudicated_outcome_count() >= self.config.min_outcomes_threshold
+    }
+
+    /// Get verification strategy recommendation for a domain
+    pub fn recommend_strategy(&self, topic_domain: &str) -> Option<&VerificationStrategy> {
+        self.strategies
+            .iter()
+            .filter(|s| s.domain == topic_domain)
+            .max_by(|a, b| {
+                a.success_rate
+                    .partial_cmp(&b.success_rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    }
+
+    /// Add a verification strategy
+    pub fn add_strategy(&mut self, strategy: VerificationStrategy) {
+        self.strategies.push(strategy);
+    }
+
+    /// Export learner state for persistence
+    pub fn export_state(&self) -> LearnerState {
+        LearnerState {
+            source_credibility: self.source_credibility.clone(),
+            strategies: self.strategies.clone(),
+            meta_phi: self.meta_phi.clone(),
+            domain_expertise: self.domain_expertise.clone(),
+        }
+    }
+
+    /// Import learner state from persistence
+    pub fn import_state(&mut self, state: LearnerState) {
+        self.source_credibility = state.source_credibility;
+        self.strategies = state.strategies;
+        self.meta_phi = state.meta_phi;
+        self.domain_expertise = state.domain_expertise;
+    }
+}
+
+/// Statistics about the epistemic learner
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearnerStats {
+    /// Total verification records, including unadjudicated predictions
+    pub total_outcomes: usize,
+    /// Records with an independent correctness label
+    pub adjudicated_outcomes: usize,
+    /// Records still awaiting an independent correctness label
+    pub unadjudicated_outcomes: usize,
+    /// Accuracy over adjudicated outcomes only; 0.5 is the neutral prior when none exist
+    pub accuracy: f32,
+    /// Number of tracked sources
+    pub source_count: usize,
+    /// Number of domains with expertise
+    pub domain_count: usize,
+    /// Number of strategies
+    pub strategy_count: usize,
+    /// Current meta-phi value
+    pub meta_phi: f64,
+    /// Meta-phi improvement rate
+    pub improvement_rate: f64,
+}
+
+/// Exportable learner state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearnerState {
+    /// Source credibility data
+    pub source_credibility: HashMap<String, SourceCredibility>,
+    /// Learned strategies
+    pub strategies: Vec<VerificationStrategy>,
+    /// Meta-phi tracking
+    pub meta_phi: MetaPhi,
+    /// Domain expertise
+    pub domain_expertise: HashMap<String, f32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_outcome(domain: &str, source: &str, correct: bool) -> VerificationOutcome {
+        VerificationOutcome {
+            claim: "Test claim".to_string(),
+            source_domain: source.to_string(),
+            source_type: ResearchSource::Documentation,
+            was_correct: Some(correct),
+            predicted_confidence: 0.8,
+            domain: domain.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_record_outcomes() {
+        let mut learner = EpistemicLearner::new();
+
+        // Record some outcomes: 7 correct, 3 wrong
+        for i in 0..10 {
+            let correct = i % 3 != 0; // i=0,3,6,9 are wrong, rest are correct (6/10)
+            learner
+                .record_outcome(make_outcome("programming", "rust-lang.org", correct))
+                .unwrap();
+        }
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 10);
+        // 6 out of 10 are correct (i=1,2,4,5,7,8)
+        assert!(
+            stats.accuracy >= 0.5 && stats.accuracy <= 0.7,
+            "Expected accuracy between 0.5 and 0.7, got {}",
+            stats.accuracy
+        );
+        assert_eq!(stats.source_count, 1);
+    }
+
+    #[test]
+    fn unadjudicated_records_do_not_change_learning_or_readiness() {
+        let mut learner = EpistemicLearner::new();
+
+        for index in 0..12 {
+            let outcome = VerificationOutcome::unadjudicated(
+                format!("Unresolved claim {index}"),
+                "self-referential.example",
+                ResearchSource::Web,
+            )
+            .with_domain("science")
+            .with_confidence(0.99);
+            learner.record_outcome(outcome).unwrap();
+        }
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_outcomes, 12);
+        assert_eq!(stats.adjudicated_outcomes, 0);
+        assert_eq!(stats.unadjudicated_outcomes, 12);
+        assert_eq!(stats.accuracy, 0.5);
+        assert_eq!(stats.source_count, 0);
+        assert_eq!(stats.domain_count, 0);
+        assert!(!learner.is_ready());
+        assert_eq!(
+            learner.get_domain_expertise("science"),
+            0.5,
+            "unadjudicated predictions must not train domain expertise"
+        );
+        assert!(
+            learner
+                .get_source_credibility("self-referential.example")
+                .is_none(),
+            "unadjudicated predictions must not train source credibility"
+        );
+    }

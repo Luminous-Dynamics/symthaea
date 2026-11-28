@@ -285,7 +285,7 @@ fn test_epistemic_learner_basics() {
             claim: format!("Claim {}", i),
             source_domain: "rust-lang.org".into(),
             source_type: ResearchSource::Documentation,
-            was_correct: i % 3 != 0, // ~70% correct
+            was_correct: Some(i % 3 != 0), // synthetic adjudicated ground truth
             predicted_confidence: 0.8,
             domain: "programming".into(),
         };
@@ -309,7 +309,7 @@ fn test_source_credibility_learning() {
                 claim: "Test".into(),
                 source_domain: "docs.rust-lang.org".into(),
                 source_type: ResearchSource::Documentation,
-                was_correct: true,
+                was_correct: Some(true),
                 predicted_confidence: 0.9,
                 domain: "programming".into(),
             })
@@ -323,7 +323,7 @@ fn test_source_credibility_learning() {
                 claim: "Test".into(),
                 source_domain: "unreliable-blog.com".into(),
                 source_type: ResearchSource::Web,
-                was_correct: false,
+                was_correct: Some(false),
                 predicted_confidence: 0.5,
                 domain: "programming".into(),
             })
@@ -429,7 +429,7 @@ fn test_full_epistemic_pipeline() {
             claim: verification.claim.clone(),
             source_domain: "nixos.org".into(),
             source_type: ResearchSource::Documentation,
-            was_correct: true,
+            was_correct: Some(true),
             predicted_confidence: verification.confidence,
             domain: "systems".into(),
         })
