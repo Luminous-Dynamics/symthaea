@@ -394,8 +394,7 @@ fn test_is_surprised() {
 
     // Check surprise status
     let surprised = agent.is_surprised();
-    // Just verify it returns a boolean without crashing
-    assert!(surprised || !surprised);
+    assert!(!surprised, "A neutral initial observation should not trigger surprise");
 }
 
 #[test]
@@ -529,8 +528,10 @@ fn test_td_learner_update_model() {
 
 #[test]
 fn test_td_learner_learning_rate_decay() {
-    let mut config = TemporalDifferenceLearningConfig::default();
-    config.learning_rate_decay = 0.9;
+    let config = TemporalDifferenceLearningConfig {
+        learning_rate_decay: 0.9,
+        ..Default::default()
+    };
 
     let mut learner = TemporalDifferenceLearner::new(config, 4, 8, 4);
     let initial_lr = learner.current_learning_rate;
@@ -544,9 +545,11 @@ fn test_td_learner_learning_rate_decay() {
 
 #[test]
 fn test_td_learner_min_learning_rate() {
-    let mut config = TemporalDifferenceLearningConfig::default();
-    config.learning_rate_decay = 0.1;
-    config.min_learning_rate = 0.01;
+    let config = TemporalDifferenceLearningConfig {
+        learning_rate_decay: 0.1,
+        min_learning_rate: 0.01,
+        ..Default::default()
+    };
 
     let mut learner = TemporalDifferenceLearner::new(config, 4, 8, 4);
 
@@ -676,9 +679,14 @@ fn test_model_improves_prediction_accuracy() {
 
 #[test]
 fn test_learning_rate_decay_works() {
-    let mut config = ActiveInferenceAgentConfig::default();
-    config.enable_td_learning = true;
-    config.td_config.learning_rate_decay = 0.95;
+    let config = ActiveInferenceAgentConfig {
+        enable_td_learning: true,
+        td_config: TemporalDifferenceLearningConfig {
+            learning_rate_decay: 0.95,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let mut agent = ActiveInferenceAgent::new(config);
     let initial_lr = agent.td_learner.as_ref().unwrap().current_learning_rate;
@@ -951,9 +959,11 @@ fn test_enhanced_fep_bridge_precision_gating() {
 
     let result = bridge.cycle(0.5, 0.5, 0.5, 0.5);
 
-    // With high threshold, should_learn depends on model confidence
-    // Just verify it doesn't crash and returns a valid result
-    assert!(result.should_learn || !result.should_learn);
+    assert_eq!(
+        result.should_learn,
+        result.fep_result.model_confidence > 0.8 && result.fep_result.should_learn,
+        "precision gating must require both the configured confidence threshold and the core learning decision"
+    );
 }
 
 #[test]
@@ -1049,7 +1059,7 @@ fn test_hidden_state_total_uncertainty_finite() {
 fn test_hidden_state_confidence_bounded() {
     let state = HiddenState::new(4);
     let confidence = state.confidence();
-    assert!(confidence >= 0.0 && confidence <= 1.0);
+    assert!((0.0..=1.0).contains(&confidence));
 }
 
 #[test]
@@ -1242,8 +1252,10 @@ fn test_model_confidence_tracker_decay_respects_minimum() {
 
 #[test]
 fn test_td_learner_without_eligibility_traces() {
-    let mut config = TemporalDifferenceLearningConfig::default();
-    config.use_eligibility_traces = false;
+    let config = TemporalDifferenceLearningConfig {
+        use_eligibility_traces: false,
+        ..Default::default()
+    };
 
     let learner = TemporalDifferenceLearner::new(config, 4, 8, 4);
     assert!(learner.eligibility_traces.is_none());
@@ -1371,8 +1383,10 @@ fn test_td_learner_reset_traces_clears() {
 
 #[test]
 fn test_td_learner_transition_history_overflow() {
-    let mut config = TemporalDifferenceLearningConfig::default();
-    config.max_transition_history = 5;
+    let config = TemporalDifferenceLearningConfig {
+        max_transition_history: 5,
+        ..Default::default()
+    };
 
     let mut learner = TemporalDifferenceLearner::new(config, 4, 8, 4);
     let model = GenerativeModel::new(8, 4, 4);
@@ -1526,15 +1540,15 @@ fn test_enhanced_bridge_precision_threshold_clamped() {
     // Set high threshold — should clamp to 1.0 and prevent learning
     bridge.set_precision_gated_learning(true, 5.0);
     let result = bridge.cycle(0.5, 0.5, 0.5, 0.5);
-    // With threshold=1.0, model confidence is unlikely to exceed it
-    // so should_learn should generally be false (precision gating rejects)
-    assert!(result.should_learn || !result.should_learn); // Valid boolean
+    // The setter clamps the threshold to 1.0 and the comparison is strict.
+    // Confidence is bounded at 1.0, so learning must be rejected.
+    assert!(!result.should_learn); // Valid boolean
 
     // Set low threshold — should clamp to 0.0 and allow learning more easily
     bridge.set_precision_gated_learning(false, -1.0);
     let result = bridge.cycle(0.5, 0.5, 0.5, 0.5);
-    // With gating disabled, should_learn depends only on core FEP result
-    assert!(result.should_learn || !result.should_learn);
+    // With gating disabled, the bridge must preserve the core decision.
+    assert_eq!(result.should_learn, result.fep_result.should_learn);
 }
 
 #[test]
@@ -1557,7 +1571,7 @@ fn test_enhanced_bridge_action_outcome_coupling_evolves() {
 
     let final_coupling = bridge.cycle(0.5, 0.5, 0.5, 0.5).action_outcome_coupling;
     assert!(
-        final_coupling >= 0.0 && final_coupling <= 1.0,
+        (0.0..=1.0).contains(&final_coupling),
         "Coupling should be in [0, 1], got {final_coupling}"
     );
 }
