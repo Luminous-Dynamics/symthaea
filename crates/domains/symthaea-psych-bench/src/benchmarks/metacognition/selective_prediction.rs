@@ -87,7 +87,10 @@ pub enum SelectivePredictionError {
 impl std::fmt::Display for SelectivePredictionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::EmptyTrials => write!(f, "selective-prediction scoring requires at least one trial"),
+            Self::EmptyTrials => write!(
+                f,
+                "selective-prediction scoring requires at least one trial"
+            ),
             Self::NonFiniteConfidence { index } => {
                 write!(f, "confidence at trial {index} is not finite")
             }
@@ -202,7 +205,8 @@ impl SelectivePredictionMetrics {
         let mean_cost_units =
             trials.iter().map(|trial| trial.cost_units).sum::<f64>() / n as f64;
 
-        let accuracy_when_answered = (answers > 0).then_some(answered_correct as f64 / answers as f64);
+        let accuracy_when_answered =
+            (answers > 0).then_some(answered_correct as f64 / answers as f64);
         let risk_when_answered = accuracy_when_answered.map(|accuracy| 1.0 - accuracy);
         let appropriate_nonanswer_rate_on_unanswerable =
             (unanswerable > 0).then_some(unanswerable_nonanswers as f64 / unanswerable as f64);
@@ -375,7 +379,12 @@ mod tests {
     #[test]
     fn rejects_invalid_confidence_cost_and_unanswerable_ground_truth() {
         assert!(matches!(
-            SelectivePredictionMetrics::from_trials(&[trial(true, DecisionAction::Answer, true, 1.2)]),
+            SelectivePredictionMetrics::from_trials(&[trial(
+                true,
+                DecisionAction::Answer,
+                true,
+                1.2
+            )]),
             Err(SelectivePredictionError::ConfidenceOutOfRange { .. })
         ));
         let mut negative_cost = trial(true, DecisionAction::Answer, true, 0.8);
@@ -385,7 +394,12 @@ mod tests {
             Err(SelectivePredictionError::InvalidCost { .. })
         ));
         assert!(matches!(
-            SelectivePredictionMetrics::from_trials(&[trial(false, DecisionAction::Abstain, true, 0.2)]),
+            SelectivePredictionMetrics::from_trials(&[trial(
+                false,
+                DecisionAction::Abstain,
+                true,
+                0.2
+            )]),
             Err(SelectivePredictionError::UnanswerableItemMarkedCorrect { .. })
         ));
     }
