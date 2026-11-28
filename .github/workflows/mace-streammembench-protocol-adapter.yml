@@ -1,0 +1,25 @@
+name: MACE StreamMemBench Protocol Adapter
+on:
+  pull_request:
+    paths:
+      - "research/mace-streammembench-adapter-v0-1/**"
+      - "data/schemas/mace_streammembench_adapter_v1.schema.json"
+      - "docs/research/MACE_STREAMMEMBENCH_ADAPTER_V0_1.md"
+      - ".github/workflows/mace-streammembench-protocol-adapter.yml"
+  push:
+    branches:
+      - "research/mace-streammembench-protocol-adapter-v0-1"
+jobs:
+  adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Parse adapter source
+        run: rustfmt --edition 2024 --emit stdout --config skip_children=true research/mace-streammembench-adapter-v0-1/src/lib.rs >/dev/null
+      - name: Test protocol contract
+        run: cargo test --manifest-path research/mace-streammembench-adapter-v0-1/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/mace-streammembench-adapter-v0-1/Cargo.toml --all-targets -- -D warnings
+      - name: Parse protocol schema
+        run: python3 -m json.tool data/schemas/mace_streammembench_adapter_v1.schema.json >/dev/null
