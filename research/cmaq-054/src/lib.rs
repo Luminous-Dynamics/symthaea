@@ -148,6 +148,7 @@ pub struct KernelFamilyUpdate {
 pub struct KernelFamilyPortfolio {
     experts: Vec<KernelExpert>,
     alpha_portfolio: Rational,
+    threshold_scale: Rational,
     log_threshold: f64,
     portfolio_contract_sha256: String,
     fleet_plan_sha256: String,
@@ -161,6 +162,27 @@ pub struct KernelFamilyPortfolio {
 impl KernelFamilyPortfolio {
     pub fn new(
         risk_plan: &ComposedRiskPlan,
+        portfolio_contract_sha256: String,
+        configurations: Vec<KernelExpertConfig>,
+    ) -> Result<Self, KernelFamilyError> {
+        Self::new_with_threshold_scale(
+            risk_plan,
+            Rational::one(),
+            portfolio_contract_sha256,
+            configurations,
+        )
+    }
+
+    /// Constructs a child family for a larger prior mixture.
+    ///
+    /// The effective family threshold is alpha_test * threshold_scale.
+    /// This method is intended for nested mixtures such as a restart-time
+    /// portfolio: the component at start s receives scale nu_s, while the
+    /// outer portfolio still spends the shared alpha_test once. The reference
+    /// envelope is shared and is not reallocated for each child.
+    pub fn new_with_threshold_scale(
+        risk_plan: &ComposedRiskPlan,
+        threshold_scale: Rational,
         portfolio_contract_sha256: String,
         configurations: Vec<KernelExpertConfig>,
     ) -> Result<Self, KernelFamilyError> {
@@ -180,7 +202,7 @@ impl KernelFamilyPortfolio {
             return Err(KernelFamilyError::RiskPlanWeightMismatch);
         }
 
-        let alpha_portfolio = risk_plan.alpha_test();
+        let alpha_portfolio = multiply_probabilities(risk_plan.alpha_test(), threshold_scale)?;
         let mut prior_sum = None;
         let mut expert_ids = HashSet::with_capacity(configurations.len());
         let mut experts = Vec::with_capacity(configurations.len());
@@ -295,6 +317,7 @@ impl KernelFamilyPortfolio {
         Ok(Self {
             experts,
             alpha_portfolio,
+            threshold_scale,
             log_threshold,
             portfolio_contract_sha256,
             fleet_plan_sha256: receipt.fleet_plan_sha256.clone(),
@@ -464,8 +487,18 @@ impl KernelFamilyPortfolio {
         self.observations_seen
     }
 
+    /// Effective threshold allocated to this family component.
+    ///
+    /// For a root CMAQ-054 portfolio this equals the composed plan's
+    /// alpha_test. For a nested restart component it equals
+    /// alpha_test * threshold_scale.
     pub fn alpha_portfolio(&self) -> Rational {
         self.alpha_portfolio
+    }
+
+    /// Fixed prior weight of this family component in its parent mixture.
+    pub fn threshold_scale(&self) -> Rational {
+        self.threshold_scale
     }
 
     pub fn log_mixture_e_value(&self) -> f64 {
