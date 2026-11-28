@@ -201,15 +201,10 @@ fn validate_event_shape(event: &PolicyRevisionEventV1) -> Result<(), ReplayRejec
             }
         }
     }
-    if let Some(value) = event.previous_revision_id.as_deref() {
-        if !nonempty(value) {
-            return Err(ReplayRejectV1::InvalidEventShape);
-        }
-    }
-    if let Some(value) = event.reversion_of_revision_id.as_deref() {
-        if !nonempty(value) {
-            return Err(ReplayRejectV1::InvalidEventShape);
-        }
+    if event.previous_revision_id.as_deref().is_some_and(|value| !nonempty(value))
+        || event.reversion_of_revision_id.as_deref().is_some_and(|value| !nonempty(value))
+    {
+        return Err(ReplayRejectV1::InvalidEventShape);
     }
     Ok(())
 }
@@ -447,74 +442,45 @@ mod tests {
         digest_bytes(value.as_bytes())
     }
 
-    fn base_event(
-        sequence: u64,
-        previous_event_sha256: String,
+    struct EventDraftV1<'a> {
         kind: RevisionEventKindV1,
-        revision_id: Option<&str>,
-        target_revision_id: Option<&str>,
-        previous_revision_id: Option<&str>,
-        reversion_of_revision_id: Option<&str>,
-        content: &str,
-        source: &str,
-        authority: &str,
+        revision_id: Option<&'a str>,
+        target_revision_id: Option<&'a str>,
+        previous_revision_id: Option<&'a str>,
+        reversion_of_revision_id: Option<&'a str>,
+        content: &'a str,
+        source: &'a str,
+        authority: &'a str,
         effective_at_ms: u64,
         recorded_at_ms: u64,
-    ) -> PolicyRevisionEventV1 {
-        PolicyRevisionEventV1 {
+    }
+
+    fn append(events: &mut Vec<PolicyRevisionEventV1>, draft: EventDraftV1<'_>) {
+        let previous_event_sha256 = events.last().map_or_else(
+            || GENESIS_EVENT_SHA256_V1.to_owned(),
+            |event| event.event_sha256.clone(),
+        );
+        let event = PolicyRevisionEventV1 {
             schema_version: SCHEMA_VERSION_V1.into(),
             stream_id: "env-a/procedure-checkout".into(),
             environment_id: "env-a".into(),
             procedure_id: "checkout".into(),
             scope_id: "tenant-7".into(),
-            sequence,
-            event_id: format!("event-{sequence}"),
-            kind,
-            revision_id: revision_id.map(str::to_owned),
-            target_revision_id: target_revision_id.map(str::to_owned),
-            previous_revision_id: previous_revision_id.map(str::to_owned),
-            reversion_of_revision_id: reversion_of_revision_id.map(str::to_owned),
-            policy_content_sha256: digest(content),
-            source_lineage_receipt_sha256: digest(source),
-            authority_receipt_sha256: digest(authority),
-            effective_at_ms,
-            recorded_at_ms,
+            sequence: events.len() as u64 + 1,
+            event_id: format!("event-{}", events.len() + 1),
+            kind: draft.kind,
+            revision_id: draft.revision_id.map(str::to_owned),
+            target_revision_id: draft.target_revision_id.map(str::to_owned),
+            previous_revision_id: draft.previous_revision_id.map(str::to_owned),
+            reversion_of_revision_id: draft.reversion_of_revision_id.map(str::to_owned),
+            policy_content_sha256: digest(draft.content),
+            source_lineage_receipt_sha256: digest(draft.source),
+            authority_receipt_sha256: digest(draft.authority),
+            effective_at_ms: draft.effective_at_ms,
+            recorded_at_ms: draft.recorded_at_ms,
             previous_event_sha256,
             event_sha256: String::new(),
-        }
-    }
-
-    fn append(
-        events: &mut Vec<PolicyRevisionEventV1>,
-        kind: RevisionEventKindV1,
-        revision_id: Option<&str>,
-        target_revision_id: Option<&str>,
-        previous_revision_id: Option<&str>,
-        reversion_of_revision_id: Option<&str>,
-        content: &str,
-        source: &str,
-        authority: &str,
-        effective_at_ms: u64,
-        recorded_at_ms: u64,
-    ) {
-        let previous = events.last().map_or_else(
-            || GENESIS_EVENT_SHA256_V1.to_owned(),
-            |event| event.event_sha256.clone(),
-        );
-        let event = base_event(
-            events.len() as u64 + 1,
-            previous,
-            kind,
-            revision_id,
-            target_revision_id,
-            previous_revision_id,
-            reversion_of_revision_id,
-            content,
-            source,
-            authority,
-            effective_at_ms,
-            recorded_at_ms,
-        );
+        };
         events.push(seal_policy_revision_event_v1(event).unwrap());
     }
 
@@ -549,10 +515,30 @@ mod tests {
     #[test]
     fn bitemporal_query_returns_only_events_known_and_effective_at_the_snapshot() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 300,
+        });
 
         let before_notice = resolve(&events, 250, 250).unwrap();
         assert_eq!(before_notice.active_revision.as_ref().map(|value| value.revision_id.as_str()), Some("rev-a1"));
@@ -565,10 +551,30 @@ mod tests {
     #[test]
     fn valid_time_before_change_keeps_old_revision_even_when_new_notice_is_known() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 300,
+        });
 
         let historical = resolve(&events, 150, 300).unwrap();
         assert_eq!(historical.active_revision.as_ref().map(|value| value.revision_id.as_str()), Some("rev-a1"));
@@ -577,14 +583,54 @@ mod tests {
     #[test]
     fn a_to_b_to_a_reversion_creates_new_revision_and_new_provenance() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a-v1", "authority-a-v1", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 200);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("rev-b1"), Some("rev-b1"), None,
-            "policy-b", "withdraw-b", "withdraw-authority", 300, 300);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a2"), None, None, Some("rev-a1"),
-            "policy-a", "source-a-v2", "authority-a-v2", 301, 301);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a-v1",
+            authority: "authority-a-v1",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("rev-b1"),
+            previous_revision_id: Some("rev-b1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "withdraw-b",
+            authority: "withdraw-authority",
+            effective_at_ms: 300,
+            recorded_at_ms: 300,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a2"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: Some("rev-a1"),
+            content: "policy-a",
+            source: "source-a-v2",
+            authority: "authority-a-v2",
+            effective_at_ms: 301,
+            recorded_at_ms: 301,
+        });
 
         let result = resolve(&events, 400, 400).unwrap();
         let active = result.active_revision.unwrap();
@@ -598,10 +644,30 @@ mod tests {
     #[test]
     fn withdrawn_policy_does_not_resurrect_without_explicit_new_activation() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("rev-a1"), Some("rev-a1"), None,
-            "policy-a", "withdraw-a", "withdraw-authority", 200, 200);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("rev-a1"),
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "withdraw-a",
+            authority: "withdraw-authority",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
         let result = resolve(&events, 250, 250).unwrap();
         assert_eq!(result.status, ResolutionStatusV1::NoActiveRevision);
         assert_eq!(result.active_revision, None);
@@ -610,8 +676,18 @@ mod tests {
     #[test]
     fn activation_requires_verified_authority_receipt() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
         let authorities = BTreeSet::new();
         let head = events.last().unwrap().event_sha256.clone();
         assert_eq!(
@@ -623,8 +699,18 @@ mod tests {
     #[test]
     fn scope_or_stream_identity_cannot_be_crossed() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
         let mut wrong = query(100, 100);
         wrong.scope_id = "tenant-other".into();
         let authorities = authority_set(&events);
@@ -638,56 +724,186 @@ mod tests {
     #[test]
     fn same_content_requires_an_explicit_reversion_origin() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a-v1", "authority-a-v1", 100, 100);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("rev-a1"), Some("rev-a1"), None,
-            "policy-a", "withdraw-a", "withdraw-authority", 200, 200);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a2"), None, None, None,
-            "policy-a", "source-a-v2", "authority-a-v2", 300, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a-v1",
+            authority: "authority-a-v1",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("rev-a1"),
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "withdraw-a",
+            authority: "withdraw-authority",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a2"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a-v2",
+            authority: "authority-a-v2",
+            effective_at_ms: 300,
+            recorded_at_ms: 300,
+        });
         assert_eq!(resolve(&events, 350, 350), Err(ReplayRejectV1::ContentReuseRequiresReversion));
     }
 
     #[test]
     fn reversion_must_have_new_revision_id_and_fresh_source_and_authority_receipts() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a-v1", "authority-a-v1", 100, 100);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("rev-a1"), Some("rev-a1"), None,
-            "policy-a", "withdraw-a", "withdraw-authority", 200, 200);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a2"), None, None, Some("rev-a1"),
-            "policy-a", "source-a-v1", "authority-a-v2", 300, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a-v1",
+            authority: "authority-a-v1",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("rev-a1"),
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "withdraw-a",
+            authority: "withdraw-authority",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a2"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: Some("rev-a1"),
+            content: "policy-a",
+            source: "source-a-v1",
+            authority: "authority-a-v2",
+            effective_at_ms: 300,
+            recorded_at_ms: 300,
+        });
         assert_eq!(resolve(&events, 350, 350), Err(ReplayRejectV1::InvalidReversion));
     }
 
     #[test]
     fn duplicate_revision_id_is_rejected() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a-v1", "authority-a-v1", 100, 100);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("rev-a1"), Some("rev-a1"), None,
-            "policy-a", "withdraw-a", "withdraw-authority", 200, 200);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, Some("rev-a1"),
-            "policy-a", "source-a-v2", "authority-a-v2", 300, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a-v1",
+            authority: "authority-a-v1",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("rev-a1"),
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "withdraw-a",
+            authority: "withdraw-authority",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: Some("rev-a1"),
+            content: "policy-a",
+            source: "source-a-v2",
+            authority: "authority-a-v2",
+            effective_at_ms: 300,
+            recorded_at_ms: 300,
+        });
         assert_eq!(resolve(&events, 350, 350), Err(ReplayRejectV1::DuplicateRevisionId));
     }
 
     #[test]
     fn invalid_withdrawal_target_cannot_silently_clear_another_revision() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Withdraw, None, Some("other-rev"), Some("rev-a1"), None,
-            "policy-a", "withdraw-a", "withdraw-authority", 200, 200);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Withdraw,
+            revision_id: None,
+            target_revision_id: Some("other-rev"),
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "withdraw-a",
+            authority: "withdraw-authority",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
         assert_eq!(resolve(&events, 250, 250), Err(ReplayRejectV1::InvalidWithdrawal));
     }
 
     #[test]
     fn event_chain_detects_tampering_missing_events_and_wrong_head() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 200);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
 
         let mut changed = events.clone();
         changed[0].policy_content_sha256 = digest("tampered");
@@ -712,8 +928,18 @@ mod tests {
     #[test]
     fn no_known_or_effective_event_returns_no_active_revision() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 200, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 200,
+            recorded_at_ms: 300,
+        });
         let not_known = resolve(&events, 250, 250).unwrap();
         assert_eq!(not_known.status, ResolutionStatusV1::NoActiveRevision);
         let not_yet_effective = resolve(&events, 150, 300).unwrap();
@@ -723,8 +949,18 @@ mod tests {
     #[test]
     fn resolution_receipt_is_integrity_bound_to_both_times_and_active_revision() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
         let result = resolve(&events, 120, 140).unwrap();
         assert!(result.verify_integrity());
         let mut tampered = result.clone();
@@ -735,10 +971,30 @@ mod tests {
     #[test]
     fn unverified_future_notice_does_not_poison_an_earlier_as_known_query() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 300,
+        });
         let authorities = BTreeSet::from([digest("authority-a")]);
         let head = events.last().unwrap().event_sha256.clone();
 
@@ -754,12 +1010,42 @@ mod tests {
     #[test]
     fn retroactive_effective_time_insertion_is_rejected_explicitly() {
         let mut events = Vec::new();
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-a1"), None, None, None,
-            "policy-a", "source-a", "authority-a", 100, 100);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-b1"), None, Some("rev-a1"), None,
-            "policy-b", "source-b", "authority-b", 200, 200);
-        append(&mut events, RevisionEventKindV1::Activate, Some("rev-c1"), None, Some("rev-b1"), None,
-            "policy-c", "source-c", "authority-c", 150, 300);
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-a1"),
+            target_revision_id: None,
+            previous_revision_id: None,
+            reversion_of_revision_id: None,
+            content: "policy-a",
+            source: "source-a",
+            authority: "authority-a",
+            effective_at_ms: 100,
+            recorded_at_ms: 100,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-b1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-a1"),
+            reversion_of_revision_id: None,
+            content: "policy-b",
+            source: "source-b",
+            authority: "authority-b",
+            effective_at_ms: 200,
+            recorded_at_ms: 200,
+        });
+        append(&mut events, EventDraftV1 {
+            kind: RevisionEventKindV1::Activate,
+            revision_id: Some("rev-c1"),
+            target_revision_id: None,
+            previous_revision_id: Some("rev-b1"),
+            reversion_of_revision_id: None,
+            content: "policy-c",
+            source: "source-c",
+            authority: "authority-c",
+            effective_at_ms: 150,
+            recorded_at_ms: 300,
+        });
         assert_eq!(resolve(&events, 400, 400), Err(ReplayRejectV1::InvalidTimeOrder));
     }
 
