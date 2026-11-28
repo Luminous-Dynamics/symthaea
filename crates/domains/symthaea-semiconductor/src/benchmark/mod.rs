@@ -170,8 +170,11 @@ pub use capacity_aware_feedback::{
 pub use conformal_interval_builder::{
     CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1, CONFORMAL_INTERVAL_INPUT_SCHEMA_V1,
     CONFORMAL_SCORE_POLICY_SCHEMA_V1, CONFORMAL_SET_RECEIPT_SCHEMA_V1,
+    BoundedConformalScoreContractV1, BoundedConformalScoreKindV1,
+    BoundedPredictionSetInputV1, BoundedPredictionSetKindV1, BoundedPredictionSetReceiptV1,
     ConformalCalibrationSampleV1, ConformalCalibrationScoreV1, ConformalIntervalInputV1,
     ConformalScoreKindV1, ConformalScorePolicyV1, ConformalSetBuildReasonV1,
     ConformalSetBuildStatusV1, ConformalSetBuilderErrorV1, ConformalSetReceiptV1,
-    build_conformal_interval_v1,
+    bounded_conformal_score_contract_sha256_v1, build_bounded_score_prediction_set_v1,
+    build_conformal_interval_v1, verify_bounded_score_prediction_set_v1,
 };
