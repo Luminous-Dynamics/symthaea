@@ -10,9 +10,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-const SCHEMA: &str = include_str!(
-    "../../../benchmarks/mel/schemas/mel-hear-011-auditory-evidence-v0-1.schema.json"
-);
+const SCHEMA: &str =
+    include_str!("../../../benchmarks/mel/schemas/mel-hear-011-auditory-evidence-v0-1.schema.json");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FixtureSummary {
@@ -136,9 +135,9 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
                     .as_array()
                     .ok_or_else(|| "materialized view shape must be an array".to_owned())?;
                 if shape.is_empty()
-                    || shape.iter().any(|dimension| {
-                        dimension.as_u64().is_none_or(|value| value == 0)
-                    })
+                    || shape
+                        .iter()
+                        .any(|dimension| dimension.as_u64().is_none_or(|value| value == 0))
                 {
                     return Err("materialized view dimensions must be positive integers".to_owned());
                 }
@@ -164,22 +163,19 @@ fn validate_views(record: &Value) -> Result<(usize, usize), String> {
 
     for required in ["waveform", "complex_stft", "erb_band_energy", "constant_q"] {
         if !kinds.contains(required) {
-            return Err(format!("required representation view is absent: {required}"));
+            return Err(format!(
+                "required representation view is absent: {required}"
+            ));
         }
     }
     Ok((views.len(), materialized))
 }
 
 /// Validate the metadata-only known-signal fixture and its exact source artifact.
-pub fn validate_fixture(
-    record: &Value,
-    source_asset: &[u8],
-) -> Result<FixtureSummary, String> {
+pub fn validate_fixture(record: &Value, source_asset: &[u8]) -> Result<FixtureSummary, String> {
     let schema: Value = serde_json::from_str(SCHEMA)
         .map_err(|error| format!("committed schema is invalid JSON: {error}"))?;
-    if string(&schema, "$schema")?
-        != "https://json-schema.org/draft/2020-12/schema"
-    {
+    if string(&schema, "$schema")? != "https://json-schema.org/draft/2020-12/schema" {
         return Err("unsupported JSON Schema dialect".to_owned());
     }
 
@@ -219,7 +215,9 @@ pub fn validate_fixture(
 
     if evidence_status == "metadata_fixture_only" {
         if !events.is_empty() || !scenes.is_empty() || !claims.is_empty() {
-            return Err("metadata-only fixture cannot make event, scene or query claims".to_owned());
+            return Err(
+                "metadata-only fixture cannot make event, scene or query claims".to_owned(),
+            );
         }
         if materialized_view_count != 0 {
             return Err("metadata-only fixture cannot claim materialized feature views".to_owned());
@@ -242,8 +240,8 @@ pub fn validate_fixture(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_fixture, FixtureSummary};
-    use serde_json::{json, Value};
+    use super::{FixtureSummary, validate_fixture};
+    use serde_json::{Value, json};
 
     const FIXTURE: &str = include_str!("../fixtures/auditory-evidence-v0.1.json");
     const SOURCE_ASSET: &[u8] = include_bytes!("../fixtures/synthetic-tone-f32le-hex.txt");
@@ -270,62 +268,76 @@ mod tests {
     #[test]
     fn changed_source_bytes_fail_the_digest_check() {
         let changed = b"tampered source bytes";
-        assert!(validate_fixture(&fixture(), changed)
-            .unwrap_err()
-            .contains("digest"));
+        assert!(
+            validate_fixture(&fixture(), changed)
+                .unwrap_err()
+                .contains("digest")
+        );
     }
 
     #[test]
     fn declared_frame_count_must_match_the_sample_asset() {
         let mut record = fixture();
         record["source"]["frame_count"] = json!(15);
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("frame_count"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("frame_count")
+        );
     }
 
     #[test]
     fn uncalibrated_digital_values_cannot_claim_sound_pressure() {
         let mut record = fixture();
         record["source"]["amplitude_unit"] = json!("dB_SPL");
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("cannot claim SPL"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("cannot claim SPL")
+        );
     }
 
     #[test]
     fn complex_stft_must_preserve_phase_by_contract() {
         let mut record = fixture();
         record["views"][1]["phase_policy"] = json!("magnitude_only");
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("phase retention"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("phase retention")
+        );
     }
 
     #[test]
     fn metadata_only_records_cannot_claim_events_or_scenes() {
         let mut record = fixture();
         record["event_hypotheses"] = json!([{"event_id":"invented"}]);
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("cannot make event"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("cannot make event")
+        );
     }
 
     #[test]
     fn planned_views_cannot_smuggle_unverified_artifacts() {
         let mut record = fixture();
         record["views"][0]["artifact_sha256"] = json!("0".repeat(64));
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("unmaterialized views"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("unmaterialized views")
+        );
     }
 
     #[test]
     fn duplicate_representation_kinds_are_rejected() {
         let mut record = fixture();
         record["views"][3]["kind"] = json!("erb_band_energy");
-        assert!(validate_fixture(&record, SOURCE_ASSET)
-            .unwrap_err()
-            .contains("duplicate representation kind"));
+        assert!(
+            validate_fixture(&record, SOURCE_ASSET)
+                .unwrap_err()
+                .contains("duplicate representation kind")
+        );
     }
 }
