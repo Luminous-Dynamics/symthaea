@@ -44,7 +44,7 @@ struct FourierFeature {
 }
 
 #[derive(Debug, Clone)]
-struct SpatialHdcEncoder {
+pub(crate) struct SpatialHdcEncoder {
     width: u16,
     height: u16,
     features: Vec<FourierFeature>,
@@ -53,7 +53,7 @@ struct SpatialHdcEncoder {
 }
 
 impl SpatialHdcEncoder {
-    fn new(width: u16, height: u16, seed: u64) -> Result<Self, HdcCandidateError> {
+    pub(crate) fn new(width: u16, height: u16, seed: u64) -> Result<Self, HdcCandidateError> {
         if width == 0 || height == 0 {
             return Err(HdcCandidateError::ZeroDimension);
         }
@@ -81,7 +81,7 @@ impl SpatialHdcEncoder {
         })
     }
 
-    fn encode(&self, x: u16, y: u16) -> ContinuousHV {
+    pub(crate) fn encode(&self, x: u16, y: u16) -> ContinuousHV {
         let x_norm = if self.width > 1 {
             f32::from(x) / f32::from(self.width - 1)
         } else {
