@@ -54,6 +54,22 @@ Do not optimize against v1 recall alone. Use v1 only as a legacy reference; publ
 
 The listed Vidu S2 Avatar avatar-performance overall is 81.71, but that includes a +5 customizability bonus; its content-only quality-overall is 76.71. Its reported A/V sync is 99.60 and stability 97.25, while following is only 36.90. The strategic lesson: excellent synchronization and stability do not imply strong action/task following. Compare component metrics and exclude non-quality bonus points when claiming quality superiority.
 
+### DIVE — continuous audiovisual engagement
+
+DIVE (October 20, 2026) evaluates continuous audiovisual streams rather than isolated timestamped questions. It has 525 audio/video samples, six tasks across proactive intervention, continuous engagement and interaction coordination, with separate response quality, participation decisions, response-window rates and reaction latency. The paper reports sub-second average response latency for leading real-time systems, yet response-window rates remain at or below 53.77%.
+
+This exposes a gap between quick answers and sustained participation. A system can answer fast when it chooses to answer and still miss most opportunities to intervene or adapt to newly arriving information.
+
+### $\\tau$-Voice — grounded task execution under realistic audio
+
+The ICML 2026 $\\tau$-Voice benchmark contains 278 grounded tasks combining multi-turn conversations, domain policies, environmental interaction and realistic audio. In its reported evaluation, voice agents achieved 31–51% task completion in clean conditions and 26–38% under realistic noise and diverse accents, compared with 85% for the evaluated text reasoning baseline. These are study-specific results, not a universal modality gap, but they demonstrate the need to measure how much of the underlying reasoning capability survives real-time voice interaction.
+
+### Full-Duplex-Bench v1.5 — overlapping speech behavior
+
+The benchmark separates user interruption, backchannels, speech directed at others and background speech, with both behavior rates and stop/response latency. Realtime-Venus reports responding to 75% of user interruptions while continuing through 97% of backchannels, 88% of other-directed speech and 86% of background speech.
+
+Symthaea should not optimize interruption recall alone: it must respond to true interruptions while preserving continuation through non-interrupting overlap. Report the four behavior families and end-to-end stop latency separately.
+
 ### ActAvatar — temporally anchored action control
 
 ActAvatar (CVPR 2026) reports phase-aware cross-attention with globally and temporally anchored action prompt segments, plus progressive audio-visual alignment to reduce interference between text-driven action control and audio-driven lip synchronization. This validates the value of explicit temporal phases, but it is a talking-avatar generation method rather than a complete permissioned full-duplex agent. Symthaea's action timeline should complement, not claim to replace, learned generation models.
@@ -125,6 +141,9 @@ For each task family, include:
 - best available full-duplex baseline;
 - best available cascaded baseline;
 - multi-party speech baseline evaluated on explicit versus implicit addressing (Duplex-MPE);
+- continuous engagement/intervention baseline (DIVE);
+- realistic-audio, grounded task-completion baseline ($\\tau$-Voice);
+- overlap-specific full-duplex behavior baseline (Full-Duplex-Bench v1.5);
 - sparse visual baseline (1 FPS);
 - fixed-rate visual baseline (2 FPS and 4 FPS where affordable);
 - surprise-only ROI;
@@ -175,6 +194,9 @@ Source contracts, docs and authored tests exist on the research branch. They are
 - [VideoFDB v1.4 leaderboard](https://research.nvidia.com/labs/amri/projects/video-fdb/leaderboard.html) — latest November 25 table; retain separate perception/generation tracks and full-duplex/cascaded strata.
 - [StreamEval leaderboard](https://streameval.ai/) and [paper](https://arxiv.org/abs/2610.28402) — preserve component scores for following, synchronization, stability, identity and quality; exclude the custom-avatar bonus when comparing content quality.
 - [InteractionBench paper](https://arxiv.org/abs/2611.02430) and [site](https://avera-labs.github.io/InteractionBench/) — same-input timing, spoken-task, whisper/volume and long-context grounding protocol.
+- [DIVE paper](https://arxiv.org/abs/2610.28405) — continuous-stream engagement, intervention windows and reaction timing.
+- [$\\tau$-Voice ICML 2026](https://proceedings.mlr.press/v306/ray26a.html) — grounded task completion with full-duplex audio, policies and realistic acoustic conditions.
+- [Full-Duplex-Bench v1.5](https://github.com/vtrinh-nvidia/Full-Duplex-Bench) — interruption, backchannel, other-directed speech, ambient speech and stop latency.
 - [Duplex-MPE paper](https://arxiv.org/abs/2609.31948) — multi-party interaction, explicit/implicit addressee and silence/stopping conditions.
 - [TurnBench paper](https://arxiv.org/abs/2608.25218) — dyadic turn-taking reference; interpret the currently documented v1 ranking limitation conservatively.
 
