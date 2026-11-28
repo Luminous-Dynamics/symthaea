@@ -67,6 +67,7 @@ pub struct JointPopulationRowV1 {
     pub round_id: u64,
     pub sample_id: String,
     pub measurement_event_id: String,
+    pub event_time_unix_seconds: i64,
     pub context_key: String,
     pub physical_measurement_selected: bool,
     pub physical_metrology_cost_units: f64,
@@ -340,6 +341,12 @@ fn validate_population(
         require_text(&row.sample_id, "population.sample_id")?;
         require_text(&row.measurement_event_id, "population.measurement_event_id")?;
         require_text(&row.context_key, "population.context_key")?;
+        if row.event_time_unix_seconds <= 0 {
+            return Err(JointRiskTraceErrorV1(format!(
+                "round {} has an invalid population event timestamp",
+                row.round_id
+            )));
+        }
         if !row.physical_metrology_cost_units.is_finite()
             || row.physical_metrology_cost_units < 0.0
             || (row.physical_measurement_selected && row.physical_metrology_cost_units <= 0.0)
@@ -437,6 +444,15 @@ fn validate_population(
                 }
             }
         }
+    }
+    let mut previous_event_time = None;
+    for row in rows.values() {
+        if previous_event_time.is_some_and(|previous| row.event_time_unix_seconds <= previous) {
+            return Err(JointRiskTraceErrorV1(
+                "population event times must increase strictly with round order".into(),
+            ));
+        }
+        previous_event_time = Some(row.event_time_unix_seconds);
     }
     Ok(rows)
 }
@@ -750,6 +766,7 @@ fn validate_aci_arm(
         if prediction.delay_rounds == 0
             || prediction.sample_id != row.sample_id
             || prediction.measurement_event_id != row.measurement_event_id
+            || prediction.event_time_unix_seconds != row.event_time_unix_seconds
             || prediction.model_artifact_sha256 != arm.global_model_artifact_sha256
             || prediction.policy_sha256 != arm.controller_policy_sha256
             || prediction.delay_rounds != evidence.policy.delay_rounds
@@ -1282,6 +1299,7 @@ fn validate_ca_arm(
             || prediction.round != report.round
             || prediction.sample_id != row.sample_id
             || prediction.measurement_event_id != row.measurement_event_id
+            || prediction.event_time_unix_seconds != row.event_time_unix_seconds
             || prediction.physical_measurement_selected != row.physical_measurement_selected
             || prediction.global_model_artifact_sha256 != arm.global_model_artifact_sha256
             || prediction.interval_method_sha256 != arm.interval_method_sha256
@@ -1942,7 +1960,7 @@ mod tests {
             label_value: 12.0,
             label_available_at_unix_seconds: 1_900_000_010,
             eligibility_report_available_at_unix_seconds: 1_900_000_015,
-            delivered_at_unix_seconds: 1_900_000_020,
+            delivered_at_unix_seconds: 1_900_000_040,
             delivered_round: 2,
             clock_domain_id: "fab-clock".into(),
             idempotency_key: "label-001:1".into(),
@@ -1955,8 +1973,6 @@ mod tests {
                 LabelConsumptionEligibilityV1::EligibleUnderDeclaredPolicy,
             ),
         };
-        let first_update = deliver_delayed_aci_label_v1(&mut engine, &first_delivery).unwrap();
-
         let second_prediction = issue_delayed_aci_prediction_v1(
             &mut engine,
             &DelayedAciPredictionInputV1 {
@@ -1973,6 +1989,8 @@ mod tests {
             },
         )
         .unwrap();
+        // The round-2 prediction is frozen before the round-1 label arrives.
+        let first_update = deliver_delayed_aci_label_v1(&mut engine, &first_delivery).unwrap();
 
         begin_delayed_aci_round_v1(&mut engine, 3).unwrap();
         let degenerate = resolve_degenerate_aci_interval_v1(&mut engine, "wafer-002").unwrap();
@@ -2009,9 +2027,9 @@ mod tests {
                 round: 1,
                 sample_id: "wafer-001".into(),
                 measurement_event_id: "meas-001".into(),
-                event_time_unix_seconds: 1_899_999_980,
-                prediction_at_unix_seconds: 1_899_999_985,
-                round_time_unix_seconds: 1_899_999_990,
+                event_time_unix_seconds: 1_900_000_000,
+                prediction_at_unix_seconds: 1_900_000_001,
+                round_time_unix_seconds: 1_900_000_005,
                 clock_domain_id: "fab-clock".into(),
                 global_model_artifact_sha256: digest('4'),
                 interval_method_sha256: digest('6'),
@@ -2038,9 +2056,9 @@ mod tests {
                 round: 2,
                 sample_id: "wafer-002".into(),
                 measurement_event_id: "meas-002".into(),
-                event_time_unix_seconds: 1_900_000_025,
-                prediction_at_unix_seconds: 1_900_000_030,
-                round_time_unix_seconds: 1_900_000_035,
+                event_time_unix_seconds: 1_900_000_030,
+                prediction_at_unix_seconds: 1_900_000_031,
+                round_time_unix_seconds: 1_900_000_045,
                 clock_domain_id: "fab-clock".into(),
                 global_model_artifact_sha256: digest('4'),
                 interval_method_sha256: digest('6'),
@@ -2134,6 +2152,7 @@ mod tests {
                     round_id: 1,
                     sample_id: "wafer-001".into(),
                     measurement_event_id: "meas-001".into(),
+                    event_time_unix_seconds: 1_900_000_000,
                     context_key: "eqp-01/ch-01".into(),
                     physical_measurement_selected: true,
                     physical_metrology_cost_units: 1.0,
@@ -2150,12 +2169,13 @@ mod tests {
                     label_value: Some(12.0),
                     label_available_at_unix_seconds: Some(1_900_000_010),
                     eligibility_report_available_at_unix_seconds: Some(1_900_000_015),
-                    label_delivered_at_unix_seconds: Some(1_900_000_020),
+                    label_delivered_at_unix_seconds: Some(1_900_000_040),
                 },
                 JointPopulationRowV1 {
                     round_id: 2,
                     sample_id: "wafer-002".into(),
                     measurement_event_id: "meas-002".into(),
+                    event_time_unix_seconds: 1_900_000_030,
                     context_key: "eqp-01/ch-01".into(),
                     physical_measurement_selected: false,
                     physical_metrology_cost_units: 0.0,
@@ -2331,6 +2351,7 @@ mod tests {
             round_id: 3,
             sample_id: "wafer-003".into(),
             measurement_event_id: "meas-003".into(),
+            event_time_unix_seconds: 1_900_000_100,
             context_key: "eqp-02/ch-01".into(),
             physical_measurement_selected: true,
             physical_metrology_cost_units: 1.0,
