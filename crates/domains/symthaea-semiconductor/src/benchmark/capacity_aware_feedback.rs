@@ -564,6 +564,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
+            prediction_set_sha256: None,
             disposition: CaOcrcTrackingDispositionV1::Duplicate,
             reasons: vec![CaOcrcReasonV1::DuplicateAcceptedRevision],
             observed_loss: None,
@@ -621,6 +622,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
+            prediction_set_sha256: None,
             disposition,
             reasons: if reasons.is_empty() { vec![CaOcrcReasonV1::FeedbackNotInTrackingSet] } else { reasons },
             observed_loss: None,
@@ -736,6 +738,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
+            prediction_set_sha256: None,
             disposition,
             reasons,
             observed_loss: None,
@@ -763,6 +766,7 @@ pub fn receive_ca_ocrc_feedback_v1(
             current_round: feedback.current_round,
             label_id: feedback.label_id.clone(),
             label_revision: feedback.label_revision,
+            prediction_set_sha256: Some(tracked.prediction_set_sha256.clone()),
             disposition: CaOcrcTrackingDispositionV1::GuaranteeSuspended,
             reasons: Vec::new(),
             observed_loss: None,
@@ -958,6 +962,9 @@ mod tests {
             measurement_event_id: format!("event-{index}"),
             prediction_kind: CaOcrcPredictionKindV1::Nontrivial,
             lower_bound: Some(0.0), upper_bound: Some(1.0),
+            threshold_used: 0.5,
+            score_contract_sha256: digest('f'),
+            prediction_set_sha256: digest('g'),
             event_time_unix_seconds: 1_800_000_000 + index as i64 * 60,
             prediction_at_unix_seconds: 1_800_000_002 + index as i64 * 60,
             clock_domain_id: "fab-clock".into(), uniform_draw: draw,
@@ -969,6 +976,7 @@ mod tests {
         CaOcrcFeedbackV1 {
             schema: CA_OCRC_FEEDBACK_SCHEMA_V1.into(), current_round: current,
             origin_round: origin, actual_delay: current - origin,
+            prediction_set_sha256: digest('g'),
             prediction_id: format!("pred-{origin}"),
             sample_id: format!("sample-{origin}"),
             measurement_event_id: format!("event-{origin}"),
@@ -1006,6 +1014,7 @@ mod tests {
         let mut empty = round(0, 0.0);
         empty.prediction_kind = CaOcrcPredictionKindV1::KnownEmpty;
         empty.lower_bound = None; empty.upper_bound = None;
+        empty.threshold_used = -0.01;
         let decision = start_ca_ocrc_round_v1(&mut engine, &empty).unwrap();
         assert_eq!(decision.immediate_loss, Some(1.0));
         assert!((decision.threshold_after_round - 0.085).abs() < 1e-12);
@@ -1014,9 +1023,26 @@ mod tests {
         let mut full = round(1, 0.0);
         full.prediction_kind = CaOcrcPredictionKindV1::KnownFull;
         full.lower_bound = None; full.upper_bound = None;
+        full.threshold_used = 1.01;
         let decision = start_ca_ocrc_round_v1(&mut engine, &full).unwrap();
         assert_eq!(decision.immediate_loss, Some(0.0));
         assert!((decision.threshold_after_round - 1.005).abs() < 1e-12);
+    }
+
+    #[test]
+    fn prediction_set_receipt_must_bind_active_threshold_and_score_contract() {
+        let mut engine = create_ca_ocrc_engine_v1("e", "fab-clock", policy(2, 4, 0.50)).unwrap();
+        let mut wrong_threshold = round(0, 0.9);
+        wrong_threshold.threshold_used = 0.4;
+        assert!(start_ca_ocrc_round_v1(&mut engine, &wrong_threshold).is_err());
+
+        let mut wrong_score = round(0, 0.9);
+        wrong_score.score_contract_sha256 = digest('z');
+        assert!(start_ca_ocrc_round_v1(&mut engine, &wrong_score).is_err());
+
+        let mut malformed_set = round(0, 0.9);
+        malformed_set.prediction_set_sha256 = "not-a-digest".into();
+        assert!(start_ca_ocrc_round_v1(&mut engine, &malformed_set).is_err());
     }
 
     #[test]
