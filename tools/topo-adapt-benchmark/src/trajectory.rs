@@ -609,12 +609,7 @@ fn digest_state(
     });
     hasher.update(&(canonical_edges.len() as u64).to_le_bytes());
     for edge in &canonical_edges {
-        hasher.update(&edge.from.to_le_bytes());
-        hasher.update(&edge.to.to_le_bytes());
-        hasher.update(&edge.capacity.to_le_bytes());
-        hasher.update(&edge.latency.to_le_bytes());
-        hasher.update(&edge.maintenance_cost.to_le_bytes());
-        hash_optional_string(&mut hasher, edge.id.as_deref());
+        hash_edge(&mut hasher, edge);
     }
 
     let mut canonical_demands = demands.to_vec();
@@ -672,9 +667,12 @@ fn digest_episode_context(episode: &Episode, semantics: &GraphSemantics) -> Stri
         hash_optional_u64(&mut hasher, node.demand);
     }
 
-    for edges in [&episode.active_edges, &episode.candidate_edges] {
+    for (edge_class, edges) in [
+        (0_u8, &episode.active_edges),
+        (1_u8, &episode.candidate_edges),
+    ] {
+        hasher.update(&[edge_class]);
         let mut canonical = edges.to_vec();
-        hasher.update(&(canonical.len() as u64).to_le_bytes());
         canonical.sort_by(|left, right| {
             (left.from, left.to, left.id.as_deref()).cmp(&(
                 right.from,
