@@ -393,6 +393,9 @@ pub fn verify_and_consume(
         }
     }
     for (payload_pointer, observation_pointer) in [
+        ("/system_id", "/system/system_id"),
+        ("/system_version", "/system/version"),
+        ("/harness_version", "/system/harness_version"),
         ("/source_sha256", "/system/source_sha256"),
         ("/system_environment_sha256", "/system/environment_sha256"),
     ] {
@@ -558,6 +561,9 @@ mod tests {
             "actor_id": "actor-1",
             "subject_id": "subject-1",
             "authorization_decision": "allow",
+            "system_id": "test-adapter",
+            "system_version": "0.1.0",
+            "harness_version": "0.1.0",
             "source_sha256": VALID_SHA,
             "system_environment_sha256": VALID_SHA,
             "authority_snapshot_sha256": VALID_SHA,
