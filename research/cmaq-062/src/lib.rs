@@ -214,6 +214,8 @@ pub struct ContextTreePortfolio {
     log_threshold: f64,
     policy_sha256: String,
     trace_sha256: String,
+    mixture_leaf_base: usize,
+    mixture_tree: Vec<f64>,
     observations_seen: u64,
     pair_ids: HashSet<String>,
     log_mixture_e_value: f64,
@@ -338,6 +340,20 @@ impl ContextTreePortfolio {
         let policy_sha256 = policy_digest(&nodes, alpha, betting_rate);
         let trace_sha256 = policy_sha256.clone();
         let log_threshold = rational_log_inverse(alpha)?;
+        let mixture_leaf_base = nodes.len().next_power_of_two();
+        let mut mixture_tree = vec![f64::NEG_INFINITY; mixture_leaf_base * 2];
+        for (index, node) in nodes.iter().enumerate() {
+            mixture_tree[mixture_leaf_base + index] = node.log_prior_weight;
+        }
+        for index in (1..mixture_leaf_base).rev() {
+            mixture_tree[index] = log_add_exp(
+                mixture_tree[index * 2],
+                mixture_tree[index * 2 + 1],
+            );
+        }
+        if !mixture_tree[1].is_finite() || mixture_tree[1].abs() > 1e-10 {
+            return Err(ContextError::PriorsDoNotSumToOne);
+        }
 
         Ok(Self {
             nodes,
@@ -347,6 +363,8 @@ impl ContextTreePortfolio {
             log_threshold,
             policy_sha256,
             trace_sha256,
+            mixture_leaf_base,
+            mixture_tree,
             observations_seen: 0,
             pair_ids: HashSet::new(),
             log_mixture_e_value: 0.0,
@@ -456,25 +474,30 @@ impl ContextTreePortfolio {
             });
         }
 
-        // Increment the fixed node mixture by replacing only the active
-        // path's old contributions. The inactive nodes are unchanged. This
-        // keeps aggregation O(depth), rather than rescanning the full tree.
-        let old_active_terms = staged.iter()
-            .map(|item| {
-                let node = &self.nodes[item.index];
-                node.log_prior_weight + node.log_e_value
-            })
-            .collect::<Vec<_>>();
-        let new_active_terms = staged.iter()
-            .map(|item| {
-                let node = &self.nodes[item.index];
-                node.log_prior_weight + item.log_e_value
-            })
-            .collect::<Vec<_>>();
-        let log_old_active = log_sum_exp(&old_active_terms)?;
-        let log_new_active = log_sum_exp(&new_active_terms)?;
-        let log_inactive_remainder = log_sub_exp(self.log_mixture_e_value, log_old_active)?;
-        let log_mixture = log_add_exp(log_inactive_remainder, log_new_active);
+        // Update a log-sum-exp segment tree at only the active node leaves.
+        // Every fixed-prior component remains represented, whether active or
+        // inactive. Dirty ancestors are recomputed deepest-first.
+        let mut next_mixture_tree = self.mixture_tree.clone();
+        let mut dirty = HashSet::new();
+        for item in &staged {
+            let node = &self.nodes[item.index];
+            let mut tree_index = self.mixture_leaf_base + item.index;
+            next_mixture_tree[tree_index] = node.log_prior_weight + item.log_e_value;
+            tree_index /= 2;
+            while tree_index > 0 {
+                dirty.insert(tree_index);
+                tree_index /= 2;
+            }
+        }
+        let mut dirty_indices = dirty.into_iter().collect::<Vec<_>>();
+        dirty_indices.sort_unstable_by(|left, right| right.cmp(left));
+        for index in dirty_indices {
+            next_mixture_tree[index] = log_add_exp(
+                next_mixture_tree[index * 2],
+                next_mixture_tree[index * 2 + 1],
+            );
+        }
+        let log_mixture = next_mixture_tree[1];
         if !log_mixture.is_finite() {
             return Err(ContextError::ArithmeticOverflow);
         }
@@ -516,6 +539,7 @@ impl ContextTreePortfolio {
         }
         self.observations_seen = sequence;
         self.pair_ids.insert(pair_id.to_string());
+        self.mixture_tree = next_mixture_tree;
         self.log_mixture_e_value = log_mixture;
         self.quarantined = quarantined;
         self.trace_sha256 = trace.clone();
@@ -688,6 +712,28 @@ mod tests {
             assert_eq!(u.active_path.len(),2);
         }
         assert_eq!(m.selected_counts().iter().map(|x|x.1).sum::<u64>(),64);
+    }
+
+    #[test]
+    fn segment_tree_mixture_matches_direct_fixed_prior_sum_after_each_update() {
+        let mut monitor = tree();
+        for sequence in 1..=96u64 {
+            let z = if sequence % 3 == 0 { 0.5 } else { -0.5 };
+            let y = if sequence % 4 == 0 { std::f64::consts::TAU } else { 0.0 };
+            let update = monitor.observe_pair(
+                sequence,
+                &format!("mixture-{sequence}"),
+                &[z],
+                &[0.0],
+                &[y],
+            ).unwrap();
+            let direct = monitor.nodes.iter()
+                .map(|node| node.log_prior_weight + node.log_e_value)
+                .collect::<Vec<_>>();
+            let direct_total = log_sum_exp(&direct).unwrap();
+            assert!((direct_total - update.log_mixture_e_value).abs() < 1e-10);
+            assert!((monitor.mixture_tree[1] - direct_total).abs() < 1e-10);
+        }
     }
 
     #[test]
