@@ -40,6 +40,7 @@ pub enum EvsiError {
     InvalidCostWeight,
     InvalidLoss,
     InvalidLikelihoodModel,
+    LikelihoodTableDigestMismatch,
     ActionNotAdmissible,
     UnknownOutcome,
     ZeroProbabilityOutcome,
@@ -66,6 +67,7 @@ impl fmt::Display for EvsiError {
             Self::InvalidCostWeight => write!(formatter, "cost-to-risk weight must be finite and non-negative"),
             Self::InvalidLoss => write!(formatter, "decision losses must be finite and non-negative"),
             Self::InvalidLikelihoodModel => write!(formatter, "measurement likelihoods are not a complete probability model"),
+            Self::LikelihoodTableDigestMismatch => write!(formatter, "measurement likelihood table digest does not match the supplied probabilities"),
             Self::ActionNotAdmissible => write!(formatter, "measurement action is not admissible"),
             Self::UnknownOutcome => write!(formatter, "observed outcome is not part of the selected action"),
             Self::ZeroProbabilityOutcome => write!(formatter, "observed outcome has zero probability under the supplied prior"),
@@ -105,7 +107,7 @@ pub struct ObservationOutcomeV1 {
 pub struct MeasurementActionV1 {
     pub action_id: String,
     /// Digest of a separately qualified/calibrated likelihood model.
-    pub likelihood_model_sha256: String,
+    pub likelihood_table_sha256: String,
     pub cost: f64,
     pub admissible: bool,
     pub outcomes: Vec<ObservationOutcomeV1>,
@@ -151,7 +153,7 @@ pub struct OutcomeValueV1 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ActionEstimateV1 {
     pub action_id: String,
-    pub likelihood_model_sha256: String,
+    pub likelihood_table_sha256: String,
     pub admissible: bool,
     pub within_budget: bool,
     pub current_bayes_risk: f64,
@@ -201,6 +203,15 @@ fn valid_digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// SHA-256 over the exact compact JSON encoding of the ordered likelihood table.
+pub fn likelihood_table_sha256(
+    outcomes: &[ObservationOutcomeV1],
+) -> Result<String, EvsiError> {
+    let encoded =
+        serde_json::to_vec(outcomes).map_err(|_| EvsiError::InvalidLikelihoodModel)?;
+    Ok(format!("{:x}", Sha256::digest(encoded)))
 }
 
 fn validate_distribution(values: &[f64], field: &'static str) -> Result<(), EvsiError> {
@@ -272,7 +283,7 @@ fn validate_action(
     hypothesis_count: usize,
 ) -> Result<(), EvsiError> {
     validate_identifier(&action.action_id, "action_id")?;
-    if !valid_digest(&action.likelihood_model_sha256) {
+    if !valid_digest(&action.likelihood_table_sha256) {
         return Err(EvsiError::InvalidDigest);
     }
     if !action.cost.is_finite() || action.cost <= 0.0 {
@@ -305,6 +316,9 @@ fn validate_action(
         !total.is_finite() || (*total - 1.0).abs() > PROBABILITY_TOLERANCE
     }) {
         return Err(EvsiError::InvalidLikelihoodModel);
+    }
+    if action.likelihood_table_sha256 != likelihood_table_sha256(&action.outcomes)? {
+        return Err(EvsiError::LikelihoodTableDigestMismatch);
     }
     Ok(())
 }
@@ -355,7 +369,7 @@ fn estimate_action(
         }
         marginal_total += marginal_probability;
 
-        let posterior_bayes_risk = if marginal_probability <= NUMERICAL_TOLERANCE {
+        let posterior_bayes_risk = if marginal_probability <= 0.0 {
             None
         } else {
             let posterior: Vec<f64> = prior
@@ -400,7 +414,7 @@ fn estimate_action(
 
     Ok(ActionEstimateV1 {
         action_id: action.action_id.clone(),
-        likelihood_model_sha256: action.likelihood_model_sha256.clone(),
+        likelihood_table_sha256: action.likelihood_table_sha256.clone(),
         admissible: action.admissible,
         within_budget: action.cost <= policy.resource_budget,
         current_bayes_risk: current_risk,
@@ -537,7 +551,7 @@ pub fn posterior_after_observation(
     if !marginal_probability.is_finite() {
         return Err(EvsiError::NumericalOverflow);
     }
-    if marginal_probability <= NUMERICAL_TOLERANCE {
+    if marginal_probability <= 0.0 {
         return Err(EvsiError::ZeroProbabilityOutcome);
     }
 
@@ -560,10 +574,6 @@ mod tests {
         DecisionLossV1, EvsiError, MeasurementActionV1, NoActionReason,
         ObservationOutcomeV1, PolicyConfigV1, PriorBeliefV1,
     };
-
-    fn digest(byte: u8) -> String {
-        format!("{:02x}", byte).repeat(32)
-    }
 
     fn prior() -> PriorBeliefV1 {
         PriorBeliefV1 {
@@ -595,21 +605,22 @@ mod tests {
         admissible: bool,
         likelihoods: [[f64; 2]; 2],
     ) -> MeasurementActionV1 {
+        let outcomes = vec![
+            ObservationOutcomeV1 {
+                outcome_id: "supports-musical-change".to_owned(),
+                likelihood_by_hypothesis: likelihoods[0].to_vec(),
+            },
+            ObservationOutcomeV1 {
+                outcome_id: "supports-room-change".to_owned(),
+                likelihood_by_hypothesis: likelihoods[1].to_vec(),
+            },
+        ];
         MeasurementActionV1 {
             action_id: action_id.to_owned(),
-            likelihood_model_sha256: digest(0xab),
+            likelihood_table_sha256: super::likelihood_table_sha256(&outcomes).unwrap(),
             cost,
             admissible,
-            outcomes: vec![
-                ObservationOutcomeV1 {
-                    outcome_id: "supports-musical-change".to_owned(),
-                    likelihood_by_hypothesis: likelihoods[0].to_vec(),
-                },
-                ObservationOutcomeV1 {
-                    outcome_id: "supports-room-change".to_owned(),
-                    likelihood_by_hypothesis: likelihoods[1].to_vec(),
-                },
-            ],
+            outcomes,
         }
     }
 
@@ -763,28 +774,34 @@ mod tests {
     }
 
     #[test]
+    fn probability_table_substitution_rejects_without_a_new_digest() {
+        let mut altered = action(
+            "altered-likelihood-table",
+            0.1,
+            true,
+            [[0.9, 0.1], [0.1, 0.9]],
+        );
+        altered.outcomes[0].likelihood_by_hypothesis = vec![0.8, 0.2];
+        altered.outcomes[1].likelihood_by_hypothesis = vec![0.2, 0.8];
+        assert_eq!(
+            select_next_measurement(&request(vec![altered])),
+            Err(EvsiError::LikelihoodTableDigestMismatch)
+        );
+    }
+
+    #[test]
     fn zero_probability_outcome_does_not_create_a_posterior() {
         let prior = PriorBeliefV1 {
             prior_id: "certain-hypothesis".to_owned(),
             hypothesis_ids: vec!["a".to_owned(), "b".to_owned()],
             probabilities: vec![1.0, 0.0],
         };
-        let action = MeasurementActionV1 {
-            action_id: "partition-test".to_owned(),
-            likelihood_model_sha256: digest(0xab),
-            cost: 0.1,
-            admissible: true,
-            outcomes: vec![
-                ObservationOutcomeV1 {
-                    outcome_id: "possible".to_owned(),
-                    likelihood_by_hypothesis: vec![1.0, 0.0],
-                },
-                ObservationOutcomeV1 {
-                    outcome_id: "impossible-under-prior".to_owned(),
-                    likelihood_by_hypothesis: vec![0.0, 1.0],
-                },
-            ],
-        };
+        let action = action(
+            "partition-test",
+            0.1,
+            true,
+            [[1.0, 0.0], [0.0, 1.0]],
+        );
         assert_eq!(
             posterior_after_observation(
                 &prior,
