@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Run reproducible PCE v0.2 reference and random baselines.
+//! Run reproducible PCE v0.3 reference, random and safe-oracle baselines.
 //!
 //! Usage:
 //!   cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines
