@@ -803,15 +803,12 @@ mod tests {
         let root = root();
         let ledger = ledger();
         let mut changed_envelope = envelope.clone();
-        let original_payload = decode_hex(
-            changed_envelope["payload_hex"].as_str().unwrap(),
-        )
-        .unwrap();
-        let mut modified_payload = original_payload;
-        let mutation_index = modified_payload.len() / 2;
-        modified_payload[mutation_index] ^= 0x01;
-        changed_envelope["payload_hex"] = json!(hex(&modified_payload));
-        changed_envelope["payload_sha256"] = json!(sha256(&modified_payload));
+        let mut modified_payload = payload_from_envelope(&changed_envelope);
+        modified_payload["observer"]["measurement_profile"] =
+            json!("linux-cgroup-v2+filesystem-effect-ledger-v2");
+        let modified_bytes = serde_json::to_vec(&modified_payload).unwrap();
+        changed_envelope["payload_hex"] = json!(hex(&modified_bytes));
+        changed_envelope["payload_sha256"] = json!(sha256(&modified_bytes));
         let context = ObserverVerificationContext {
             task: &task,
             observation: &observation,
