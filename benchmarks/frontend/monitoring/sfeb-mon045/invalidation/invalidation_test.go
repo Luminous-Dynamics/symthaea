@@ -180,7 +180,6 @@ func TestGraphDigestNormalizesEquivalentTimeZones(t *testing.T){
 func TestMissingEvaluationTimeHoldsClaims(t *testing.T){
  in:=healthyInput();in.EvaluatedAt=time.Time{}
  got:=Evaluate(in)
- if got.GraphVerdict!=Indeterminate||findClaim(got,"recovery-claim")!=nil{ /* fixture has recovery-claim absent */ }
  if got.GraphVerdict!=Indeterminate||findClaim(got,"recovery-claim")==nil||findClaim(got,"recovery-claim").Verdict!=Indeterminate{t.Fatalf("missing evaluation time must hold root claim: %+v",got)}
 }
 
