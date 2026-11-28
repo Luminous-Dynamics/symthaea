@@ -766,7 +766,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_gain_envelopes_for_one_side() {
         let mut contract = valid_contract();
-        contract.gain_envelopes.push(contract.gain_envelopes[0].clone());
+        let duplicate = contract.gain_envelopes[0].clone();
+        contract.gain_envelopes.push(duplicate);
         assert!(codes(&contract).contains(&TransitionViolationCode::DuplicateGainEnvelopeSide));
     }
 
@@ -803,6 +804,36 @@ mod tests {
             "execution_authorized":true
         }"#;
         assert!(serde_json::from_str::<TransitionContract>(json).is_err());
+    }
+
+    #[test]
+    fn rejects_zero_sample_rate_and_channel_count() {
+        let mut contract = valid_contract();
+        contract.source.audio.sample_rate_hz = 0;
+        contract.target.audio.channels = 0;
+        let found = codes(&contract);
+        assert!(found.contains(&TransitionViolationCode::InvalidSourceSampleRate));
+        assert!(found.contains(&TransitionViolationCode::InvalidTargetChannelCount));
+    }
+
+    #[test]
+    fn rejects_empty_analysis_version_and_invalid_manifest_digest() {
+        let mut contract = valid_contract();
+        contract.source.evidence.analysis_version = " ".to_string();
+        contract.target.evidence.manifest_sha256 = "G".repeat(64);
+        let found = codes(&contract);
+        assert!(found.contains(&TransitionViolationCode::EmptySourceAnalysisVersion));
+        assert!(found.contains(&TransitionViolationCode::InvalidTargetAnalysisSha256));
+    }
+
+    #[test]
+    fn deserialization_requires_source_evidence_and_does_not_invent_it() {
+        let mut value = serde_json::to_value(valid_contract()).unwrap();
+        value["source"]
+            .as_object_mut()
+            .unwrap()
+            .remove("evidence");
+        assert!(serde_json::from_value::<TransitionContract>(value).is_err());
     }
 
     #[test]
