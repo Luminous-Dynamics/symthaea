@@ -50,6 +50,7 @@ pub struct HdcLtcSpatialCandidate {
     width: u16,
     height: u16,
     encoder: SpatialHdcEncoder,
+    seed: u64,
     neuron: HdcLtcUnifiedNeuron,
     initialized: bool,
     pending_action: Option<Action>,
@@ -64,6 +65,7 @@ impl HdcLtcSpatialCandidate {
             width,
             height,
             encoder,
+            seed,
             neuron,
             initialized: false,
             pending_action: None,
@@ -114,8 +116,8 @@ impl HdcLtcSpatialCandidate {
 impl InteractiveCandidate<Observation, Action> for HdcLtcSpatialCandidate {
     type Error = HdcLtcAdapterError;
 
-    fn reset(&mut self, episode_id: u64) -> Result<(), Self::Error> {
-        self.neuron = build_neuron(episode_id);
+    fn reset(&mut self) -> Result<(), Self::Error> {
+        self.neuron = build_neuron(self.seed);
         self.initialized = false;
         self.pending_action = None;
         Ok(())
@@ -330,7 +332,7 @@ mod tests {
                 episode_step: 0,
             })
             .expect("decision");
-        candidate.reset(46).expect("reset");
+        candidate.reset().expect("reset");
         assert!(!candidate.initialized);
         assert!(candidate.pending_action.is_none());
     }
