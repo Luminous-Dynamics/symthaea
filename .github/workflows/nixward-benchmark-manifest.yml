@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/core/nixward/tests/benchmark_manifest.rs"
+      - "crates/core/nixward/tests/benchmark_run_receipt.rs"
       - "research/nixward-benchmark-v0.1/**"
       - "crates/core/nixward/Cargo.toml"
       - "Cargo.toml"
@@ -16,6 +17,7 @@ on:
       - "research/nixward-benchmark-v0-1-20261128"
     paths:
       - "crates/core/nixward/tests/benchmark_manifest.rs"
+      - "crates/core/nixward/tests/benchmark_run_receipt.rs"
       - "research/nixward-benchmark-v0.1/**"
       - ".github/workflows/nixward-benchmark-manifest.yml"
   workflow_dispatch:
@@ -43,6 +45,6 @@ jobs:
         with:
           components: rustfmt
       - name: Check benchmark test formatting
-        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/tests/benchmark_manifest.rs
-      - name: Validate benchmark manifest contract
-        run: cargo +1.96.0 test --locked -p nixward --test benchmark_manifest
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/tests/benchmark_manifest.rs crates/core/nixward/tests/benchmark_run_receipt.rs
+      - name: Validate benchmark manifest and receipt contracts
+        run: cargo +1.96.0 test --locked -p nixward --test benchmark_manifest --test benchmark_run_receipt
