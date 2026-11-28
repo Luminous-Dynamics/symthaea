@@ -10,14 +10,7 @@
 pub mod claims;
 pub mod providers;
 mod evidence_use;
-mod preference_exposure;
 pub mod preference_exposure;
-pub use preference_exposure::{
-    verify_preference_exposure_v1, ContextExposureManifestV1, ContextExposureVerifierV1,
-    ContextMemorySourceV1, ContextMemorySpanV1, PreferenceExposureRejectV1,
-    PreferenceInfluenceModeV1, PreferenceInfluenceSelectionV1,
-    VerifiedPreferenceExposureV1,
-};
 pub use preference_exposure::{
     verify_preference_exposure_v1, ContextExposureManifestV1,
     ContextExposureVerifierV1, ContextMemorySourceV1, ContextMemorySpanV1,
