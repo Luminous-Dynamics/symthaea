@@ -139,11 +139,73 @@ pub struct CgrbStateObservationV1 {
     pub evidence_digest: String,
 }
 
+/// Read-only lookup key. Implementations must not expose mutation methods.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CgrbOracleQueryV1 {
+    pub operation_id: String,
+    pub actor_token: String,
+    pub action_type: String,
+    pub target: String,
+    pub policy_version: u64,
+    pub clock_id: String,
+    pub precondition_state_version: String,
+    pub precondition_state_digest: String,
+    pub postcondition_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CgrbOracleReadErrorV1 {
+    Unavailable,
+    Timeout,
+    PermissionDenied,
+    ProtocolFailure,
+}
+
+/// Narrow read-only adapter. It deliberately exposes no execute/write method.
+///
+/// The trait is an API boundary only. It does not establish process separation,
+/// source authenticity, hardware attestation, or legal authority. Those are
+/// deployment facts configured and reviewed by the benchmark harness.
+pub trait CgrbReadOnlyStateOracleV1 {
+    fn read_operation(
+        &self,
+        query: &CgrbOracleQueryV1,
+    ) -> Result<Option<CgrbStateObservationV1>, CgrbOracleReadErrorV1>;
+}
+
+/// A harness-pinned oracle profile plus a read-only adapter.
+///
+/// Do not construct the profile from adapter self-report. Provision it from
+/// the benchmark's frozen connector/deployment manifest. The pure verifier
+/// still cannot authenticate that manifest or the remote endpoint.
+pub struct CgrbPinnedOracleV1<O> {
+    profile: CgrbOracleProfileV1,
+    reader: O,
+}
+
+impl<O: CgrbReadOnlyStateOracleV1> CgrbPinnedOracleV1<O> {
+    pub fn new(profile: CgrbOracleProfileV1, reader: O) -> Self {
+        Self { profile, reader }
+    }
+
+    pub fn profile(&self) -> &CgrbOracleProfileV1 {
+        &self.profile
+    }
+
+    fn read_operation(
+        &self,
+        query: &CgrbOracleQueryV1,
+    ) -> Result<Option<CgrbStateObservationV1>, CgrbOracleReadErrorV1> {
+        self.reader.read_operation(query)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CgrbUnknownReasonV1 {
     NoDispatch,
     NoObservation,
+    OracleUnavailable,
     UntrustedOracle,
     OracleProfileMismatch,
     OperationBindingMismatch,
@@ -289,8 +351,8 @@ pub fn assess_task_outcome_v1(
         || observation.state_model_digest != oracle_profile.state_model_digest
         || observation.clock_id != oracle_profile.clock_id
         || observation.oracle_id.is_empty()
-        || observation.oracle_build_digest.is_empty()
-        || observation.state_model_digest.is_empty()
+        || !is_content_digest(&oracle_profile.oracle_build_digest)
+        || !is_content_digest(&oracle_profile.state_model_digest)
     {
         return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OracleProfileMismatch);
     }
@@ -320,8 +382,10 @@ pub fn assess_task_outcome_v1(
     }
 
     if observation.state_version.trim().is_empty()
-        || observation.state_digest.trim().is_empty()
-        || observation.evidence_digest.trim().is_empty()
+        || !is_content_digest(&observation.state_digest)
+        || !is_content_digest(&observation.evidence_digest)
+        || !is_content_digest(&observation.base_state_digest)
+        || !is_content_digest(&observation.postcondition_digest)
     {
         return CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::IncompleteObservation);
     }
@@ -387,6 +451,46 @@ pub fn assess_task_outcome_v1(
                     CgrbUnknownReasonV1::PostconditionNotResolved,
                 ),
             }
+        }
+    }
+}
+
+/// Query a harness-pinned read-only oracle and assess its exact response.
+///
+/// Any transport error or absent record remains OutcomeUnknown. The adapter
+/// profile is never accepted from the adapter itself.
+pub fn assess_via_oracle_v1<O: CgrbReadOnlyStateOracleV1>(
+    attempt: &CgrbActionAttemptV1,
+    oracle: &CgrbPinnedOracleV1<O>,
+    now_clock_id: &str,
+    now_tick: u64,
+    max_observation_age_ticks: u64,
+) -> CgrbTaskOutcomeV1 {
+    let query = CgrbOracleQueryV1 {
+        operation_id: attempt.operation_id.clone(),
+        actor_token: attempt.actor_token.clone(),
+        action_type: attempt.action_type.clone(),
+        target: attempt.target.clone(),
+        policy_version: attempt.authority.policy_version,
+        clock_id: attempt.clock_id.clone(),
+        precondition_state_version: attempt.precondition_state_version.clone(),
+        precondition_state_digest: attempt.precondition_state_digest.clone(),
+        postcondition_digest: attempt.postcondition_digest.clone(),
+    };
+    match oracle.read_operation(&query) {
+        Ok(Some(observation)) => assess_task_outcome_v1(
+            attempt,
+            oracle.profile(),
+            Some(&observation),
+            now_clock_id,
+            now_tick,
+            max_observation_age_ticks,
+        ),
+        Ok(None) => {
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::NoObservation)
+        }
+        Err(_) => {
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OracleUnavailable)
         }
     }
 }
@@ -620,6 +724,65 @@ mod tests {
         assert_eq!(
             result,
             CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::IncompleteObservation)
+        );
+    }
+
+    struct StaticOracle {
+        observation: Result<Option<CgrbStateObservationV1>, CgrbOracleReadErrorV1>,
+    }
+
+    impl CgrbReadOnlyStateOracleV1 for StaticOracle {
+        fn read_operation(
+            &self,
+            _query: &CgrbOracleQueryV1,
+        ) -> Result<Option<CgrbStateObservationV1>, CgrbOracleReadErrorV1> {
+            self.observation.clone()
+        }
+    }
+
+    #[test]
+    fn pinned_read_only_oracle_adapter_uses_exact_state_verifier() {
+        let oracle = CgrbPinnedOracleV1::new(
+            profile(),
+            StaticOracle {
+                observation: Ok(Some(observation())),
+            },
+        );
+        let result = assess_via_oracle_v1(
+            &attempt(), &oracle, "world-clock", 21, 5
+        );
+        assert_eq!(result, CgrbTaskOutcomeV1::Committed);
+    }
+
+    #[test]
+    fn oracle_transport_failure_remains_unknown() {
+        let oracle = CgrbPinnedOracleV1::new(
+            profile(),
+            StaticOracle {
+                observation: Err(CgrbOracleReadErrorV1::Timeout),
+            },
+        );
+        let result = assess_via_oracle_v1(
+            &attempt(), &oracle, "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::OracleUnavailable)
+        );
+    }
+
+    #[test]
+    fn missing_oracle_record_remains_unknown() {
+        let oracle = CgrbPinnedOracleV1::new(
+            profile(),
+            StaticOracle { observation: Ok(None) },
+        );
+        let result = assess_via_oracle_v1(
+            &attempt(), &oracle, "world-clock", 21, 5
+        );
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::NoObservation)
         );
     }
 
