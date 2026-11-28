@@ -1,0 +1,228 @@
+{
+  "schema_version": "sdcb-gaussian-covariance-lrt-power-v1",
+  "title": "Finite-sample likelihood-ratio operating characteristics for the SDCB near-pole-swap challenge",
+  "status": "preliminary-authoring-runtime-numerical-reference-not-rust-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14065,
+    "follow_on_issue": 14110,
+    "covariance_reference_pr": 14068,
+    "covariance_reference_head": "c557ccc03fc3034d18fa6d4165c3466d792f2358",
+    "covariance_fixture_path": "docs/research/SDCB_GAUSSIAN_PROCESS_SEPARATION_V1.json",
+    "covariance_fixture_contract": "OU process followed by a first-order low-pass instrument response; complete sampled covariance law"
+  },
+  "hypotheses": {
+    "family": "fixed_known_zero_mean_multivariate_gaussian",
+    "world_a": {
+      "id": "near_world_a_physical_slow_sensor_fast",
+      "lambda": "0.25",
+      "mu": "4.0",
+      "process_stationary_variance": "9.0",
+      "q": "8.47058823529411764705882352941176470588235294117647058823529"
+    },
+    "world_b": {
+      "id": "near_world_b_physical_fast_sensor_slow",
+      "lambda": "4.04",
+      "mu": "0.25",
+      "process_stationary_variance": "145.35529411764705882352941176470588235294117647059",
+      "q": "8.47058823529411764705882352941176470588235294117647058823529"
+    },
+    "covariance_kernel": "C(h)=q*exp(-r*h)*(1+r*h*(1-exp(-g*h))/(g*h)); r=min(lambda,mu); g=abs(lambda-mu); continuous limit psi(0)=1",
+    "observed_covariance": "Sigma_ij=C(abs(t_i-t_j))+0.1*I_ij"
+  },
+  "acquisition": {
+    "time_grid": "t_i=i*sample_interval for i=0,...,n-1",
+    "base_sample_interval": "0.5",
+    "readout_noise": "independent additive Gaussian",
+    "readout_noise_variance": "0.1",
+    "nested_sample_counts": [
+      8,
+      16,
+      32,
+      64
+    ],
+    "sample_cost": "one synthetic acquisition unit per time sample",
+    "physical_cost": "not measured"
+  },
+  "lrt": {
+    "null_hypothesis": "World B",
+    "alternative_hypothesis": "World A",
+    "log_likelihood_ratio": "ell(y)=log(f_A(y)/f_B(y))=0.5*log(det(Sigma_B)/det(Sigma_A))+0.5*y^T*(Sigma_B^-1-Sigma_A^-1)*y",
+    "alpha": "0.05",
+    "rejection_rule": "reject World B when ell(y)>tau_alpha; use randomized rejection on an atom at tau_alpha to attain the declared size",
+    "equal_prior_rule": "choose World A when ell(y)>0, choose World B when ell(y)<0, and split ties 50/50",
+    "quadratic_form_reduction": {
+      "constant": "c=0.5*(logdet(Sigma_B)-logdet(Sigma_A))",
+      "under_a": "ell(Y_A)=c+0.5*Z^T*G_A*Z; G_A=L_A^T*Sigma_B^-1*L_A-I",
+      "under_b": "ell(Y_B)=c+0.5*Z^T*G_B*Z; G_B=I-L_B^T*Sigma_A^-1*L_B",
+      "standard_normal": "Z~N(0,I); Sigma_A=L_A*L_A^T; Sigma_B=L_B*L_B^T",
+      "distribution": "central indefinite Gaussian quadratic form with eigenvalues of the symmetric G matrix"
+    },
+    "numerical_method": {
+      "method": "Imhof characteristic-function inversion for a weighted sum of independent chi-square(1) variables",
+      "independent_numerical_cross_check": "separately evaluated quadrature implementations (SciPy quad and mpmath quadrature) on the same characteristic-function representation",
+      "eigensystem_precision": "double precision",
+      "integration_precision": "mpmath 30 decimal digits for the independent quadrature check",
+      "certified_global_error_bound": false,
+      "status": "preliminary numerical agreement; not a certified quadrature enclosure",
+      "future_methods": "compare with Davies or another independently structured quadratic-form distribution implementation before qualification"
+    }
+  },
+  "operating_characteristics": [
+    {
+      "samples": 8,
+      "log_lr_threshold_alpha_005": "0.012703251449905",
+      "size": "0.05",
+      "power": "0.050702991193206",
+      "equal_prior_optimal_accuracy": "0.502018474268",
+      "exact_total_variation_from_lr": "0.004036948536",
+      "pinsker_accuracy_upper": "0.502625964565678920242163414779",
+      "kl_a_to_b": "0.00005516551920161024177780499993480445396569",
+      "kl_b_to_a": "0.00005542108725631821104168806998282875626367"
+    },
+    {
+      "samples": 16,
+      "log_lr_threshold_alpha_005": "0.021174602300709",
+      "size": "0.05",
+      "power": "0.051225295514002",
+      "equal_prior_optimal_accuracy": "0.503067979380",
+      "exact_total_variation_from_lr": "0.006135958760",
+      "pinsker_accuracy_upper": "0.503911333379518270325983897935",
+      "kl_a_to_b": "0.0001223882304458705095360053291888517843317",
+      "kl_b_to_a": "0.0001229660190790511576321498369080388017993"
+    },
+    {
+      "samples": 32,
+      "log_lr_threshold_alpha_005": "0.032736059434691",
+      "size": "0.05",
+      "power": "0.051963731842379",
+      "equal_prior_optimal_accuracy": "0.504486188840",
+      "exact_total_variation_from_lr": "0.008972377680",
+      "pinsker_accuracy_upper": "0.505666057413828341520391183012",
+      "kl_a_to_b": "0.0002568336529343929103512196480056398427797",
+      "kl_b_to_a": "0.0002580558827245191703731084905394443045507"
+    },
+    {
+      "samples": 64,
+      "log_lr_threshold_alpha_005": "0.048690914171591",
+      "size": "0.05",
+      "power": "0.053011417261428",
+      "equal_prior_optimal_accuracy": "0.506447259615",
+      "exact_total_variation_from_lr": "0.012894519230",
+      "pinsker_accuracy_upper": "0.508106513568663763977139713158",
+      "kl_a_to_b": "0.0005257244979114377119816482856388511513809",
+      "kl_b_to_a": "0.000528235610015455195855025797802004534409"
+    }
+  ],
+  "fixed_sample_count_interval_sweep": {
+    "samples": 32,
+    "alpha": "0.05",
+    "rows": [
+      {
+        "sample_interval": "0.1",
+        "observation_horizon": "3.1",
+        "kl_a_to_b": "0.000159870650617048704235035661059",
+        "equal_prior_optimal_accuracy": "0.5035009357",
+        "power_at_size_005": "0.0514171111"
+      },
+      {
+        "sample_interval": "0.25",
+        "observation_horizon": "7.75",
+        "kl_a_to_b": "0.000237458040220367418461942115067",
+        "equal_prior_optimal_accuracy": "0.5043115891",
+        "power_at_size_005": "0.0518963644"
+      },
+      {
+        "sample_interval": "0.5",
+        "observation_horizon": "15.5",
+        "kl_a_to_b": "0.000256833652934392910351219648006",
+        "equal_prior_optimal_accuracy": "0.5044861888",
+        "power_at_size_005": "0.0519637318"
+      },
+      {
+        "sample_interval": "1.0",
+        "observation_horizon": "31.0",
+        "kl_a_to_b": "0.0000983278542217618636609345824017",
+        "equal_prior_optimal_accuracy": "0.5027647477",
+        "power_at_size_005": "0.0511708338"
+      },
+      {
+        "sample_interval": "2.0",
+        "observation_horizon": "62.0",
+        "kl_a_to_b": "0.0000157437383764742624385569972525",
+        "equal_prior_optimal_accuracy": "0.5011045507",
+        "power_at_size_005": "0.0504658095"
+      },
+      {
+        "sample_interval": "4.0",
+        "observation_horizon": "124.0",
+        "kl_a_to_b": "0.00000187924026148223060485427018917",
+        "equal_prior_optimal_accuracy": "0.5003806167",
+        "power_at_size_005": "0.0501693817"
+      }
+    ],
+    "interpretation": "Among these six candidates only, interval 0.5 gives the greatest estimated LRT power and KL at fixed n=32. This is not a continuous or global design optimum; sample cost, elapsed time, and energy are distinct objectives."
+  },
+  "exploratory_monte_carlo_check": {
+    "samples": 32,
+    "draws_per_hypothesis": 3000000,
+    "observed_size": "0.050162",
+    "size_wilson_95_interval": [
+      "0.0499156",
+      "0.0504096"
+    ],
+    "observed_power": "0.05201933",
+    "power_wilson_95_interval": [
+      "0.0517686",
+      "0.0522712"
+    ],
+    "seed_and_prng_frozen": false,
+    "interpretation": "Exploratory consistency check only. The seed/PRNG manifest is not included in this fixture; do not treat this row as a reproducible qualification result."
+  },
+  "negative_and_positive_controls": [
+    {
+      "id": "exact_pole_swap",
+      "expected": "Identical joint distributions; randomized size-alpha LRT has power alpha and equal-prior accuracy 0.5; deterministic tie conventions must not create a classifier advantage."
+    },
+    {
+      "id": "near_pole_swap",
+      "expected": "Distinct covariance kernels but weak finite-design discrimination; reproduce the frozen likelihood-ratio operating characteristics."
+    },
+    {
+      "id": "sample_permutation",
+      "expected": "Applying the same permutation to both covariance matrices leaves every LRT operating characteristic unchanged."
+    },
+    {
+      "id": "nested_observations",
+      "expected": "The optimal equal-prior discrimination cannot worsen when the larger observation vector contains the smaller vector as a prefix."
+    },
+    {
+      "id": "readout_noise",
+      "expected": "Increasing independent additive readout noise cannot improve optimal discrimination for this observation channel."
+    },
+    {
+      "id": "unsupported_covariance",
+      "expected": "Non-SPD/singular support, unknown covariance, nonfinite values, or numerical nonconvergence return explicit unsupported/error status; no jitter or silent covariance repair."
+    }
+  ],
+  "scope_exclusions": [
+    "unknown or estimated covariance parameters",
+    "composite hypotheses and nuisance-parameter profiling",
+    "nonzero mean contrasts",
+    "singular-support Gaussian measures",
+    "adaptive acquisition or optional stopping",
+    "non-Gaussian innovations and model-family misspecification",
+    "physical calibration, traceability, QUANT data, or field performance"
+  ],
+  "qualification": {
+    "fixture_parsed_in_authoring_runtime": true,
+    "independent_quadrature_replay": true,
+    "Monte_Carlo_sanity_check": true,
+    "Rust_compiled_or_executed": false,
+    "Cargo_tests": false,
+    "Clippy": false,
+    "hosted_CI": false,
+    "physical_validation": false,
+    "SOTA_superiority": false
+  },
+  "claim_boundary": "Preliminary numerical reference for a fixed, known, zero-mean, positive-definite Gaussian covariance pair under a frozen finite sampling design. It is not a Rust implementation pass, statistical qualification, physical validation, or superiority result."
+}
