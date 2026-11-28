@@ -1,0 +1,89 @@
+name: Sym-RSI Scientific Decision Replay
+
+on:
+  push:
+    branches:
+      - research/scientific-decision-replay-contract-2026-11-27
+    paths:
+      - "crates/domains/symthaea-futures-ensemble/Cargo.toml"
+      - "crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"
+      - "tools/sym-rsi-decision-replay-contract/**"
+      - "docs/research/SYMTHAEA_SCIENTIFIC_DECISION_REPLAY_CONTRACT_2026-11-27.md"
+      - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-futures-ensemble/Cargo.toml"
+      - "crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs"
+      - "crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs"
+      - "tools/sym-rsi-decision-replay-contract/**"
+      - "docs/research/SYMTHAEA_SCIENTIFIC_DECISION_REPLAY_CONTRACT_2026-11-27.md"
+      - ".github/workflows/sym-rsi-scientific-decision-replay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Rust 1.96 decision and custody contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Generate rustfmt preview
+        run: |
+          rustfmt --edition 2024 --config skip_children=true \
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs \
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
+      - name: Upload rustfmt preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-decision-replay-rustfmt-preview
+          path: |
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
+      - name: Restore the exact committed sources
+        run: |
+          git checkout -- \
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs \
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
+      - name: Check formatting on committed sources
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true \
+            crates/domains/symthaea-futures-ensemble/examples/scientific_decision_replay_contract.rs \
+            crates/domains/symthaea-futures-ensemble/examples/evolutionary_rescue_split_capsules.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/scientific_decision_replay.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/evolutionary_rescue_custody.rs \
+            crates/domains/symthaea-futures-ensemble/examples/support/asb_action_payload.rs \
+            tools/sym-rsi-decision-replay-contract/src/lib.rs
+      - name: Run isolated decision and custody contract tests
+        run: cargo test --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml
+      - name: Strict Clippy for isolated contract harness
+        run: cargo clippy --locked --manifest-path tools/sym-rsi-decision-replay-contract/Cargo.toml --all-targets -- -D warnings

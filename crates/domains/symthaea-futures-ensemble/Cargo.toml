@@ -17,3 +17,6 @@ symthaea-futures-calibration = { workspace = true }
 symthaea-futures-ledger = { workspace = true }
 symthaea-alife = { workspace = true }
 serde_json = { workspace = true }
+blake3 = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
