@@ -87,6 +87,37 @@ Physical-measurement selection is a separate policy with cost, turnaround, queue
 
 CA-OCRC's correction handles outcomes lost through its declared randomized tracking policy and bounded delay model. A label that is UNKNOWN/BLOCKED because calibration, instrument identity, numeric consistency or provenance failed is not the same as an ordinary randomly untracked feedback event. The module therefore suspends its theorem status when a tracked outcome arrives without usable K1 evidence. It does not apply inverse-probability weighting to unqualified evidence or assert that the paper's risk theorem survives informative metrology missingness.
 
+## 3. K1-qualified finite-sample interval and bounded-score set construction
+
+The first set-construction layer is now in `conformal_interval_builder.rs`.
+
+### ACI interval quantile
+
+For a declared absolute or scale-normalized residual score, the builder:
+- accepts only current K1 `EligibleUnderDeclaredPolicy` label reports;
+- verifies label/report revision, value, payload and report digest;
+- requires label and report availability no later than the new prediction cutoff;
+- requires the exact global-model artifact, measurement/measurand-unit contract and score-policy digest to match;
+- rejects reused sample IDs, measurement events and label revisions;
+- binds each calibration score to both the prediction receipt digest and full calibration-sample digest;
+- retains the most recently available K1 outcomes up to the declared window cap;
+- computes the finite-sample order statistic `k = ceil((n+1)(1-alpha))`;
+- returns `FullSetRequired` when `k>n`, rather than substituting a lower quantile;
+- emits an immutable set receipt containing sorted scores, window label IDs, policy/model/measurement identities, quantile rank, interval and SHA-256.
+
+This is a rolling-window empirical conformal interval under a declared calibration-score stream; its coverage claim still depends on the method's exchangeability/online assumptions. It is not automatically conditional coverage under adaptive metrology selection or arbitrary drift.
+
+### CA-OCRC bounded-score set constructor
+
+The same module separately implements `C_t={y:S_t(x,y)<=r_t}` for bounded absolute-residual and bounded scale-normalized-residual contracts:
+- `r_t<0` → known empty set;
+- `0<=r_t<B` → finite interval;
+- `r_t>=B` → known full set.
+
+The set receipt binds the exact bounded score contract, (B), current threshold, model artifact, prediction identity and resulting bounds. CA-OCRC round inputs now bind the active threshold, the score-contract digest and this prediction-set digest; feedback receipts retain that set digest. This is distinct from the ACI quantile builder: ACI chooses its interval from a calibration quantile, while CA-OCRC constructs the current score sublevel set from its online risk threshold.
+
+The bounded-score set constructor and the ACI quantile builder have separate known-answer tests. The independent reference file composes the first with delayed ACI and the bounded sublevel-set builder with CA-OCRC.
+
 ## 3. Benchmarks and targets
 
 Run independent, task-specific comparisons:
@@ -145,6 +176,10 @@ Predictive superiority targets should be set only after a faithful reproduction 
 - CA-OCRC (November 2026): bounded arbitrary delay and limited pending-feedback tracker benchmark.
 
 These are not one leaderboard. The winning research direction is a composition of prediction efficiency, selective coverage, delayed feedback, capacity-aware tracking and evidence qualification—with each guarantee attached to its own assumptions.
+
+## New selection-conditional extension
+
+Issue [#14169](https://github.com/Luminous-Dynamics/symthaea/issues/14169) tracks CAP-style selection-conditional conformal calibration under active metrology. It explicitly distinguishes a wafer being selected, physically measured, K1-qualified and retained by the feedback controller. Selected-wafer FCR/coverage and full-fab population coverage are separate outputs; deterministic zero-propensity strata remain UNKNOWN without a randomized audit path.
 
 ## Claim ceiling
 
