@@ -161,6 +161,22 @@ The schema deliberately keeps semantic relations separate from renderer layout a
 
 Structural schema validation and causal endpoint verification are separate. The duplicate-ID and dangling-endpoint cases are expected to pass structural JSON shape validation but must be rejected by the runtime graph verifier. The schema and fixtures have been authored but have not been run through an independent Draft 2020-12 validator; no Rust graph compiler/verifier or Bevy edge renderer exists yet.
 
+## 10. Rust compiler and verifier implementation (2026-11-28)
+
+The dependency-light Soma module `crates/domains/symthaea-soma/src/embodiment_scene_graph.rs` now implements the scene graph v2 contract:
+
+- `compile_scene_graph_v2` delegates cue/permit scope checks to the existing scene compiler, emits one stable core and at most one cue-specific node, creates a semantic edge only for an explicit attention target or explicit yield target, and emits a separate layout attachment.
+- `verify_scene_graph_v2` checks the canonical cue digest, permit-derived metadata, scene graph digest, stable node set, glyph/form mapping, relation source field and direction, unique IDs, endpoint validity, layout attachment completeness, privacy-aware description, and bounded geometry weights.
+- Raw target strings are not copied into nodes, semantic relations, or renderer-facing descriptions for local-sensitive cues. In fact, raw targets are not copied for public cues either; the canonical cue digest binds the source cue.
+- Child motion is derived from the explicit interaction cue and reduced to static under static permission.
+
+Eleven Rust unit tests cover all seven forms, explicit attention and handoff relations, no-invented-edge listening scenes, relation tampering, duplicate IDs, dangling endpoints, orphan nodes, missing layout attachments, target non-disclosure, and graph digest tampering.
+
+The schema fixtures remain structural JSON Schema fixtures. Their digest strings are shape placeholders; runtime acceptance requires the real canonical cue and permit plus digest recomputation in the Rust verifier. This distinction is intentional and must remain visible until fixture generation is integrated with the compiler.
+
+The tests are authored but have not been compiled or executed. No Bevy endpoint-connected graph rendering is claimed; the adapter still renders the earlier role-aware layout until the typed graph adapter is implemented.
+
+
 ## 9. Qualification status
 
 This document specifies the next contract increment. The current renderer uses deterministic, role-aware placement but still has no explicit endpoint-connected semantic graph. No v2 schema, graph compiler, edge renderer, or human study has been implemented or qualified.
