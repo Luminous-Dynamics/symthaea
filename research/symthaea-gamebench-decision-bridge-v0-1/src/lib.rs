@@ -32,7 +32,9 @@ pub enum ProbeSideEffect {
 /// evaluator-only in EvaluatorWorld.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProbeOutcomeContract {
+    pub episode_id: String,
     pub probe_id: String,
+    pub result_delay_steps: u64,
     pub outcome_ids: Vec<String>,
     pub side_effect: ProbeSideEffect,
 }
@@ -46,8 +48,19 @@ pub struct OutcomeProbability {
 /// Candidate-authored distribution emitted before the probe executes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OutcomeForecast {
+    pub episode_id: String,
     pub probe_id: String,
+    pub emitted_at_step: u64,
     pub probabilities: Vec<OutcomeProbability>,
+}
+
+/// Evaluator receipt for the actually observed public probe outcome.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProbeObservationReceipt {
+    pub episode_id: String,
+    pub probe_id: String,
+    pub observed_at_step: u64,
+    pub observed_outcome_id: String,
 }
 
 /// Evaluator-only summary passed through from the shared EVSI evaluator.
@@ -74,6 +87,10 @@ pub enum BridgeError {
     ProbeContractMismatch(String),
     UnsupportedWorldMutatingProbe(String),
     ForecastProbeMismatch { expected: String, actual: String },
+    EpisodeMismatch { field: &'static str, expected: String, actual: String },
+    ForecastNotPreRegistered { forecast_step: u64, required_step: u64 },
+    ObservationBeforeResultReady { observed_step: u64, earliest_step: u64 },
+    ProbeObservationMismatch { expected: String, actual: String },
     ForecastOutcomeSetMismatch,
     DuplicateForecastOutcome(String),
     InvalidForecastProbability { outcome_id: String, value: f64 },
@@ -101,6 +118,22 @@ impl Display for BridgeError {
             Self::ForecastProbeMismatch { expected, actual } => write!(
                 formatter,
                 "forecast probe mismatch: expected {expected}, got {actual}"
+            ),
+            Self::EpisodeMismatch { field, expected, actual } => write!(
+                formatter,
+                "{field} episode mismatch: expected {expected}, got {actual}"
+            ),
+            Self::ForecastNotPreRegistered { forecast_step, required_step } => write!(
+                formatter,
+                "forecast emitted at step {forecast_step}; required before step {required_step}"
+            ),
+            Self::ObservationBeforeResultReady { observed_step, earliest_step } => write!(
+                formatter,
+                "probe observation at step {observed_step}; earliest valid step is {earliest_step}"
+            ),
+            Self::ProbeObservationMismatch { expected, actual } => write!(
+                formatter,
+                "observation probe mismatch: expected {expected}, got {actual}"
             ),
             Self::ForecastOutcomeSetMismatch => {
                 write!(formatter, "forecast must contain exactly the declared outcome IDs")
@@ -144,6 +177,19 @@ pub fn assess_read_only_probe(
     forecast: &OutcomeForecast,
 ) -> Result<GameProbeAssessment, BridgeError> {
     validate_probe_contract(episode, world, contract)?;
+    if forecast.episode_id != episode.episode_id {
+        return Err(BridgeError::EpisodeMismatch {
+            field: "forecast",
+            expected: episode.episode_id.clone(),
+            actual: forecast.episode_id.clone(),
+        });
+    }
+    if forecast.emitted_at_step != episode.current_step {
+        return Err(BridgeError::ForecastNotPreRegistered {
+            forecast_step: forecast.emitted_at_step,
+            required_step: episode.current_step,
+        });
+    }
     validate_forecast(contract, forecast)?;
 
     let evaluation = evaluate_candidate(
@@ -178,11 +224,48 @@ pub fn assess_read_only_probe(
 pub fn score_outcome_forecast(
     contract: &ProbeOutcomeContract,
     forecast: &OutcomeForecast,
-    observed_outcome_id: &str,
+    receipt: &ProbeObservationReceipt,
 ) -> Result<f64, BridgeError> {
     validate_contract_shape(contract)?;
     validate_forecast(contract, forecast)?;
 
+    if forecast.episode_id != contract.episode_id {
+        return Err(BridgeError::EpisodeMismatch {
+            field: "forecast",
+            expected: contract.episode_id.clone(),
+            actual: forecast.episode_id.clone(),
+        });
+    }
+    if receipt.episode_id != contract.episode_id {
+        return Err(BridgeError::EpisodeMismatch {
+            field: "observation receipt",
+            expected: contract.episode_id.clone(),
+            actual: receipt.episode_id.clone(),
+        });
+    }
+    if receipt.probe_id != contract.probe_id {
+        return Err(BridgeError::ProbeObservationMismatch {
+            expected: contract.probe_id.clone(),
+            actual: receipt.probe_id.clone(),
+        });
+    }
+    let earliest_step = forecast
+        .emitted_at_step
+        .checked_add(contract.result_delay_steps)
+        .ok_or(BridgeError::ObservationBeforeResultReady {
+            observed_step: receipt.observed_at_step,
+            earliest_step: u64::MAX,
+        })?;
+    if receipt.observed_at_step <= forecast.emitted_at_step
+        || receipt.observed_at_step < earliest_step
+    {
+        return Err(BridgeError::ObservationBeforeResultReady {
+            observed_step: receipt.observed_at_step,
+            earliest_step: earliest_step.max(forecast.emitted_at_step.saturating_add(1)),
+        });
+    }
+
+    let observed_outcome_id = receipt.observed_outcome_id.as_str();
     if !contract.outcome_ids.iter().any(|id| id == observed_outcome_id) {
         return Err(BridgeError::UnknownObservedOutcome(observed_outcome_id.to_owned()));
     }
@@ -207,12 +290,24 @@ fn validate_probe_contract(
     contract: &ProbeOutcomeContract,
 ) -> Result<(), BridgeError> {
     validate_contract_shape(contract)?;
+    if contract.episode_id != episode.episode_id {
+        return Err(BridgeError::EpisodeMismatch {
+            field: "probe contract",
+            expected: episode.episode_id.clone(),
+            actual: contract.episode_id.clone(),
+        });
+    }
 
     if contract.side_effect == ProbeSideEffect::WorldMutating {
         return Err(BridgeError::UnsupportedWorldMutatingProbe(contract.probe_id.clone()));
     }
-    if !episode.permitted_probes.iter().any(|option| option.probe_id == contract.probe_id) {
-        return Err(BridgeError::ProbeNotPermitted(contract.probe_id.clone()));
+    let public_option = episode
+        .permitted_probes
+        .iter()
+        .find(|option| option.probe_id == contract.probe_id)
+        .ok_or_else(|| BridgeError::ProbeNotPermitted(contract.probe_id.clone()))?;
+    if public_option.result_delay_steps != contract.result_delay_steps {
+        return Err(BridgeError::ProbeContractMismatch(contract.probe_id.clone()));
     }
 
     let evaluator_probe = world
@@ -235,7 +330,7 @@ fn validate_probe_contract(
 }
 
 fn validate_contract_shape(contract: &ProbeOutcomeContract) -> Result<(), BridgeError> {
-    if contract.probe_id.trim().is_empty() {
+    if contract.episode_id.trim().is_empty() || contract.probe_id.trim().is_empty() {
         return Err(BridgeError::EmptyProbeId);
     }
     if contract.outcome_ids.is_empty() {
@@ -410,12 +505,16 @@ mod tests {
         };
 
         let nuisance_contract = ProbeOutcomeContract {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_lamp".into(),
+            result_delay_steps: 1,
             outcome_ids: vec!["lamp_dark".into(), "lamp_lit".into()],
             side_effect: ProbeSideEffect::ReadOnly,
         };
         let switch_contract = ProbeOutcomeContract {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_switch_trace".into(),
+            result_delay_steps: 1,
             outcome_ids: vec!["trace_A".into(), "trace_B".into()],
             side_effect: ProbeSideEffect::ReadOnly,
         };
@@ -424,7 +523,9 @@ mod tests {
 
     fn forecast(probe_id: &str, first: &str, second: &str, p_first: f64) -> OutcomeForecast {
         OutcomeForecast {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: probe_id.to_owned(),
+            emitted_at_step: 0,
             probabilities: vec![
                 OutcomeProbability {
                     outcome_id: first.to_owned(),
@@ -437,6 +538,16 @@ mod tests {
             ],
         }
     }
+
+    fn receipt(probe_id: &str, outcome_id: &str, observed_at_step: u64) -> ProbeObservationReceipt {
+        ProbeObservationReceipt {
+            episode_id: "gamebench-f6-development-fixture".into(),
+            probe_id: probe_id.to_owned(),
+            observed_at_step,
+            observed_outcome_id: outcome_id.to_owned(),
+        }
+    }
+
 
     #[test]
     fn lower_information_probe_has_higher_decision_value_than_nuisance_probe() {
@@ -471,7 +582,7 @@ mod tests {
         let score = score_outcome_forecast(
             &switch,
             &forecast("inspect_switch_trace", "trace_A", "trace_B", 1.0),
-            "trace_A",
+            &receipt("inspect_switch_trace", "trace_A", 1),
         ).expect("score");
         assert_eq!(score, 0.0);
     }
@@ -482,7 +593,7 @@ mod tests {
         let score = score_outcome_forecast(
             &switch,
             &forecast("inspect_switch_trace", "trace_A", "trace_B", 0.75),
-            "trace_A",
+            &receipt("inspect_switch_trace", "trace_A", 1),
         ).expect("score");
         assert!((score - 0.125).abs() < 1.0e-12);
     }
@@ -505,14 +616,16 @@ mod tests {
     fn rejects_forecast_with_malformed_probability_mass() {
         let (_episode, _world, _nuisance, switch) = fixture();
         let malformed = OutcomeForecast {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_switch_trace".into(),
+            emitted_at_step: 0,
             probabilities: vec![
                 OutcomeProbability { outcome_id: "trace_A".into(), probability: 0.7 },
                 OutcomeProbability { outcome_id: "trace_B".into(), probability: 0.7 },
             ],
         };
         assert!(matches!(
-            score_outcome_forecast(&switch, &malformed, "trace_A"),
+            score_outcome_forecast(&switch, &malformed, &receipt("inspect_switch_trace", "trace_A", 1)),
             Err(BridgeError::ForecastProbabilityMass(_))
         ));
     }
@@ -528,7 +641,7 @@ mod tests {
             ],
         };
         assert!(matches!(
-            score_outcome_forecast(&switch, &duplicate, "trace_A"),
+            score_outcome_forecast(&switch, &duplicate, &receipt("inspect_switch_trace", "trace_A", 1)),
             Err(BridgeError::DuplicateForecastOutcome(_))
         ));
 
@@ -540,16 +653,44 @@ mod tests {
             ],
         };
         assert!(matches!(
-            score_outcome_forecast(&switch, &unknown, "trace_A"),
+            score_outcome_forecast(&switch, &unknown, &receipt("inspect_switch_trace", "trace_A", 1)),
             Err(BridgeError::ForecastOutcomeSetMismatch)
         ));
+    }
+
+    #[test]
+    fn rejects_a_forecast_emitted_after_the_observation() {
+        let (_episode, _world, _nuisance, switch) = fixture();
+        let mut late = forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5);
+        late.emitted_at_step = 1;
+        let result = score_outcome_forecast(
+            &switch,
+            &late,
+            &receipt("inspect_switch_trace", "trace_A", 1),
+        );
+        assert!(matches!(result, Err(BridgeError::ObservationBeforeResultReady { .. })));
+    }
+
+    #[test]
+    fn rejects_forecast_receipt_replayed_across_episodes() {
+        let (_episode, _world, _nuisance, switch) = fixture();
+        let mut replayed = receipt("inspect_switch_trace", "trace_A", 1);
+        replayed.episode_id = "different-episode".into();
+        let result = score_outcome_forecast(
+            &switch,
+            &forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5),
+            &replayed,
+        );
+        assert!(matches!(result, Err(BridgeError::EpisodeMismatch { .. })));
     }
 
     #[test]
     fn rejects_public_outcome_vocabulary_that_does_not_match_evaluator() {
         let (episode, world, _nuisance, _switch) = fixture();
         let wrong = ProbeOutcomeContract {
+            episode_id: "gamebench-f6-development-fixture".into(),
             probe_id: "inspect_switch_trace".into(),
+            result_delay_steps: 1,
             outcome_ids: vec!["H_A".into(), "H_B".into()],
             side_effect: ProbeSideEffect::ReadOnly,
         };
