@@ -123,19 +123,41 @@ pub enum StratifiedRiskError {
 impl std::fmt::Display for StratifiedRiskError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnsupportedDesignVersion => write!(formatter, "unsupported stratified audit design version"),
-            Self::EmptyDesignIdentity => write!(formatter, "audit design identity or randomization manifest reference is empty"),
-            Self::InvalidPlan(message) => write!(formatter, "invalid stratified audit plan: {message}"),
-            Self::PredictionCountMismatch => write!(formatter, "prediction cohort size does not match the audit plan"),
+            Self::UnsupportedDesignVersion => {
+                write!(formatter, "unsupported stratified audit design version")
+            }
+            Self::EmptyDesignIdentity => {
+                write!(formatter, "audit design identity or randomization manifest reference is empty")
+            }
+            Self::InvalidPlan(message) => {
+                write!(formatter, "invalid stratified audit plan: {message}")
+            }
+            Self::PredictionCountMismatch => {
+                write!(formatter, "prediction cohort size does not match the audit plan")
+            }
             Self::EmptyPredictionId => write!(formatter, "prediction record ID must not be empty"),
-            Self::DuplicatePredictionId(id) => write!(formatter, "duplicate prediction record ID: {id}"),
-            Self::UnknownPredictionId(id) => write!(formatter, "prediction record is not in audit plan: {id}"),
-            Self::MissingPredictionId(id) => write!(formatter, "audit-plan record has no candidate prediction: {id}"),
-            Self::InvalidPredictionConfidence(id) => write!(formatter, "prediction confidence is invalid for record: {id}"),
-            Self::SelectedRecordMissingAdjudication(id) => write!(formatter, "selected audit record has no independent adjudication: {id}"),
-            Self::NonSelectedRecordHasAdjudication(id) => write!(formatter, "non-selected record has an audit label: {id}"),
+            Self::DuplicatePredictionId(id) => {
+                write!(formatter, "duplicate prediction record ID: {id}")
+            }
+            Self::UnknownPredictionId(id) => {
+                write!(formatter, "prediction record is not in audit plan: {id}")
+            }
+            Self::MissingPredictionId(id) => {
+                write!(formatter, "audit-plan record has no candidate prediction: {id}")
+            }
+            Self::InvalidPredictionConfidence(id) => {
+                write!(formatter, "prediction confidence is invalid for record: {id}")
+            }
+            Self::SelectedRecordMissingAdjudication(id) => {
+                write!(formatter, "selected audit record has no independent adjudication: {id}")
+            }
+            Self::NonSelectedRecordHasAdjudication(id) => {
+                write!(formatter, "non-selected record has an audit label: {id}")
+            }
             Self::NoAuditSample => write!(formatter, "audit plan contains no selected records"),
-            Self::InvalidCoverageTarget => write!(formatter, "coverage targets must be finite and in (0, 1]"),
+            Self::InvalidCoverageTarget => {
+                write!(formatter, "coverage targets must be finite and in (0, 1]")
+            }
             Self::InvalidConfidenceThreshold => {
                 write!(formatter, "confidence thresholds must be finite and in [0, 1]")
             }
@@ -510,19 +532,47 @@ pub fn evaluate_stratified_audit_risk(
         confidence_threshold_baselines,
         risk_coverage_curve: curve,
         aurc,
-        aurc_uncertainty_status:
-            "Not estimated: nested confidence-prefix covariance and simultaneous uncertainty are not implemented"
-                .to_owned(),
-        interval_scope:
-            "Pointwise asymptotic normal approximation only; not finite-sample, anytime-valid or simultaneous"
-                .to_owned(),
+        aurc_uncertainty_status: concat!(
+            "Not estimated: nested confidence-prefix covariance and simultaneous ",
+            "uncertainty are not implemented"
+        )
+        .to_owned(),
+        interval_scope: concat!(
+            "Pointwise asymptotic normal approximation only; not finite-sample, ",
+            "anytime-valid or simultaneous"
+        )
+        .to_owned(),
         assumptions: vec![
-            "The candidate prediction, confidence and abstention state for every cohort row is frozen before audit selection.".to_owned(),
-            "The audit plan is a valid stratified simple-random sample without replacement within each pre-label stratum.".to_owned(),
-            "Random priorities were generated independently and uniformly by an external custodian; the plan does not authenticate that process.".to_owned(),
-            "Every selected unit received an independent adjudication and nonselected units did not receive labels in this audit lane.".to_owned(),
-            "The strata and quotas were frozen before labels and are not selected using adjudication outcomes.".to_owned(),
-            "Normal intervals are approximate and pointwise; no multiple-comparison or finite-sample risk guarantee is asserted.".to_owned(),
+            concat!(
+                "The candidate prediction, confidence and abstention state for every ",
+                "cohort row is frozen before audit selection."
+            )
+            .to_owned(),
+            concat!(
+                "The audit plan is a valid stratified simple-random sample without ",
+                "replacement within each pre-label stratum."
+            )
+            .to_owned(),
+            concat!(
+                "Random priorities were generated independently and uniformly by an ",
+                "external custodian; the plan does not authenticate that process."
+            )
+            .to_owned(),
+            concat!(
+                "Every selected unit received an independent adjudication and ",
+                "nonselected units did not receive labels in this audit lane."
+            )
+            .to_owned(),
+            concat!(
+                "The strata and quotas were frozen before labels and are not selected ",
+                "using adjudication outcomes."
+            )
+            .to_owned(),
+            concat!(
+                "Normal intervals are approximate and pointwise; no multiple-comparison ",
+                "or finite-sample risk guarantee is asserted."
+            )
+            .to_owned(),
         ],
     })
 }
@@ -658,7 +708,11 @@ fn estimate_from_stratum_counts(
             lower: risk - NORMAL_95_Z * se,
             upper: risk + NORMAL_95_Z * se,
             confidence_level: 0.95,
-            method: "pointwise normal approximation using unbiased stratified-SRSWOR variance".to_owned(),
+            method: concat!(
+                "pointwise normal approximation using unbiased ",
+                "stratified-SRSWOR variance"
+            )
+            .to_owned(),
         }
     });
 
@@ -679,12 +733,18 @@ fn estimate_from_stratum_counts(
         variance_unavailable_strata: variance_unavailable_strata.clone(),
         uncertainty_unavailable_reason: if !variance_estimable {
             Some(
-                "at least one non-census stratum has fewer than two selected audit labels"
-                    .to_owned(),
+                concat!(
+                    "at least one non-census stratum has fewer than two ",
+                    "selected audit labels"
+                )
+                .to_owned(),
             )
         } else if !enough_audit_labels {
             Some(format!(
-                "accepted audit label count {accepted_audit_count} is below the configured minimum {minimum_sample_size}"
+                concat!(
+                    "accepted audit label count {accepted_audit_count} is below ",
+                    "the configured minimum {minimum_sample_size}"
+                )
             ))
         } else {
             None
