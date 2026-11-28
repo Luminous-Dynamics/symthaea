@@ -1,0 +1,49 @@
+name: MEL crossed performer-work simulation replay
+
+on:
+  push:
+    branches:
+      - research/mel-crossed-performer-work-inference-v0-20261127
+    paths:
+      - "research/mel-hear-005/**"
+      - "docs/research/MEL-HEAR-005-CROSSED-PERFORMER-WORK-INFERENCE-SIMULATION-V0.md"
+      - ".github/workflows/mel-hear-005-crossed-inference-simulation.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - research/mel-performance-identity-inference-v3-20261127
+    paths:
+      - "research/mel-hear-005/**"
+      - "docs/research/MEL-HEAR-005-CROSSED-PERFORMER-WORK-INFERENCE-SIMULATION-V0.md"
+      - ".github/workflows/mel-hear-005-crossed-inference-simulation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Exact research simulation replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+      - name: Install pinned Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+      - name: Install pinned research dependency
+        run: python -m pip install -r research/mel-hear-005/requirements.txt
+      - name: Replay retained evidence byte-for-byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/mel-hear-005/simulate_crossed_bootstrap.py > "$RUNNER_TEMP/simulation-v0.json"
+          diff -u research/mel-hear-005/simulation-v0.json "$RUNNER_TEMP/simulation-v0.json"
+
+      - name: Replay performer-axis support sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/mel-hear-005/simulate_performer_axis_sweep.py > "$RUNNER_TEMP/performer-axis-sweep-v0.json"
+          diff -u research/mel-hear-005/performer-axis-sweep-v0.json "$RUNNER_TEMP/performer-axis-sweep-v0.json"
