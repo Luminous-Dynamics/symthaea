@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Composite cognitive profile: aggregate 67 benchmarks into ~8 domain scores.
+//! Heuristic domain dashboard for selected PsychBench benchmark outputs.
 //!
-//! Produces a "radar chart" data structure mapping cognitive domains to
-//! normalized performance scores, enabling quick comparison of strengths
-//! and weaknesses across cognitive faculties.
+//! This legacy presentation applies hand-written transformations to heterogeneous
+//! key metrics and averages them by domain. It is a debugging/triage visualization,
+//! not a validated psychometric scale, not an IQ-like measure, and not evidence
+//! of general cognitive ability. Cross-domain comparisons are not calibrated.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -17,7 +18,7 @@ use super::report::{BenchmarkReport, key_metric_for_benchmark};
 pub struct DomainScore {
     /// Domain name.
     pub domain: String,
-    /// Mean score across benchmarks (0.0–1.0 scale).
+    /// Mean of heuristically transformed task metrics (0.0–1.0); not psychometric.
     pub score: f64,
     /// Number of benchmarks contributing.
     pub n_benchmarks: usize,
@@ -136,7 +137,7 @@ use super::report::is_lower_better;
 pub struct CognitiveProfile {
     /// Per-domain scores.
     pub domains: Vec<DomainScore>,
-    /// Overall composite score (mean across domains).
+    /// Legacy unweighted mean of heuristic domain indices; not a validated overall ability score.
     pub overall: f64,
     /// Strongest domain.
     pub strongest: String,
@@ -230,9 +231,9 @@ impl CognitiveProfile {
     /// Format as ASCII radar chart.
     pub fn to_radar_markdown(&self) -> String {
         let mut out = String::new();
-        out.push_str("## Cognitive Profile\n\n");
+        out.push_str("## Heuristic Domain Dashboard (not a psychometric assessment)\n\n");
         out.push_str(&format!(
-            "Overall: {:.1}% | Strongest: {} | Weakest: {}\n\n",
+            "Unweighted descriptive index: {:.1}% (not an ability estimate) | Highest index: {} | Lowest index: {}\n\n",
             self.overall * 100.0,
             self.strongest,
             self.weakest
@@ -272,15 +273,15 @@ impl CognitiveProfile {
 /// Interpret a domain score.
 fn interpret_score(score: f64) -> &'static str {
     if score >= 0.90 {
-        "Exceptional"
+        "High heuristic index"
     } else if score >= 0.75 {
-        "Strong"
+        "Above-midrange heuristic index"
     } else if score >= 0.50 {
-        "Moderate"
+        "Midrange heuristic index"
     } else if score >= 0.25 {
-        "Below average"
+        "Low heuristic index"
     } else {
-        "Impaired"
+        "Very low heuristic index"
     }
 }
 
@@ -391,7 +392,7 @@ mod tests {
         let profile = CognitiveProfile::from_report(&report);
         let md = profile.to_radar_markdown();
 
-        assert!(md.contains("Cognitive Profile"));
+        assert!(md.contains("Heuristic Domain Dashboard"));
         assert!(md.contains("Overall:"));
         assert!(md.contains("Strongest:"));
         assert!(md.contains("#")); // bar chart
@@ -399,11 +400,11 @@ mod tests {
 
     #[test]
     fn test_interpret_score() {
-        assert_eq!(interpret_score(0.95), "Exceptional");
-        assert_eq!(interpret_score(0.80), "Strong");
-        assert_eq!(interpret_score(0.60), "Moderate");
-        assert_eq!(interpret_score(0.30), "Below average");
-        assert_eq!(interpret_score(0.10), "Impaired");
+        assert_eq!(interpret_score(0.95), "High heuristic index");
+        assert_eq!(interpret_score(0.80), "Above-midrange heuristic index");
+        assert_eq!(interpret_score(0.60), "Midrange heuristic index");
+        assert_eq!(interpret_score(0.30), "Low heuristic index");
+        assert_eq!(interpret_score(0.10), "Very low heuristic index");
     }
 
     #[test]
