@@ -54,7 +54,7 @@ The separate package `research/symthaea-gamebench-fep-adapter-v0-1/` implements 
 
 ## Authored tests and qualification status
 
-- Environment, candidate contract, policy baselines, and evaluator runner: **58 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 5; evaluator runner: 5).
+- Environment, candidate contract, policy baselines, and evaluator runner: **59 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 5; evaluator runner: 5).
 - FEP navigation adapter: **6 unit tests authored**.
 - Total: **74 authored tests**. These counts are source inventory, not observed test results.
 - Two isolated workflows run rustfmt, Cargo tests, and strict Clippy.
@@ -96,7 +96,8 @@ The core crate exposes `evaluate_f1(spec, candidate)`. It calls only the observa
 - actions attempted and exact optimal action count;
 - excess action count on successful episodes;
 - per-decision latency and replayable event records;
-- candidate error, if any.
+- candidate error, if any;
+- the candidate's original confidence and forecast distributions paired with the executed action, ready for independent prediction scoring.
 
 Task completion and candidate-protocol validity remain separate: a task can be completed even if the candidate subsequently fails while consuming transition feedback.
 
