@@ -188,15 +188,15 @@ impl LatestSceneGraphSubmissionAck {
 }
 
 #[derive(Resource, Default)]
-struct ActiveSceneGraph {
-    submission: Option<AuthorizedSceneGraphSubmission>,
+pub(super) struct ActiveSceneGraph {
+    pub(super) submission: Option<AuthorizedSceneGraphSubmission>,
     group_id: u64,
 }
 
 #[derive(Component)]
 struct SceneGraphRelationEntity;
 
-fn render_pending_scene_graph(
+pub(super) fn render_pending_scene_graph(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -354,7 +354,7 @@ fn render_pending_scene_graph(
     active_graph.group_id = group_id;
 }
 
-fn enforce_active_scene_graph(
+pub(super) fn enforce_active_scene_graph(
     mut commands: Commands,
     clock: Res<SceneClock>,
     policy: Option<Res<PresentationPolicyState>>,
