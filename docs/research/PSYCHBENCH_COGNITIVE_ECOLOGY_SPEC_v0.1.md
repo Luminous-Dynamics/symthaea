@@ -227,23 +227,30 @@ Build and qualify the environment kernel before adding a natural-language wrappe
 
 **Implemented on `research/psychbench-vnext-2026-11`:**
 - Rust types for `ScenarioManifest`, evaluator-only `WorldState`, `Observation`, `Action`, event records, perturbations, and `StepReceipt`.
-- Deterministic `step` and evaluator-only `perturb` transitions.
-- Separate full evaluator state from agent-visible inspected-site observations.
-- Manifest and state digests using BLAKE3; manifest mismatch is rejected.
-- Deterministic replay of ordered agent/evaluator commands.
-- A first hidden-resource delivery path with inspection budget, valve-key dependency, locked crossing, persistent delivery goal, and injected gate failure/recovery.
-- Unit tests for hidden-resource disclosure, delivery gating, intervention/recovery, failed-action non-mutation, replay determinism, manifest mismatch, receipt determinism, observation budget, and step budget. **These tests are added but have not been executed.**
+- Two deterministic seeded layouts: seed parity places the water filter at either the depot or outpost; the generator version is part of the manifest digest.
+- Deterministic `step`, runner-facing `attempt`, and evaluator-only `perturb` transitions. Rejected actions consume a tick and are recorded as `ActionRejected` events. Hard errors (step limit, manifest mismatch, serialization failure) fail closed.
+- Separate evaluator state from agent-visible inspected-site observations.
+- BLAKE3 state/manifest digests, manifest-mismatch rejection, deterministic trace replay and replay-receipt verification.
+- Evaluator scoring reconstructed only from the replayed state/command trace: goal completion, total transitions, agent attempts, invalid actions, inspections, interventions, recovery and action efficiency.
+- JSONL receipt export.
+- A scripted reference policy that solves both generated layouts, an intervention variant that recovers after gate failure, and a deterministic SplitMix64 random-action baseline.
+- Example runner: `cargo run -p symthaea-psych-bench --example cognitive_ecology_baselines`; add `--jsonl` for JSONL summary records.
+- Unit tests for hidden-resource disclosure, both generated layouts, delivery gating, intervention/recovery, charged invalid actions and over-budget inspections, failed-action non-mutation in the lower-level `step` API, replay determinism, receipt tamper detection, manifest mismatch, step/observation budgets, baseline determinism, and JSONL round-trip parsing. **These tests are added but have not been executed.**
 
-**Known protocol gap:** rejected actions currently return a transactional error without advancing the world. This is suitable for fail-closed evaluator APIs, but an agent-facing runner must record and charge invalid attempts separately (or replace this API with a receipt-bearing rejected-action outcome) before confirmatory use. Otherwise invalid-action probing could become a free side channel. The current fixed scenario also uses `seed` as manifest metadata only; the scenario generator is not yet implemented.
+**Remaining protocol limits:**
+- The seed currently selects only two layouts. This is a minimal deterministic variation, not a rich procedural world generator.
+- The scripted reference policy is optimal only for this hand-authored two-layout task; it is not a general oracle planner.
+- The random policy is a floor baseline, not a representative distribution of capable agents.
+- Invalid attempts consume action ticks. An over-budget inspection is charged as an invalid action and does not consume additional observation budget. Other per-action resource costs and rate limits remain to be formalized.
+- JSONL export exists as a string serializer, but durable artifact writing, an external independent verifier binary, distractors, delayed transfer, and held-out topologies remain pending.
 
-**Still to implement/validate:**
-1. JSONL event artifact export and external receipt verifier.
-2. Formal latent-rule/state-transition oracle and scenario generator independent of the current hand-authored fixture.
-3. A distractor/interruption stage and delayed transfer stage.
-4. Scripted baseline, random baseline, and oracle planner with cost accounting.
-5. Positive/negative/sham and unrelated-module controls.
-6. Versioned trial/scorer schema and CI validity gates.
-7. Only after the environment and scorer are stable, add LLM and human adapters.
+**Next implementation sequence:**
+1. Expand the seeded generator to multiple topology/rule families with independently derived sub-seeds.
+2. Add distractor/interruption, delayed retention and structural transfer stages.
+3. Add a search-based oracle/planner and matched action/observation/compute budgets.
+4. Add positive/negative/sham and unrelated-module mechanism controls.
+5. Finalize versioned trial/scorer metadata and CI validity gates.
+6. Add LLM and human adapters only after the environment and scorer are stable.
 
 ## 11. Evidence boundary
 
