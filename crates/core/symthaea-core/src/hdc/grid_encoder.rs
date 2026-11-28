@@ -71,10 +71,15 @@ impl GridEncoder {
         ContinuousHV::bundle(&refs).normalize()
     }
 
-    /// Query the color information at a specific position by unbinding the position.
+    /// Query color information at a specific position using a same-basis matched filter.
     ///
-    /// ContinuousHV bind is approximately self-inverse, so binding again
-    /// with the position HVs extracts the color component.
+    /// This operation is not algebraic unbinding: ContinuousHV::bind is
+    /// elementwise multiplication, so multiplying arbitrary continuous row
+    /// and column bases a second time does not cancel them. It produces a
+    /// position-conditioned similarity signal that may recover a color in
+    /// simple cases, but bundled multi-cell grids can contain substantial
+    /// cross-talk. The current single-cell test is not evidence of multi-cell
+    /// retrieval quality; see GRID-CONTINUOUS-RETRIEVAL-001 (#14176).
     pub fn query_position(&self, grid_hv: &ContinuousHV, row: usize, col: usize) -> ContinuousHV {
         let row_hv = &self.row_hvs[row];
         let col_hv = &self.col_hvs[col];
