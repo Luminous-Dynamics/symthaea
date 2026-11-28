@@ -464,15 +464,25 @@ impl ExpectedFreeEnergyComputer {
             return Err("candidate action set must not be empty".to_string());
         }
         if model.num_actions == 0 || model.state_dim == 0 || model.obs_dim == 0 {
-            return Err("generative model dimensions and action count must be non-zero".to_string());
+            return Err(
+                "generative model dimensions and action count must be non-zero".to_string(),
+            );
         }
         if state.mean.len() != model.state_dim || state.precision.len() != model.state_dim {
-            return Err("candidate scoring belief dimensions do not match the generative model".to_string());
+            return Err(
+                "candidate scoring belief dimensions do not match the generative model".to_string(),
+            );
         }
         if state.mean.iter().any(|value| !value.is_finite())
-            || state.precision.iter().any(|value| !value.is_finite() || *value <= 0.0)
+            || state
+                .precision
+                .iter()
+                .any(|value| !value.is_finite() || *value <= 0.0)
         {
-            return Err("candidate scoring belief contains non-finite means or non-positive precision".to_string());
+            return Err(
+                "candidate scoring belief contains non-finite means or non-positive precision"
+                    .to_string(),
+            );
         }
         if self.preferences.is_empty()
             || self.preferences.iter().any(|value| !value.is_finite())
@@ -486,7 +496,9 @@ impl ExpectedFreeEnergyComputer {
         }
         if self.precision_overrides.as_ref().is_some_and(|values| {
             values.len() != self.preferences.len()
-                || values.iter().any(|value| !value.is_finite() || *value < 0.0)
+                || values
+                    .iter()
+                    .any(|value| !value.is_finite() || *value < 0.0)
         }) {
             return Err("candidate scoring precision overrides are invalid".to_string());
         }
@@ -494,8 +506,7 @@ impl ExpectedFreeEnergyComputer {
             || model.transition_matrices.iter().any(|matrix| {
                 matrix.len() != model.state_dim
                     || matrix.iter().any(|row| {
-                        row.len() != model.state_dim
-                            || row.iter().any(|value| !value.is_finite())
+                        row.len() != model.state_dim || row.iter().any(|value| !value.is_finite())
                     })
             })
             || model.transition_bias.len() != model.num_actions
@@ -505,14 +516,19 @@ impl ExpectedFreeEnergyComputer {
             || !model.transition_precision.is_finite()
             || model.transition_precision <= 0.0
         {
-            return Err("generative model transition dimensions, bias or precision are invalid".to_string());
+            return Err(
+                "generative model transition dimensions, bias or precision are invalid".to_string(),
+            );
         }
         if model.likelihood_matrix.len() != model.state_dim
-            || model.likelihood_matrix.iter().any(|row| {
-                row.len() != model.obs_dim || row.iter().any(|value| !value.is_finite())
-            })
+            || model
+                .likelihood_matrix
+                .iter()
+                .any(|row| row.len() != model.obs_dim || row.iter().any(|value| !value.is_finite()))
         {
-            return Err("generative model likelihood matrix dimensions or values are invalid".to_string());
+            return Err(
+                "generative model likelihood matrix dimensions or values are invalid".to_string(),
+            );
         }
         let mut seen = std::collections::BTreeSet::new();
         let mut results = Vec::with_capacity(actions.len());
@@ -537,12 +553,25 @@ impl ExpectedFreeEnergyComputer {
             if values.iter().any(|value| !value.is_finite())
                 || result.predicted_state.mean.len() != model.state_dim
                 || result.predicted_state.precision.len() != model.state_dim
-                || result.predicted_state.mean.iter().any(|value| !value.is_finite())
-                || result.predicted_state.precision.iter().any(|value| !value.is_finite() || *value <= 0.0)
+                || result
+                    .predicted_state
+                    .mean
+                    .iter()
+                    .any(|value| !value.is_finite())
+                || result
+                    .predicted_state
+                    .precision
+                    .iter()
+                    .any(|value| !value.is_finite() || *value <= 0.0)
                 || result.expected_observation.len() != model.obs_dim
-                || result.expected_observation.iter().any(|value| !value.is_finite())
+                || result
+                    .expected_observation
+                    .iter()
+                    .any(|value| !value.is_finite())
             {
-                return Err(format!("candidate action {action} produced non-finite output"));
+                return Err(format!(
+                    "candidate action {action} produced non-finite output"
+                ));
             }
             results.push(result);
         }
@@ -588,7 +617,6 @@ impl ExpectedFreeEnergyComputer {
     }
 }
 
-
 #[cfg(test)]
 mod observational_candidate_tests {
     use super::*;
@@ -606,8 +634,12 @@ mod observational_candidate_tests {
         let state = HiddenState::new(4);
         let state_before = state.clone();
 
-        let first = scorer.evaluate_candidates_observational(&[0, 1, 2], &state, &model).unwrap();
-        let second = scorer.evaluate_candidates_observational(&[0, 1, 2], &state, &model).unwrap();
+        let first = scorer
+            .evaluate_candidates_observational(&[0, 1, 2], &state, &model)
+            .unwrap();
+        let second = scorer
+            .evaluate_candidates_observational(&[0, 1, 2], &state, &model)
+            .unwrap();
 
         assert_eq!(first.len(), 3);
         assert_eq!(
@@ -629,9 +661,21 @@ mod observational_candidate_tests {
         let scorer = ExpectedFreeEnergyComputer::new(4);
         let model = GenerativeModel::new(4, 4, 3);
         let state = HiddenState::new(4);
-        assert!(scorer.evaluate_candidates_observational(&[], &state, &model).is_err());
-        assert!(scorer.evaluate_candidates_observational(&[0, 0], &state, &model).is_err());
-        assert!(scorer.evaluate_candidates_observational(&[3], &state, &model).is_err());
+        assert!(
+            scorer
+                .evaluate_candidates_observational(&[], &state, &model)
+                .is_err()
+        );
+        assert!(
+            scorer
+                .evaluate_candidates_observational(&[0, 0], &state, &model)
+                .is_err()
+        );
+        assert!(
+            scorer
+                .evaluate_candidates_observational(&[3], &state, &model)
+                .is_err()
+        );
     }
 
     #[test]
@@ -640,9 +684,17 @@ mod observational_candidate_tests {
         let model = GenerativeModel::new(4, 4, 3);
         let mut state = HiddenState::new(4);
         state.mean[0] = f64::NAN;
-        assert!(scorer.evaluate_candidates_observational(&[0], &state, &model).is_err());
+        assert!(
+            scorer
+                .evaluate_candidates_observational(&[0], &state, &model)
+                .is_err()
+        );
 
         let mismatched = HiddenState::new(3);
-        assert!(scorer.evaluate_candidates_observational(&[0], &mismatched, &model).is_err());
+        assert!(
+            scorer
+                .evaluate_candidates_observational(&[0], &mismatched, &model)
+                .is_err()
+        );
     }
 }
