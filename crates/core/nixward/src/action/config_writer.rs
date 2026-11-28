@@ -185,16 +185,28 @@ impl ConfigWriter {
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let patterns = [
-            format!("    pkgs.{package_attr}\n"),
-            format!("    pkgs.{package_attr}"),
-            format!("pkgs.{package_attr}\n"),
-            format!("pkgs.{package_attr}"),
-        ];
-
+        let target = format!("pkgs.{package_attr}");
         let mut modified = original.clone();
-        for pattern in &patterns {
-            modified = modified.replace(pattern, "");
+        let mut search_from = 0usize;
+        while let Some(relative) = modified[search_from..].find(&target) {
+            let start = search_from + relative;
+            let end = start + target.len();
+            let preceding = modified[..start].chars().next_back();
+            let following = modified[end..].chars().next();
+
+            let left_boundary = preceding.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, '[' | ',' | '(')
+            });
+            let right_boundary = following.is_none_or(|ch| {
+                ch.is_whitespace() || matches!(ch, ']' | ',' | ';' | ')')
+            });
+
+            if left_boundary && right_boundary {
+                modified.replace_range(start..end, "");
+                search_from = start;
+            } else {
+                search_from = end;
+            }
         }
 
         Ok(ConfigPatch {
@@ -438,18 +450,34 @@ impl ConfigWriter {
             ));
         }
 
-        // Validate syntax before either previewing or writing.
-        if self.validate {
-            Self::validate_nix_syntax(&patch.modified)?;
-        }
-
         if self.dry_run {
+            // Use the bundled parser for previews so dry-run remains usable on
+            // machines without nix-instantiate; it still must be valid Nix syntax.
+            let mut parser = NixParser::new();
+            let parsed = parser.parse(&patch.modified).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Dry-run Nix parsing failed: {}", error.message),
+                )
+            })?;
+            if !parsed.errors.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Dry-run Nix parsing reported errors: {:?}", parsed.errors),
+                ));
+            }
+
             return Ok(WriteResult {
                 path: patch.target.clone(),
                 backup_path: None,
                 changed: true,
                 diff: patch.diff(),
             });
+        }
+
+        // Validate syntax with the Nix evaluator/parser before writing.
+        if self.validate {
+            Self::validate_nix_syntax(&patch.modified)?;
         }
 
         // Create git backup
