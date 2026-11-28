@@ -11,7 +11,7 @@ MON-040 computes a one-sided Clopper–Pearson interval over replay observations
 ## Estimand
 
 A declared execution unit represents one deployment-level experimental unit with:
-- a stable unit ID and one preregistered stratum;\n- the same trial, scenario digest, recovery-boundary digest, fault-set digest and exact code revision as every other unit;\n- a fixed seed schedule shared across all execution units, with unique replay IDs globally and unique seeds within each unit;
+- a stable unit ID and one preregistered stratum;\n- a digest-bound sampling frame and selection protocol;\n- one unique selection ordinal and a receipt digest binding unit, stratum, ordinal, frame and protocol;\n- the same trial, scenario digest, recovery-boundary digest, fault-set digest and exact code revision as every other unit;\n- a fixed seed schedule shared across all execution units, with unique replay IDs globally and unique seeds within each unit;
 - a complete dependency-domain inventory;
 - an exact replay count;
 - one outcome receipt per replay.
@@ -58,7 +58,7 @@ Mixed strata are rejected by this v1 single-cohort evaluator; analyze each prere
 - qualified statistical result: the bound meets the threshold for the declared cluster-level estimand under the stated sampling assumptions.
 - campaign verdict: always indeterminate in v1. Hashes bind bytes; they do not authenticate inventory origin, signer authority, revocation state or independence.
 
-The connected-component algorithm detects only the overlaps represented in the declared inventory. It cannot prove the absence of undeclared common-cause dependencies. MON-041 custody must authenticate dependency manifests and observation receipts before the result can inform a live campaign. Even then, independence, representativeness and the sampling frame remain experiment-design assumptions requiring independent review.
+The connected-component algorithm detects only the overlaps represented in the declared inventory. It cannot prove the absence of undeclared common-cause dependencies. MON-041 custody must authenticate the sampling frame, unit-selection receipts, dependency manifests and observation receipts before the result can inform a live campaign. Even then, independence, representativeness and the sampling frame remain experiment-design assumptions requiring independent review.
 
 ## Known-answer mathematics
 
