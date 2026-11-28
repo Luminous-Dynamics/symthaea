@@ -66,7 +66,7 @@
 //! must not be reported as stand-alone metacognitive sensitivity.
 //! Optimal threshold identified via Youden's J statistic (max hit_rate - fa_rate).
 //!
-//! ## Confidence Calibration (Niculescu-Mizil & Caruana, 2005)
+//! ## Shared Input-Score Reliability Curve (not HOT confidence calibration)
 //!
 //! Bins the shared activation/confidence input into deciles and compares each
 //! bin's mean input value with the observed GWT ignition rate. This is an
@@ -693,8 +693,14 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
             "hot_ignition_correlation",
             MetricValue::from_samples(&[pm.hot_ignition_correlation]),
         );
+        // Keep the legacy key for baseline compatibility, but expose the
+        // evidence-bounded name as the preferred metric.
         result.insert(
             "spontaneous_tracking_score",
+            MetricValue::from_samples(&[spontaneous_tracking_score]),
+        );
+        result.insert(
+            "shared_input_alignment_score",
             MetricValue::from_samples(&[spontaneous_tracking_score]),
         );
         result.insert(
@@ -786,7 +792,7 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // ROC is computed from the shared activation/confidence input supplied
         // to HOT, not from an independently generated HOT confidence report.
         result.notes.push(
-            "ROC AUC and calibration ECE use the target activation/confidence value supplied to HOT; it is also the common evidence input to GWT. These are shared-input discrimination/calibration diagnostics, not independent HOT metacognitive readouts."
+            "The legacy spontaneous_tracking_score is a shared-input HOT/GWT alignment heuristic, not evidence of spontaneous emergence. ROC AUC and calibration ECE use the target activation/confidence value supplied to HOT; it is also the common evidence input to GWT. These are shared-input discrimination/reliability diagnostics, not independent HOT metacognitive readouts."
                 .to_string(),
         );
         result.insert("roc_auc", MetricValue::from_samples(&[roc_auc]));
@@ -808,6 +814,10 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         );
         result.insert(
             "hot_input_score_calibration_ece",
+            MetricValue::from_samples(&[calibration_ece]),
+        );
+        result.insert(
+            "hot_input_score_reliability_error",
             MetricValue::from_samples(&[calibration_ece]),
         );
         result.insert(
