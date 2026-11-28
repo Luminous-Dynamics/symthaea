@@ -695,11 +695,12 @@ mod tests {
 
     #[test]
     fn prequery_metadata_is_bound_to_the_exact_query_invocation() {
-        let mut invalid = selection();
-        invalid.query_invocation_id = "fedcba9876543210fedcba9876543210".into();
+        let selected = selection();
+        let mut changed_query = query();
+        changed_query.query_invocation_id = "fedcba9876543210fedcba9876543210".into();
         assert_eq!(
             finalize_reader_exposure_v1(
-                &query(), &invalid, &[], 10, 0, 0, false,
+                &changed_query, &selected, &[], 10, 0, 0, false,
                 digest("request"), digest("response"), digest("reader"), digest("generation"), 0, 0
             ),
             Err(AdapterRejectV1::QueryInputMismatch)
