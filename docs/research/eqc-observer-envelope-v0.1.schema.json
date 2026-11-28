@@ -73,7 +73,8 @@
         "replay_status",
         "replay_result_sha256",
         "observed_at_utc",
-        "trust_policy_sha256"
+        "trust_policy_sha256",
+        "observer_sha256"
       ],
       "properties": {
         "schema": {
@@ -302,6 +303,10 @@
           "format": "date-time"
         },
         "trust_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observer_sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         }
