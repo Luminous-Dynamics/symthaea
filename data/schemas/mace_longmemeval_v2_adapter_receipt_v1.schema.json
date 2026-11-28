@@ -61,7 +61,8 @@
         "payload_sha256",
         "source_snapshot_sha256",
         "inserted_at_monotonic_ns",
-        "receipt_sha256"
+        "receipt_sha256",
+        "run_binding_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -95,6 +96,9 @@
         },
         "receipt_sha256": {
           "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
         }
       }
     },
@@ -106,7 +110,8 @@
         "run_id",
         "query_invocation_id",
         "question_text_sha256",
-        "question_image_sha256"
+        "question_image_sha256",
+        "run_binding_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -131,6 +136,9 @@
               "type": "null"
             }
           ]
+        },
+        "run_binding_sha256": {
+          "$ref": "#/$defs/sha"
         }
       }
     },
@@ -381,7 +389,8 @@
         "query_input_sha256",
         "pre_query_selection_receipt_sha256",
         "selected_item_count",
-        "metadata_sha256"
+        "metadata_sha256",
+        "run_binding_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -402,6 +411,9 @@
           "minimum": 0
         },
         "metadata_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "run_binding_sha256": {
           "$ref": "#/$defs/sha"
         }
       }
