@@ -1,0 +1,40 @@
+name: MEL HEAR-014 active analysis EVSI contract
+
+on:
+  pull_request:
+    paths:
+      - "research/melothaea-active-analysis-v0-1/**"
+      - "benchmarks/mel/schemas/mel-hear-014-active-analysis-v0-1.schema.json"
+      - ".github/workflows/mel-hear-014-active-analysis.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/melothaea-active-analysis-v0-1/**"
+      - "benchmarks/mel/schemas/mel-hear-014-active-analysis-v0-1.schema.json"
+      - ".github/workflows/mel-hear-014-active-analysis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: research/melothaea-active-analysis-v0-1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run policy tests
+        run: cargo test --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
