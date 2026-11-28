@@ -174,6 +174,7 @@ pub fn verify_action_timeline_v1(
 
     let mut ids = HashSet::with_capacity(timeline.segments.len());
     let mut groups: BTreeMap<&str, (usize, HashSet<ActionChannel>)> = BTreeMap::new();
+    let mut last_phase_by_group_channel: BTreeMap<(&str, ActionChannel), (u64, ActionPhase)> = BTreeMap::new();
     let mut last_end_by_channel: BTreeMap<ActionChannel, u64> = BTreeMap::new();
     let mut previous: Option<&ActionSegmentV1> = None;
 
@@ -211,6 +212,13 @@ pub fn verify_action_timeline_v1(
             let entry = groups.entry(group_id).or_insert_with(|| (0, HashSet::new()));
             entry.0 += 1;
             entry.1.insert(segment.channel);
+            let key = (group_id, segment.channel);
+            if let Some((last_start, last_phase)) = last_phase_by_group_channel.get(&key) {
+                if segment.starts_at_monotonic_ns > *last_start && segment.phase < *last_phase {
+                    return Err(ActionTimelineError::InvalidSynchronizationGroup);
+                }
+            }
+            last_phase_by_group_channel.insert(key, (segment.starts_at_monotonic_ns, segment.phase));
         }
     }
 
@@ -445,6 +453,18 @@ mod tests {
         assert_eq!(
             verify_action_cancellation_v1(&compiled, &cancellation),
             Err(ActionTimelineError::CancellationOutsideLifetime)
+        );
+    }
+
+    #[test]
+    fn synchronization_group_rejects_phase_regression_within_a_channel() {
+        let mut value = timeline();
+        value.segments[0].phase = ActionPhase::Release;
+        value.segments.push(segment("speech-late", ActionChannel::Speech, ActionKind::SpeechUtterance, 6_000, 7_000, Some("sync-1")));
+        value.segments.last_mut().unwrap().phase = ActionPhase::Onset;
+        assert_eq!(
+            compile_action_timeline_v1(value),
+            Err(ActionTimelineError::InvalidSynchronizationGroup)
         );
     }
 
