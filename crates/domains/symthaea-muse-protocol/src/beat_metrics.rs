@@ -222,7 +222,7 @@ pub fn aggregate_mirex_beat_scores(
             .map(|track| u128::from(track.weight_frames))
             .sum(),
     };
-    if total_weight == 0 {
+    if total_weight == 0 || total_weight > u128::from(crate::transition::MAX_SAFE_JSON_INTEGER) {
         return None;
     }
 
@@ -276,7 +276,7 @@ fn validate_event_inputs(
     if total_frames > crate::transition::MAX_SAFE_JSON_INTEGER {
         return Err(MirexBeatMetricError::SourceClockExceedsJsonSafeInteger);
     }
-    if u128::from(total_frames)
+    if u128::from(total_frames.saturating_sub(1))
         > u128::from(sample_rate_hz) * 30_000u128
     {
         return Err(MirexBeatMetricError::SourceDurationExceedsMirEvalLimit);
@@ -886,6 +886,50 @@ mod tests {
         .unwrap();
         assert!((arithmetic.scores.f_measure - 0.5).abs() < 1e-12);
         assert!((weighted.scores.f_measure - 0.9).abs() < 1e-12);
+    }
+
+    #[test]
+    fn accepts_duplicate_prediction_events_like_mir_eval() {
+        let reference = [5_000, 6_000, 7_000, 8_000];
+        let estimated = [5_000, 6_000, 6_000, 7_000, 8_000];
+        let report = score_mirex_beat_track(
+            &reference,
+            &estimated,
+            1_000,
+            10_000,
+        )
+        .unwrap();
+        assert!(report.scores.f_measure > 0.0);
+    }
+
+    #[test]
+    fn rejects_aggregate_weight_above_exact_json_integer_range() {
+        let scores = MirexBeatMetricScores {
+            f_measure: 1.0,
+            cemgil: 1.0,
+            goto: 1.0,
+            p_score: 1.0,
+            cmlc: 1.0,
+            cmlt: 1.0,
+            amlc: 1.0,
+            amlt: 1.0,
+            cemgil_best_metric_level: 1.0,
+        };
+        let tracks = [
+            WeightedMirexBeatScores {
+                scores,
+                weight_frames: crate::transition::MAX_SAFE_JSON_INTEGER,
+            },
+            WeightedMirexBeatScores {
+                scores,
+                weight_frames: 1,
+            },
+        ];
+        assert!(aggregate_mirex_beat_scores(
+            &tracks,
+            MirexBeatAggregationMode::DurationWeighted
+        )
+        .is_none());
     }
 
     #[test]
