@@ -40,3 +40,7 @@ Hold the scenario, recovery boundary, trial, code revision, fault scheduler, see
 - confidence-aware causal graphs that distinguish a minimal reproducer from a unique root cause.
 
 All live comparisons are pending.
+
+## Multi-order tournament
+
+Compare the original single reverse-deletion pass with deterministic reverse, ascending and rotated deletion schedules. Use the same observation table, exact failure signature and recovery boundary. Report the best observed fault count, exact order digests, per-order evaluation counts and evidence completeness. For fault sets above 12, never claim a global minimum.
