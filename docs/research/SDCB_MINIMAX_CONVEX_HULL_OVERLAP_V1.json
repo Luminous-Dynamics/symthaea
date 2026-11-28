@@ -213,8 +213,8 @@
     "committed_harness_fetchback": "passed",
     "manifest_parse": "passed",
     "rust_compile": "not run; rustc unavailable",
-    "rust_tests": "not run",
-    "hosted_ci": "no workflow runs or status checks present at verification",
+    "rust_tests": "seven unit tests authored, not run",
+    "hosted_ci": "CI and PR Governance workflows completed with conclusion skipped on PR head fdc10385d98e9f776c6d309933ba855b725b6928; combined status list empty; no CI pass claimed",
     "physical_validation": false,
     "gaussian_mixture_claim": false
   }
