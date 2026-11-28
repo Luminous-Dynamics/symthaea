@@ -40,7 +40,9 @@
         44100,
         88200
       ],
-      "publication_ceiling": null
+      "publication_ceiling": null,
+      "dataset_reference": "urn:fixture:synthetic-dataset",
+      "collection_process_reference": "urn:fixture:synthetic-collection-process"
     }
   ]
 }
