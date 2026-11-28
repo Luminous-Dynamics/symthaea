@@ -115,21 +115,30 @@ impl std::fmt::Display for RiskCoverageError {
             Self::DuplicateRecordId(id) => write!(formatter, "duplicate record ID: {id}"),
             Self::ZeroMinimumSampleSize => {
                 write!(formatter, "minimum sample size must be positive")
-            },
+            }
             Self::InvalidCoverageTarget(value) => {
-                write!(formatter, "coverage target must be finite and in (0, 1]: {value}")
+                write!(
+                    formatter,
+                    "coverage target must be finite and in (0, 1]: {value}"
+                )
             }
             Self::DuplicateCoverageTarget(value) => {
                 write!(formatter, "duplicate coverage target: {value}")
             }
             Self::InvalidConfidenceThreshold(value) => {
-                write!(formatter, "confidence threshold must be finite and in [0, 1]: {value}")
+                write!(
+                    formatter,
+                    "confidence threshold must be finite and in [0, 1]: {value}"
+                )
             }
             Self::DuplicateConfidenceThreshold(value) => {
                 write!(formatter, "duplicate confidence threshold: {value}")
             }
             Self::InvalidDecisionCost(name, value) => {
-                write!(formatter, "{name} decision cost must be finite and nonnegative: {value}")
+                write!(
+                    formatter,
+                    "{name} decision cost must be finite and nonnegative: {value}"
+                )
             }
         }
     }
@@ -385,12 +394,7 @@ fn summarize(
         .collect();
     let observed_abstained = total - observed_accepted.len();
     let observed_errors = count_errors(&observed_accepted);
-    let observed = policy_summary(
-        &eligible,
-        &observed_accepted,
-        observed_errors,
-        config,
-    );
+    let observed = policy_summary(&eligible, &observed_accepted, observed_errors, config);
     let mut reason_counts = BTreeMap::<String, usize>::new();
     for record in records {
         if record.model_abstained {
@@ -439,8 +443,8 @@ fn summarize(
         // a uniformly random tie permutation is E_prev + j * group_errors/m.
         // Summing expected risk at each rank gives the conventional 1/N sum.
         for j in 1..=group_size {
-            let expected_errors = previous_errors as f64
-                + (j as f64 * group_errors as f64 / group_size as f64);
+            let expected_errors =
+                previous_errors as f64 + (j as f64 * group_errors as f64 / group_size as f64);
             let accepted_at_rank = previous_accepted + j;
             area += (expected_errors / accepted_at_rank as f64) / total as f64;
         }
@@ -470,15 +474,14 @@ fn summarize(
         let Some(point) = report.curve.iter().find(|point| point.coverage >= target) else {
             continue;
         };
-        let accepted: Vec<&SelectivePredictionRecord> =
-            eligible.iter().take(point.accepted_count).copied().collect();
+        let accepted: Vec<&SelectivePredictionRecord> = eligible
+            .iter()
+            .take(point.accepted_count)
+            .copied()
+            .collect();
         let error_count = count_errors(&accepted);
         let decision_cost = decision_cost(&eligible, &accepted, config.decision_costs);
-        let random_cost = random_abstention_cost(
-            &eligible,
-            point.coverage,
-            config.decision_costs,
-        );
+        let random_cost = random_abstention_cost(&eligible, point.coverage, config.decision_costs);
         report.operating_points.push(CoverageOperatingPoint {
             target_coverage: target,
             achieved_coverage: point.coverage,
@@ -505,10 +508,12 @@ fn summarize(
             .filter(|record| record.predicted_confidence >= threshold)
             .collect();
         let errors = count_errors(&accepted);
-        report.confidence_threshold_baselines.push(ConfidenceThresholdPoint {
-            threshold,
-            policy: policy_summary(&eligible, &accepted, errors, config),
-        });
+        report
+            .confidence_threshold_baselines
+            .push(ConfidenceThresholdPoint {
+                threshold,
+                policy: policy_summary(&eligible, &accepted, errors, config),
+            });
     }
 
     report
@@ -598,10 +603,7 @@ fn random_abstention_cost(
     let mean_answer_error_cost = (false_positives as f64 * costs.false_positive
         + false_negatives as f64 * costs.false_negative)
         / all.len() as f64;
-    Some(
-        target_coverage * mean_answer_error_cost
-            + (1.0 - target_coverage) * costs.abstention,
-    )
+    Some(target_coverage * mean_answer_error_cost + (1.0 - target_coverage) * costs.abstention)
 }
 
 fn wilson_interval(errors: usize, sample_size: usize) -> Option<WilsonInterval> {
@@ -614,9 +616,7 @@ fn wilson_interval(errors: usize, sample_size: usize) -> Option<WilsonInterval> 
     let denominator = 1.0 + z_squared / n;
     let center = (proportion + z_squared / (2.0 * n)) / denominator;
     let half_width = WILSON_Z_95
-        * ((proportion * (1.0 - proportion) / n
-            + z_squared / (4.0 * n * n))
-            .sqrt())
+        * ((proportion * (1.0 - proportion) / n + z_squared / (4.0 * n * n)).sqrt())
         / denominator;
     Some(WilsonInterval {
         lower: (center - half_width).max(0.0),
@@ -639,11 +639,9 @@ fn stratify(
         let mut groups = BTreeMap::<String, Vec<&SelectivePredictionRecord>>::new();
         for record in records {
             let value = match dimension {
-                StratificationDimension::Domain => record
-                    .domain
-                    .as_deref()
-                    .unwrap_or("unknown")
-                    .to_string(),
+                StratificationDimension::Domain => {
+                    record.domain.as_deref().unwrap_or("unknown").to_string()
+                }
                 StratificationDimension::SourceFamily => record
                     .source_family
                     .as_deref()
@@ -744,7 +742,13 @@ mod tests {
         ];
         let report = evaluate_risk_coverage(&records, &config()).unwrap();
         assert_eq!(report.report.aurc, Some(0.0));
-        assert!(report.report.curve.iter().all(|point| point.risk == Some(0.0)));
+        assert!(
+            report
+                .report
+                .curve
+                .iter()
+                .all(|point| point.risk == Some(0.0))
+        );
     }
 
     #[test]
@@ -756,7 +760,13 @@ mod tests {
         ];
         let report = evaluate_risk_coverage(&records, &config()).unwrap();
         assert_eq!(report.report.aurc, Some(1.0));
-        assert!(report.report.curve.iter().all(|point| point.risk == Some(1.0)));
+        assert!(
+            report
+                .report
+                .curve
+                .iter()
+                .all(|point| point.risk == Some(1.0))
+        );
     }
 
     #[test]
@@ -812,9 +822,7 @@ mod tests {
         let point = &report.report.operating_points[0];
         assert!((point.mean_decision_cost.unwrap() - 2.0).abs() < 1e-12);
         // Compare with random abstention at the actually achieved 1/3 coverage.
-        assert!(
-            (point.random_abstention_expected_cost.unwrap() - 10.0 / 9.0).abs() < 1e-12
-        );
+        assert!((point.random_abstention_expected_cost.unwrap() - 10.0 / 9.0).abs() < 1e-12);
     }
 
     #[test]
@@ -827,8 +835,7 @@ mod tests {
         let mut pending = record("pending", 0.2, true, None);
         pending.model_abstained = true;
         pending.abstention_reason = Some("awaiting_adjudication".to_string());
-        let report =
-            evaluate_risk_coverage(&[abstained, unspecified, pending], &config()).unwrap();
+        let report = evaluate_risk_coverage(&[abstained, unspecified, pending], &config()).unwrap();
         let observed = report.report.observed_model_policy.as_ref().unwrap();
         assert_eq!(observed.policy.accepted_count, 0);
         assert_eq!(observed.policy.abstained_count, 2);
@@ -863,8 +870,18 @@ mod tests {
         first.adjudicator = Some("panel-a".to_string());
         let report = evaluate_risk_coverage(&[first], &config()).unwrap();
         assert_eq!(report.stratified.len(), 4);
-        assert!(report.stratified.iter().any(|group| group.value == "physics"));
-        assert!(report.stratified.iter().any(|group| group.value == "unknown"));
+        assert!(
+            report
+                .stratified
+                .iter()
+                .any(|group| group.value == "physics")
+        );
+        assert!(
+            report
+                .stratified
+                .iter()
+                .any(|group| group.value == "unknown")
+        );
     }
 
     #[test]
