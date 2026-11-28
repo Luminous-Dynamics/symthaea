@@ -109,7 +109,7 @@ This is not the same estimator as the propensity-weighted HT point estimate in `
 - The module uses constant predictable weights a_t = 1, deterministic envelopes c_n = 1 and b_n = 1/q_min, and the Horvitz-Thompson loss I_t * 1{r_t > lambda}/q_t.
 - For each threshold lambda on a predeclared nested grid, it computes the observable martingale-mixture E-value and inverts it by log-space bisection to obtain an upper risk bound.
 - The total failure probability delta is split across the fixed threshold grid. The selected rule is the smallest nonterminal threshold whose bound is at most the target alpha.
-- If no nonterminal threshold is feasible, lambda = 1 returns the full label space, which has structurally zero miscoverage. This safe fallback does not depend on the statistical mixture being tight.
+- The rule selects the smallest threshold in the complete frozen grid, including lambda = 1, whose mixture bound is at most alpha. If no grid threshold is feasible, lambda = 1 returns the full label space with structurally zero miscoverage; the report distinguishes this safe fallback from a statistical mixture certificate.
 - The betting fractions, mixture weights, q_min, threshold grid, target risk and delta must be frozen in a calibration-protocol manifest separate from the prediction and audit-design manifests.
 - Observed nonconformity scores are sorted once. Suffix weights and a monotone cursor compute the entire grid in O(N log N + N + J), rather than rescanning the complete cohort for each threshold.
 
