@@ -56,7 +56,7 @@ The separate package `research/symthaea-gamebench-fep-adapter-v0-1/` implements 
 
 - Environment, candidate contract, policy baselines, and evaluator runner: **59 unit tests authored** (F1–F6: 41; candidate contract: 7; random/greedy policies: 5; evaluator runner: 5).
 - FEP navigation adapter: **6 unit tests authored**.
-- Total: **74 authored tests**. These counts are source inventory, not observed test results.
+- Total: **75 authored tests**. These counts are source inventory, not observed test results.
 - Two isolated workflows run rustfmt, Cargo tests, and strict Clippy.
 - No test/format/Clippy pass is claimed until both workflows pass on the exact branch head.
 
