@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-gamebench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Standalone deterministic interactive-game benchmark fixtures for Symthaea"
+
+# This research crate is intentionally its own workspace. It must not expand
+# the production Symthaea workspace or add benchmark dependencies to runtime.
+[workspace]
+members = ["."]
+resolver = "2"
+
+[lib]
+path = "src/lib.rs"
