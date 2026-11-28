@@ -1,0 +1,90 @@
+name: EQC Observer Verifier Lockfile Bootstrap
+
+on:
+  push:
+    branches: [feat/eqc-standalone-review-2026-11-28]
+    paths:
+      - "tools/eqc-reference/Cargo.toml"
+      - "tools/eqc-reference/src/observer.rs"
+      - ".github/workflows/eqc-observer-lock-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eqc-observer-lock-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  resolve-and-test:
+    name: Resolve observer crypto dependencies and test verifier
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact review branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/eqc-standalone-review-2026-11-28
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Resolve the standalone lockfile
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile --manifest-path tools/eqc-reference/Cargo.toml
+          test -s tools/eqc-reference/Cargo.lock
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/eqc-reference/Cargo.toml -- --check
+
+      - name: Verify locked metadata
+        run: |
+          set -euo pipefail
+          cargo metadata --locked \
+            --manifest-path tools/eqc-reference/Cargo.toml \
+            --format-version 1 > "$RUNNER_TEMP/eqc-observer-metadata.json"
+          jq -e '.packages | any(.[]; .name == "luminous-eqc-reference")' \
+            "$RUNNER_TEMP/eqc-observer-metadata.json" >/dev/null
+
+      - name: Run schema, reference, signature and mutation tests
+        run: cargo test --locked --manifest-path tools/eqc-reference/Cargo.toml
+
+      - name: Preserve lockfile and test identity
+        run: |
+          mkdir -p "$RUNNER_TEMP/eqc-observer-bootstrap"
+          cp tools/eqc-reference/Cargo.lock "$RUNNER_TEMP/eqc-observer-bootstrap/Cargo.lock"
+          {
+            echo "source_head=$GITHUB_SHA"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "lock_sha256=$(sha256sum tools/eqc-reference/Cargo.lock | cut -d' ' -f1)"
+            echo "observer_verifier=Ed25519+RFC8785-JCS"
+          } > "$RUNNER_TEMP/eqc-observer-bootstrap/metadata.txt"
+
+      - name: Upload reproducible dependency resolution
+        uses: actions/upload-artifact@v4
+        with:
+          name: eqc-observer-lock-${{ github.sha }}
+          path: ${{ runner.temp }}/eqc-observer-bootstrap/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit the lockfile to the review branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/eqc-reference/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "Standalone observer lockfile is already current."
+          else
+            git commit -m "chore(eqc): lock observer signature verifier dependencies"
+            git push origin HEAD:feat/eqc-standalone-review-2026-11-28
+          fi
