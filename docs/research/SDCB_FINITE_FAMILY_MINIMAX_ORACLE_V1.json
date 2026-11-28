@@ -1,0 +1,94 @@
+{
+  "schema_version": "sdcb-finite-family-minimax-oracle-v1",
+  "title": "Exact finite-family Gaussian robust-testing oracle",
+  "status": "analytic-synthetic-reference-rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14136,
+    "family_overlap_issue": 14133,
+    "fixed_pair_lrt_issue": 14110,
+    "overlap_reference_pr": 14135,
+    "base_commit": "8d0e5cc27dcdf1833a623d32f7e73f4fb73ae54a"
+  },
+  "fixture": {
+    "observation": "one scalar observation x",
+    "variance": 1.0,
+    "null_family": [
+      {"mean": -1.0, "variance": 1.0},
+      {"mean": 1.0, "variance": 1.0}
+    ],
+    "alternative_family": [
+      {"mean": -0.5, "variance": 1.0},
+      {"mean": 0.5, "variance": 1.0}
+    ],
+    "parameters_are_exact_dyadic_values": true,
+    "family_intersection": false
+  },
+  "candidate_glrt": {
+    "score": "T(x) = max_i log f_Ai(x) - max_j log f_Bj(x)",
+    "closed_form": "T(x) = 3/8 - |x|/2",
+    "ordering": "strictly decreasing in |x|"
+  },
+  "robust_p_value": {
+    "component": "p_j(x) = P_Bj(|X| <= |x|)",
+    "family": "p_sup(x) = max_j p_j(x)",
+    "closed_form": "p_sup(x) = Phi(|x|-1) - Phi(-|x|-1)",
+    "rejection": "reject null iff p_sup(x) <= alpha",
+    "validity": "finite-family size control follows because p_sup >= p_k under every true null member B_k; this fixture also has an exact closed-form p-value"
+  },
+  "least_favourable_mixtures": {
+    "null_weights": [0.5, 0.5],
+    "alternative_weights": [0.5, 0.5],
+    "log_mixture_likelihood_ratio": "3/8 + log(cosh(x/2)) - log(cosh(x))",
+    "least_favourable": "The symmetric equal-weight mixtures are least-favourable for this two-point symmetric fixture. Their Neyman-Pearson rejection region is |x| <= r_alpha.",
+    "maximin_proof": "The Neyman-Pearson lemma upper-bounds average alternative power for every uniformly level-alpha test. The mixture-optimal test has equal size alpha at both null members and equal power at both alternative members, so its average power equals its worst-case power and it attains the maximin upper bound.",
+    "scope": "This is an exact oracle for this symmetric finite fixture only; it does not establish that equal weights, GLRT, or p_sup are maximin for arbitrary finite Gaussian families."
+  },
+  "reference_operating_point": {
+    "alpha": 0.05,
+    "critical_abs_x": 0.10331847967227244,
+    "null_size_at_mean_minus_1": 0.05,
+    "null_size_at_mean_plus_1": 0.05,
+    "alternative_power_at_mean_minus_0_5": 0.07265274373187236,
+    "alternative_power_at_mean_plus_0_5": 0.07265274373187236,
+    "worst_case_power": 0.07265274373187236,
+    "disposition_at_80_percent_power_target": "UNDERPOWERED"
+  },
+  "single_pair_robust_recalibration_baseline": {
+    "pair": "A_plus = N(0.5,1) versus B_plus = N(1,1)",
+    "test": "lower-tail single-pair likelihood-ratio test",
+    "threshold": -2.644853626951473,
+    "null_size_at_mean_minus_1": 0.05,
+    "null_size_at_mean_plus_1": 0.00013377201459869545,
+    "alternative_power_at_mean_minus_0_5": 0.0159822759685784,
+    "alternative_power_at_mean_plus_0_5": 0.0008308497372178212,
+    "worst_case_power": 0.0008308497372178212,
+    "maximin_fixture_power_ratio": 87.44390288327818,
+    "interpretation": "A single-pair rule remains uniformly size-controlled only after calibration against the least-favourable null member; it then has much poorer worst-case power than the exact symmetric minimax rule on this fixture. This is a constructed comparator, not a field-wide performance claim."
+  },
+  "monte_carlo_rank_contract": {
+    "formula": "(1 + count(T(Y_b) >= T(y_observed))) / (M + 1)",
+    "ties": "inclusive greater-than-or-equal tail",
+    "requirements": [
+      "calibration draws are independent of the test observation",
+      "each component calibration stream is sampled from its exact declared null member",
+      "no threshold, score, nuisance bound, or family member is selected using sealed evaluation outcomes"
+    ],
+    "warning": "A deterministic PRNG seed provides replayability, not physical randomness or an analytic proof."
+  },
+  "proposed_qualification_targets": {
+    "familywise_alpha": 0.05,
+    "per_null_99_percent_upper_confidence_bound": 0.06,
+    "worst_case_power": 0.8,
+    "exact_overlap_false_robust_resolution": 0,
+    "continuous_family_claims_from_grid_only": 0,
+    "small_family_oracle_agreement": "exact agreement in rejection ordering and agreement within 2e-6 for this normal-CDF approximation"
+  },
+  "validation": {
+    "independent_numerical_replay": "SciPy normal-CDF and root solution reproduced the frozen critical radius, size, and power values.",
+    "rust": "standalone reference and tests authored; rustc/Cargo unavailable in the authoring container, so compilation and execution were not performed",
+    "ci": "not run / not claimed",
+    "physical_validation": false,
+    "certified_numerical_enclosures": false
+  },
+  "claim_boundary": "This is an exact analytical minimax result for a one-dimensional symmetric two-point Gaussian family, paired with a standalone Rust reference using an approximate normal CDF. It is not a general composite-Gaussian minimax solver, a continuous-nuisance guarantee, a physical sensor validation, a CI pass, or evidence of SOTA superiority."
+}
