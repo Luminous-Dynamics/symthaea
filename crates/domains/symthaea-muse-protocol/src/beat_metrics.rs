@@ -821,9 +821,24 @@ fn continuity_scores(
             };
 
             let (phase, period) = if reference_interval == 0.0 {
-                let phase = if minimum_difference == 0.0 { 1.0 } else { f64::INFINITY };
-                let period = if estimated_interval == 0.0 { 0.0 } else { f64::INFINITY };
-                (phase, period)
+                if estimate_index == 0 || nearest == 0 {
+                    let phase = if minimum_difference == 0.0 {
+                        1.0
+                    } else {
+                        f64::INFINITY
+                    };
+                    let period = if estimated_interval == 0.0 {
+                        0.0
+                    } else {
+                        f64::INFINITY
+                    };
+                    (phase, period)
+                } else {
+                    // mir_eval's interior branch divides by a zero interval
+                    // without the boundary special-case; the comparison is
+                    // therefore non-finite and the candidate is not matched.
+                    (f64::INFINITY, f64::INFINITY)
+                }
             } else {
                 (
                     (minimum_difference / reference_interval).abs(),
@@ -1111,6 +1126,21 @@ mod tests {
         assert_eq!(scores.cmlt, 0.0);
         assert_eq!(scores.amlc, 0.0);
         assert_eq!(scores.amlt, 0.0);
+    }
+
+    #[test]
+    fn duplicate_reference_events_do_not_create_interior_continuity_matches() {
+        let reference = [5_000, 6_000, 7_000, 8_000, 9_000, 10_000, 10_000, 11_000, 12_000];
+        let estimated = [5_000, 6_000, 7_000, 8_000, 9_000, 10_000, 11_000, 12_000];
+        let scores = score_mirex_beat_track(
+            &reference,
+            &estimated,
+            1_000,
+            15_000,
+        )
+        .unwrap()
+        .scores;
+        assert!(scores.cmlt <= 8.0 / 9.0);
     }
 
     #[test]
