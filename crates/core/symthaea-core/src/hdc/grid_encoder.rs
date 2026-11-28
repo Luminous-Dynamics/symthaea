@@ -481,16 +481,12 @@ mod tests {
                     let bundled = enc.encode_grid(&grid);
                     // Explicit high-memory reference: one unbundled positional
                     // HV per observed cell, stored for direct indexed retrieval.
-                    let dense_cells: Vec<_> = grid
-                        .iter()
-                        .enumerate()
-                        .flat_map(|(row, values)| {
-                            values
-                                .iter()
-                                .enumerate()
-                                .map(move |(col, &color)| enc.encode_cell(row, col, color as usize))
-                        })
-                        .collect();
+                    let mut dense_cells = Vec::with_capacity(rows * cols);
+                    for (row, values) in grid.iter().enumerate() {
+                        for (col, &color) in values.iter().enumerate() {
+                            dense_cells.push(enc.encode_cell(row, col, color as usize));
+                        }
+                    }
                     let dense_storage_bytes =
                         dense_cells.len() * dimension * std::mem::size_of::<f32>();
                     let bundled_storage_bytes = dimension * std::mem::size_of::<f32>();
