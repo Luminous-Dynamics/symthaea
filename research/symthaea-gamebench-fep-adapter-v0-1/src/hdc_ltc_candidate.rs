@@ -119,7 +119,10 @@ impl InteractiveCandidate<Observation, Action> for HdcLtcSpatialCandidate {
     type Error = HdcLtcAdapterError;
 
     fn reset(&mut self) -> Result<(), Self::Error> {
-        self.neuron = build_neuron(self.seed);
+        self.episode_counter = self.episode_counter.wrapping_add(1);
+        let episode_seed = self.seed
+            ^ self.episode_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        self.neuron = build_neuron(episode_seed);
         self.initialized = false;
         self.pending_action = None;
         Ok(())
@@ -355,6 +358,7 @@ mod tests {
             .expect("decision");
         candidate.reset().expect("reset");
         assert!(!candidate.initialized);
+        assert_eq!(candidate.episode_counter, 1);
         assert!(candidate.pending_action.is_none());
     }
 }
