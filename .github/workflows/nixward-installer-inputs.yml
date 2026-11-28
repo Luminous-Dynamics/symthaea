@@ -1,0 +1,48 @@
+name: NixWard installer input-safety qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/nixward/src/sovereign_config.rs"
+      - "crates/core/nixward/src/typed_nix.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/nixward-installer-inputs.yml"
+  push:
+    branches:
+      - "fix/nixward-installer-input-escaping-20261128"
+    paths:
+      - "crates/core/nixward/src/sovereign_config.rs"
+      - "crates/core/nixward/src/typed_nix.rs"
+      - ".github/workflows/nixward-installer-inputs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nixward-installer-inputs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer-inputs:
+    name: installer-inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check installer and typed IR formatting
+        run: rustfmt +1.96.0 --check --edition 2024 crates/core/nixward/src/sovereign_config.rs crates/core/nixward/src/typed_nix.rs
+      - name: Test installer input boundaries
+        run: cargo +1.96.0 test --locked -p nixward --lib sovereign_config::tests::

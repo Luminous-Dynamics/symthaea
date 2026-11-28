@@ -14,6 +14,7 @@ use crate::encoding::codebook::NixCodebook;
 use crate::encoding::user_input_encoder::UserInputEncoder;
 use crate::mind::active_inference::NixActiveInference;
 use crate::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
+use crate::typed_nix::{render_string_literal, NixPackageRef};
 
 use std::collections::HashMap;
 
@@ -246,8 +247,21 @@ impl SovereignConfigGenerator {
             warnings.push(conflict.clone());
         }
 
-        // ── Step 9: Reason about packages from migration data ──
-        let packages = self.reason_about_packages(migration);
+        // ── Step 9: Validate migrated package candidates before rendering ──
+        let package_candidates = self.reason_about_packages(migration);
+        let mut packages = Vec::new();
+        for candidate in package_candidates {
+            match NixPackageRef::new(&candidate) {
+                Ok(package) => packages.push(package.attribute().as_nix()),
+                Err(error) => warnings.push(format!(
+                    "Rejected migrated package candidate {candidate:?}: {error}"
+                )),
+            }
+        }
+        warnings.push(
+            "Package attributes are syntax-validated only; target nixpkgs resolution is not yet implemented."
+                .into(),
+        );
 
         // ── Step 10: Generate the config files ──
         let sovereign_config_nix = self.render_sovereign_config(&nix_options, &packages);
@@ -577,34 +591,49 @@ impl SovereignConfigGenerator {
 
     fn reason_about_locale(&self, choices: &UserChoices) -> ReasonedOptions {
         let mut options = Vec::new();
+        let mut warnings = Vec::new();
 
-        let tz = if choices.timezone.is_empty() {
+        let timezone = if choices.timezone.is_empty() {
             "UTC"
         } else {
             &choices.timezone
         };
-        let kb = if choices.keyboard.is_empty() {
+        let keyboard = if choices.keyboard.is_empty() {
             "us"
         } else {
             &choices.keyboard
         };
 
-        options.push(("time.timeZone".into(), format!("\"{}\"", tz)));
+        match render_string_literal(timezone) {
+            Ok(value) => options.push(("time.timeZone".into(), value)),
+            Err(error) => warnings.push(format!(
+                "Rejected timezone value; it contains unsupported Nix string characters: {error}"
+            )),
+        }
+
         options.push(("i18n.defaultLocale".into(), "\"en_US.UTF-8\"".into()));
-        options.push(("console.keyMap".into(), format!("\"{}\"", kb)));
-        options.push(("services.xserver.xkb.layout".into(), format!("\"{}\"", kb)));
+
+        match render_string_literal(keyboard) {
+            Ok(value) => {
+                options.push(("console.keyMap".into(), value.clone()));
+                options.push(("services.xserver.xkb.layout".into(), value));
+            }
+            Err(error) => warnings.push(format!(
+                "Rejected keyboard layout value; it contains unsupported Nix string characters: {error}"
+            )),
+        }
 
         ReasonedOptions {
             options,
             decision: ConfigDecision {
                 option_path: "locale".into(),
-                value: format!("{} / {}", tz, kb),
-                reasoning: format!("Timezone {} with {} keyboard layout.", tz, kb),
+                value: format!("{timezone} / {keyboard}"),
+                reasoning: format!("Timezone {timezone} with {keyboard} keyboard layout."),
                 confidence: 0.9,
                 consequences: Vec::new(),
                 alternatives: Vec::new(),
             },
-            warnings: Vec::new(),
+            warnings,
         }
     }
 
@@ -1642,4 +1671,73 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn untrusted_locale_values_are_escaped_before_nix_rendering() {
+        let payload = concat!("$", "{builtins.abort \"timezone-injection\"}");
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                timezone: payload.into(),
+                keyboard: payload.into(),
+                ..Default::default()
+            },
+            &MigrationData::default(),
+        );
+
+        assert!(
+            config.sovereign_config_nix.contains(&concat!("\\", "$", "{builtins.abort")),
+            "Nix interpolation opener must be escaped in generated string literals"
+        );
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("generated locale literals should remain syntactically valid");
+    }
+
+    #[test]
+    fn unsupported_locale_controls_are_omitted_with_a_warning() {
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                timezone: "UTC\0unsafe".into(),
+                keyboard: "us".into(),
+                ..Default::default()
+            },
+            &MigrationData::default(),
+        );
+
+        assert!(!config.sovereign_config_nix.contains("time.timeZone"));
+        assert!(config.warnings.iter().any(|warning| warning.contains("Rejected timezone")));
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("omitting the invalid locale assignment should leave valid Nix");
+    }
+
+    #[test]
+    fn injected_migration_package_candidates_are_rejected() {
+        let malicious = "vim; builtins.abort \"package-injection\"";
+        let mut generator = SovereignConfigGenerator::new();
+        let config = generator.generate(
+            &HardwareProfile::default(),
+            &UserChoices {
+                desktop: "none".into(),
+                ..Default::default()
+            },
+            &MigrationData {
+                detected_apps: vec![malicious.into()],
+                ..Default::default()
+            },
+        );
+
+        assert!(!config.sovereign_config_nix.contains(malicious));
+        assert!(config.sovereign_config_nix.contains("    vim"));
+        assert!(config.warnings.iter().any(|warning| warning.contains("Rejected migrated package")));
+        assert!(config.warnings.iter().any(|warning| warning.contains("syntax-validated only")));
+        validate_nix_syntax(&config.sovereign_config_nix)
+            .expect("rejected package candidates must not break generated Nix syntax");
+    }
+
+
 }
