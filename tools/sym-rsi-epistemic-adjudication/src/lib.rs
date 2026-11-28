@@ -23,6 +23,9 @@ pub mod selective_observation;
 #[path = "../../../src/web_research/stratified_audit.rs"]
 pub mod stratified_audit;
 
+#[path = "../../../src/web_research/stratified_risk.rs"]
+pub mod stratified_risk;
+
 #[cfg(test)]
 mod compatibility_tests {
     use super::types::{ResearchSource, VerificationOutcome};
