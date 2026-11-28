@@ -9,3 +9,4 @@ description = "Deterministic graph topology adaptation benchmark evaluator"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+blake3 = { workspace = true }
