@@ -330,3 +330,11 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+## Selective-audit scientific claim risk
+
+- [False-unique risk control reference v1](SDCB_FALSE_UNIQUE_AUDIT_RISK_V1.md) — distinct pointwise-structural, composite-family, and finite-budget risks.
+- [Public six-episode known-answer fixture](SDCB_FALSE_UNIQUE_AUDIT_FIXTURE_V1.tsv) — nested candidate mechanism/family sets and positive dyadic audit probabilities.
+- [Dependency-free Rust reference](../../scripts/research/sdcb_false_unique_risk.rs) — independent finite-cohort estimands and exhaustive Horvitz–Thompson mask enumeration.
+- [Standalone runner](../../scripts/research/run_sdcb_false_unique_risk_tests.sh).
