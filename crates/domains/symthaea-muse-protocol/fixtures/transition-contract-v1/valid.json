@@ -54,11 +54,12 @@
   "alignment": {
     "source_anchor_frame": 400,
     "target_anchor_frame": 600,
-    "beat_ordinal_milli": 16000,
     "confidence_ppm": 850000,
     "source_grid_hypothesis_id": "source-grid-primary",
     "target_grid_hypothesis_id": "target-grid-primary",
-    "max_phase_error_milli": 100
+    "max_phase_error_milli": 100,
+    "transition_beat_ordinal_milli": 16000,
+    "max_tempo_delta_milli_bpm": 1000
   },
   "protected_regions": [
     {
