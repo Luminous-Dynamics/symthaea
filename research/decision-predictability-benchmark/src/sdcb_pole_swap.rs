@@ -12,9 +12,12 @@
 //! nuisance outcomes preserve the full state support.
 
 use super::sequential::{
-    enumerate_sequential_robust, evaluate_sequential_robust, SequentialAction,
-    SequentialOutcome, SequentialPolicyNode, SequentialPolicyValue,
-    SequentialProtocolState, SequentialRobustProblem,
+    SequentialAction, SequentialOutcome, SequentialProtocolState, SequentialRobustProblem,
+};
+#[cfg(test)]
+use super::sequential::{
+    enumerate_sequential_robust, evaluate_sequential_robust, SequentialPolicyNode,
+    SequentialPolicyValue,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -181,6 +184,7 @@ pub fn build_problem(task: DecisionTask) -> SequentialRobustProblem {
     }
 }
 
+#[cfg(test)]
 fn retain_only(problem: &mut SequentialRobustProblem, action_ids: &[&str]) {
     let allowed: BTreeSet<&str> = action_ids.iter().copied().collect();
     problem.actions.retain(|action| allowed.contains(action.action_id.as_str()));
@@ -193,6 +197,7 @@ fn retain_only(problem: &mut SequentialRobustProblem, action_ids: &[&str]) {
         .retain(|id| allowed.contains(id.as_str()));
 }
 
+#[cfg(test)]
 fn assert_dp_matches_exhaustive(problem: &SequentialRobustProblem) -> SequentialPolicyValue {
     let dynamic = evaluate_sequential_robust(problem).expect("dynamic programme accepts fixture");
     let exhaustive =
@@ -246,16 +251,18 @@ mod tests {
         assert_eq!(action_id, "independent_reference_of_latent_process");
         assert_eq!(branches.len(), 2);
         for branch in branches {
-            let expected_decision = if branch.possible_state_ids == [WORLD_A] {
+            let is_world_a = branch.possible_state_ids.len() == 1
+                && branch.possible_state_ids[0] == WORLD_A;
+            let expected_decision = if is_world_a {
                 "select_fast_sensor_path"
             } else {
-                assert_eq!(branch.possible_state_ids, [WORLD_B]);
+                assert_eq!(branch.possible_state_ids, vec![WORLD_B.to_owned()]);
                 "select_slow_sensor_path"
             };
             assert!(matches!(
                 branch.continuation.as_ref(),
                 SequentialPolicyNode::Stop { decision_id, worst_case_terminal_loss: 0.0 }
-                    if decision_id == expected_decision
+                    if decision_id.as_str() == expected_decision
             ));
         }
         assert_eq!(result.terminal_resource_paths.len(), 2);
