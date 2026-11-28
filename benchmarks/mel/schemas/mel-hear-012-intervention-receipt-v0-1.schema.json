@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/mel-hear-012-intervention-receipt-v0-1.schema.json",
+  "title": "MEL-HEAR-012 materialized intervention receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "pair_id",
+    "manifest_sha256",
+    "input_audio_sha256",
+    "output_audio_sha256",
+    "parameter_manifest_sha256",
+    "implementation_sha256",
+    "execution_environment_sha256",
+    "seed",
+    "input_sample_rate_hz",
+    "output_sample_rate_hz",
+    "input_frame_count",
+    "output_frame_count",
+    "applied_start_sample",
+    "applied_end_sample",
+    "completed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-hear-012-intervention-receipt-v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "input_audio_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "output_audio_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "parameter_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "execution_environment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_sample_rate_hz": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "output_sample_rate_hz": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_frame_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "output_frame_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "applied_start_sample": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "applied_end_sample": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "completed": {
+      "const": true
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
