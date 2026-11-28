@@ -392,6 +392,9 @@ A digest establishes byte identity, not authorship, truth, independent execution
 
 ## 8.1 Trusted observation boundary for v0.1
 
+The v0.2 design direction is recorded in [EQC Trusted Observer Architecture v0.1](EQC_TRUSTED_OBSERVER_ARCHITECTURE_V0_1.md) and tracked by [issue #14189](https://github.com/Luminous-Dynamics/symthaea/issues/14189). It specifies a separate host-side observer, independently provisioned trust roots, signed resource/state measurements, nonce/replay handling and fresh-environment verification. This is a design proposal; no observer signature or runner attestation is implemented by the current v0.1 evaluator.
+
+
 The standalone adapter evaluator deliberately distinguishes **contract consistency** from **independent qualification**.
 
 A system observation can currently be adapter-submitted JSON. Fields such as `verifier.independent`, resource usage, state mutation count, network bytes, and replay digests are therefore claims, not trusted measurements. The evaluator checks that these claims are structurally valid and mutually consistent, but v0.1 has no separately trusted observer, signed meter receipt, or independent state-reconciliation channel.
