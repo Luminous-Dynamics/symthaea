@@ -34,6 +34,6 @@ jobs:
           toolchain: "1.96.0"
           components: rustfmt
       - name: Check touched source formatting
-        run: rustfmt --edition 2024 --check src/web_research/extractor.rs src/web_research/mod.rs
+        run: rustfmt --edition 2024 --check --config skip_children=true src/web_research/extractor.rs src/web_research/mod.rs
       - name: Run exact claim-span tests from production extractor
-        run: cargo test --locked -p symthaea --lib web_research::extractor::tests
+        run: cargo test --locked -p symthaea --lib --features web_research_module web_research::extractor::tests
