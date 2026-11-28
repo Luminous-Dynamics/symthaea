@@ -16,6 +16,7 @@
 
 use std::collections::BTreeSet;
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 fn put_bytes(hasher: &mut Sha256, bytes: &[u8]) {
@@ -54,7 +55,8 @@ fn nonempty(value: &str, max_len: usize) -> bool {
     !value.trim().is_empty() && value.len() <= max_len
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PreferenceInfluenceModeV1 {
     Ignore,
     Support,
@@ -71,7 +73,8 @@ impl PreferenceInfluenceModeV1 {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PreferenceInfluenceSelectionV1 {
     pub selection_id: String,
     pub run_id: String,
@@ -216,52 +219,87 @@ fn selection_digest(selection: &PreferenceInfluenceSelectionV1) -> String {
     digest_hex(hasher)
 }
 
+fn validate_selection_fields(
+    selection: &PreferenceInfluenceSelectionV1,
+) -> Result<(), PreferenceExposureRejectV1> {
+    if !nonempty(&selection.selection_id, 128)
+        || !nonempty(&selection.run_id, 128)
+        || !nonempty(&selection.episode_id, 128)
+        || !nonempty(&selection.subject_id, 256)
+        || !nonempty(&selection.scope_id, 256)
+        || !nonempty(&selection.purpose_id, 128)
+        || !nonempty(&selection.audience_id, 256)
+        || !lower_sha256(&selection.decision_policy_sha256)
+        || !lower_sha256(&selection.selection_authority_receipt_sha256)
+        || selection.preference_ids.is_empty()
+        || selection.valid_at_ms < 0
+        || selection.known_at_ms < 0
+        || selection.valid_from_ms < 0
+        || selection.known_from_ms < 0
+        || selection.valid_from_ms > selection.valid_at_ms
+        || selection.valid_until_ms.is_some_and(|end| {
+            end <= selection.valid_at_ms || end <= selection.valid_from_ms
+        })
+        || selection.known_from_ms > selection.known_at_ms
+        || selection.known_until_ms.is_some_and(|end| {
+            end <= selection.known_at_ms || end <= selection.known_from_ms
+        })
+    {
+        return Err(PreferenceExposureRejectV1::InvalidSelection);
+    }
+    if selection.preference_ids.iter().any(|id| !nonempty(id, 256))
+        || selection.preference_ids.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(PreferenceExposureRejectV1::InvalidPreferenceIdSet);
+    }
+    match (
+        selection.mode,
+        selection.dominant_preference_authority_receipt_sha256.as_deref(),
+    ) {
+        (PreferenceInfluenceModeV1::Dominate, Some(value)) if lower_sha256(value) => {}
+        (PreferenceInfluenceModeV1::Dominate, _) => {
+            return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
+        }
+        (_, None) => {}
+        (_, Some(_)) => return Err(PreferenceExposureRejectV1::InvalidSelection),
+    }
+    Ok(())
+}
+
 impl PreferenceInfluenceSelectionV1 {
     pub fn seal_integrity(
         mut self,
     ) -> Result<Self, PreferenceExposureRejectV1> {
-        if !nonempty(&self.selection_id, 128)
-            || !nonempty(&self.run_id, 128)
-            || !nonempty(&self.episode_id, 128)
-            || !nonempty(&self.subject_id, 256)
-            || !nonempty(&self.scope_id, 256)
-            || !nonempty(&self.purpose_id, 128)
-            || !nonempty(&self.audience_id, 256)
-            || !lower_sha256(&self.decision_policy_sha256)
-            || !lower_sha256(&self.selection_authority_receipt_sha256)
-            || self.preference_ids.is_empty()
-            || self.valid_from_ms > self.valid_at_ms
-            || self.valid_until_ms.is_some_and(|end| self.valid_at_ms >= end)
-            || self.known_from_ms > self.known_at_ms
-            || self.known_until_ms.is_some_and(|end| self.known_at_ms >= end)
-        {
-            return Err(PreferenceExposureRejectV1::InvalidSelection);
-        }
-        if self.preference_ids.iter().any(|id| !nonempty(id, 256))
-            || self.preference_ids.windows(2).any(|pair| pair[0] >= pair[1])
-        {
-            return Err(PreferenceExposureRejectV1::InvalidPreferenceIdSet);
-        }
-        match (self.mode, self.dominant_preference_authority_receipt_sha256.as_deref()) {
-            (PreferenceInfluenceModeV1::Dominate, Some(value)) if lower_sha256(value) => {}
-            (PreferenceInfluenceModeV1::Dominate, _) => {
-                return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
-            }
-            (_, None) => {}
-            (_, Some(_)) => return Err(PreferenceExposureRejectV1::InvalidSelection),
-        }
+        validate_selection_fields(&self)?;
         self.canonical_sha256.clear();
         self.canonical_sha256 = selection_digest(&self);
         Ok(self)
     }
 
     pub fn verify_integrity(&self) -> bool {
-        lower_sha256(&self.canonical_sha256)
+        validate_selection_fields(self).is_ok()
+            && lower_sha256(&self.canonical_sha256)
             && self.canonical_sha256 == selection_digest(self)
+    }
+
+    pub fn to_json_value(&self) -> Result<serde_json::Value, PreferenceExposureRejectV1> {
+        serde_json::to_value(self).map_err(|_| PreferenceExposureRejectV1::SerializationFailure)
+    }
+
+    pub fn from_json_value(
+        value: serde_json::Value,
+    ) -> Result<Self, PreferenceExposureRejectV1> {
+        let selection: Self = serde_json::from_value(value)
+            .map_err(|_| PreferenceExposureRejectV1::SerializationFailure)?;
+        if !selection.verify_integrity() {
+            return Err(PreferenceExposureRejectV1::SelectionIntegrityMismatch);
+        }
+        Ok(selection)
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ContextMemorySourceV1 {
     pub memory_item_id: String,
     /// Empty means ordinary memory, not a selected preference.
@@ -271,7 +309,8 @@ pub struct ContextMemorySourceV1 {
     pub transformation_chain_sha256: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ContextMemorySpanV1 {
     pub span_id: String,
     pub byte_start: usize,
@@ -281,7 +320,8 @@ pub struct ContextMemorySpanV1 {
     pub sources: Vec<ContextMemorySourceV1>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ContextExposureManifestV1 {
     pub manifest_id: String,
     pub run_id: String,
@@ -371,8 +411,24 @@ impl ContextExposureManifestV1 {
     }
 
     pub fn verify_integrity(&self) -> bool {
-        self.canonical_sha256 == manifest_digest(self)
+        validate_manifest_fields(self).is_ok()
+            && self.canonical_sha256 == manifest_digest(self)
             && lower_sha256(&self.canonical_sha256)
+    }
+
+    pub fn to_json_value(&self) -> Result<serde_json::Value, PreferenceExposureRejectV1> {
+        serde_json::to_value(self).map_err(|_| PreferenceExposureRejectV1::SerializationFailure)
+    }
+
+    pub fn from_json_value(
+        value: serde_json::Value,
+    ) -> Result<Self, PreferenceExposureRejectV1> {
+        let manifest: Self = serde_json::from_value(value)
+            .map_err(|_| PreferenceExposureRejectV1::SerializationFailure)?;
+        if !manifest.verify_integrity() {
+            return Err(PreferenceExposureRejectV1::ManifestIntegrityMismatch);
+        }
+        Ok(manifest)
     }
 }
 
@@ -488,6 +544,7 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
     provider_request_bytes: &[u8],
     verifier: &V,
 ) -> Result<VerifiedPreferenceExposureV1, PreferenceExposureRejectV1> {
+    validate_selection_fields(selection)?;
     if !selection.verify_integrity() {
         return Err(PreferenceExposureRejectV1::SelectionIntegrityMismatch);
     }
@@ -1026,6 +1083,42 @@ mod tests {
             &trusted_verifier(),
         ).unwrap();
         assert!(verified.preference_was_exposed("pref:outreach"));
+    }
+
+    #[test]
+    fn selection_and_manifest_json_round_trip_reject_unknown_fields() {
+        let selection = selection(PreferenceInfluenceModeV1::Ignore);
+        let value = selection.to_json_value().unwrap();
+        let restored = PreferenceInfluenceSelectionV1::from_json_value(value.clone()).unwrap();
+        assert_eq!(restored, selection);
+
+        let mut unknown = value;
+        unknown.as_object_mut().unwrap().insert(
+            "unreviewed_authority".into(),
+            serde_json::Value::Bool(true),
+        );
+        assert_eq!(
+            PreferenceInfluenceSelectionV1::from_json_value(unknown),
+            Err(PreferenceExposureRejectV1::SerializationFailure)
+        );
+
+        let context = b"request";
+        let request = b"{\"input\":\"request\"}";
+        let manifest = manifest(&selection, context, request, vec![]);
+        let manifest_value = manifest.to_json_value().unwrap();
+        let restored_manifest =
+            ContextExposureManifestV1::from_json_value(manifest_value).unwrap();
+        assert_eq!(restored_manifest, manifest);
+    }
+
+    #[test]
+    fn negative_bitemporal_times_are_rejected_before_sealing() {
+        let mut invalid = selection(PreferenceInfluenceModeV1::Ignore);
+        invalid.valid_at_ms = -1;
+        assert_eq!(
+            invalid.seal_integrity(),
+            Err(PreferenceExposureRejectV1::InvalidSelection)
+        );
     }
 
     #[test]
