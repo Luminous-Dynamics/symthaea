@@ -747,6 +747,144 @@ mod tests {
     }
 
     #[test]
+    fn exact_markov_enumeration_supports_history_adaptive_predictable_audits() {
+        // A two-state Markov outcome process is temporally dependent:
+        // P(Y[t+1]=1 | Y[t]=0)=0.2 and P(Y[t+1]=1 | Y[t]=1)=0.8.
+        // The audit probability is chosen from the last *observed* label
+        // before the current outcome: q=0.9 initially, q=0.8 after label 0,
+        // and q=0.95 after label 1. Thus q_t is predictable and independent
+        // of the current hidden Y_t conditional on the public history.
+        const HORIZON: usize = 8;
+        let mut cfg = config(0.8);
+        cfg.delta = 0.5;
+        cfg.target_risk = 0.5;
+        cfg.threshold_grid = vec![0.5, 1.0];
+        let per_threshold_delta = cfg.delta / cfg.threshold_grid.len() as f64;
+
+        fn enumerate(
+            time: usize,
+            probability: f64,
+            current_risk: f64,
+            last_observed_label: Option<bool>,
+            accumulated_risk: f64,
+            observations: &mut Vec<SowrcObservation>,
+            config: &SowrcConfig,
+            total_probability: &mut f64,
+            failure_probability: &mut f64,
+            nontrivial_probability: &mut f64,
+        ) {
+            if time == HORIZON {
+                *total_probability += probability;
+                let report = evaluate_sowrc(observations, config).unwrap();
+                let bound = report.threshold_bounds[0].upper_risk_bound;
+                let true_predictable_risk = accumulated_risk / HORIZON as f64;
+                if true_predictable_risk > bound + 1e-12 {
+                    *failure_probability += probability;
+                }
+                if bound < 1.0 {
+                    *nontrivial_probability += probability;
+                }
+                return;
+            }
+
+            let q = match last_observed_label {
+                None => 0.9,
+                Some(false) => 0.8,
+                Some(true) => 0.95,
+            };
+
+            // No label observed: update the Markov belief by one transition.
+            observations.push(SowrcObservation {
+                sequence_number: time,
+                record_id: format!("event-{time}"),
+                inclusion_probability: q,
+                label_observed: false,
+                true_label_nonconformity: None,
+            });
+            enumerate(
+                time + 1,
+                probability * (1.0 - q),
+                0.2 + 0.6 * current_risk,
+                last_observed_label,
+                accumulated_risk + current_risk,
+                observations,
+                config,
+                total_probability,
+                failure_probability,
+                nontrivial_probability,
+            );
+            observations.pop();
+
+            // Audit observes Y_t=0; the candidate assigns p(0)=0.9 so r=0.1.
+            observations.push(SowrcObservation {
+                sequence_number: time,
+                record_id: format!("event-{time}"),
+                inclusion_probability: q,
+                label_observed: true,
+                true_label_nonconformity: Some(0.1),
+            });
+            enumerate(
+                time + 1,
+                probability * q * (1.0 - current_risk),
+                0.2,
+                Some(false),
+                accumulated_risk + current_risk,
+                observations,
+                config,
+                total_probability,
+                failure_probability,
+                nontrivial_probability,
+            );
+            observations.pop();
+
+            // Audit observes Y_t=1; the candidate assigns p(1)=0.1 so r=0.9.
+            observations.push(SowrcObservation {
+                sequence_number: time,
+                record_id: format!("event-{time}"),
+                inclusion_probability: q,
+                label_observed: true,
+                true_label_nonconformity: Some(0.9),
+            });
+            enumerate(
+                time + 1,
+                probability * q * current_risk,
+                0.8,
+                Some(true),
+                accumulated_risk + current_risk,
+                observations,
+                config,
+                total_probability,
+                failure_probability,
+                nontrivial_probability,
+            );
+            observations.pop();
+        }
+
+        let mut total_probability = 0.0;
+        let mut failure_probability = 0.0;
+        let mut nontrivial_probability = 0.0;
+        enumerate(
+            0,
+            1.0,
+            0.3,
+            None,
+            0.0,
+            &mut Vec::new(),
+            &cfg,
+            &mut total_probability,
+            &mut failure_probability,
+            &mut nontrivial_probability,
+        );
+
+        assert!((total_probability - 1.0).abs() < 1e-10);
+        assert!(nontrivial_probability > 0.0);
+        assert!(
+            failure_probability <= per_threshold_delta + 1e-12,
+            "Markov/adaptive-audit failure probability {failure_probability} exceeded {per_threshold_delta}"
+        );
+    }
+
+    #[test]
     fn scores_equal_to_lambda_are_not_miscovered() {
         let mut cfg = config(1.0);
         cfg.threshold_grid = vec![0.5, 1.0];
