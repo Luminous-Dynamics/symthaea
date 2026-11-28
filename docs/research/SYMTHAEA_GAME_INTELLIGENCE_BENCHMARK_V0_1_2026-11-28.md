@@ -476,7 +476,7 @@ The standalone Rust research crate now contains deterministic environment fixtur
 | F5 Resource chain | Scarce gatherable piles, typed recipes, workbench, acyclic recipe dependency validation, depletion and private exact planner | Zero resource pile, recipe cycle, missing station/input, depleted pile cannot be gathered |
 | F6 Hidden mechanics | Two rule variants with identical initial observations; paid lever intervention; route determined by the revealed gate state | No-probe negative control, action budget, single-use switch, hidden rule omitted from observations and debug output |
 
-The current branch contains **41 authored Rust unit tests** across F1–F6. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
+The current branch contains **58 authored Rust unit tests** across F1–F6, candidate output validation, policy baselines, and the evaluator-owned F1 runner. Test count is a source inventory only: it is not a test pass. A dedicated GitHub Actions workflow is configured for formatting, tests, and strict Clippy. No local Rust toolchain is available in the current work environment, and no exact-head CI result is claimed until that workflow completes.
 
 ### 15.1 Important implementation boundary
 
@@ -628,3 +628,43 @@ Then perform:
 - matched ablations of HDC encoding, HDC-LTC evolution, and FEP belief updates.
 
 This is the point where Symthaea can test whether the components contribute additive or synergistic benefit instead of assuming that architectural labels imply capability.
+
+
+## 18. First paired F1 evaluation harness — 28 November 2026
+
+An evaluator-owned F1 runner is now implemented in the core research crate as `evaluate_f1(spec, candidate)`.
+
+The runner:
+- calls the candidate's no-seed `reset()`;
+- passes only full-map F1 observations, four offered action attempts, remaining action budget and step count;
+- validates each candidate decision before applying it;
+- returns the next candidate-visible observation as transition feedback;
+- records the full environment event trace for independent replay;
+- computes the exact shortest-path reference privately and reports only optimal action count / excess action count;
+- records per-decision latency separately from complete episode wall time;
+- separates environment task success from candidate protocol validity.
+
+### 18.1 Paired comparison executable
+
+The adapter workspace now includes `examples/paired_f1.rs`. It compares five policy arms on identical per-seed maps:
+1. seeded random legal;
+2. greedy Manhattan;
+3. spatial HDC using actual `ContinuousHV`;
+4. HDC-LTC using actual `HdcLtcUnifiedNeuron`;
+5. FEP using actual `ActiveInferenceAgent`.
+
+The harness generates 16 deterministic 7×7 layouts from hidden-to-candidate map seeds, each with a carved valid route and random branches/dead ends. Every policy is evaluated on the same map cohort. Per-episode output includes task success, candidate protocol validity, actions, optimal actions, excess actions, p50/p95 candidate decision latency, and episode wall time. Aggregate output reports success and protocol-valid rates, mean actions, mean excess actions among successful episodes, and decision/episode latency summaries.
+
+Run from the adapter workspace:
+
+```sh
+cargo run --release --example paired_f1
+```
+
+### 18.2 Claim boundary for this first campaign
+
+This is an executable smoke/pilot harness, **not a completed experiment result**. The 16 related generated layouts do not establish broad generalization or independent task-family coverage. No campaign has been executed in this environment; there is no Rust toolchain here. The focused workflows must first pass on the exact current head, after which the harness can be run with source/config/seed receipts preserved.
+
+The exact BFS reference is used only inside the evaluator. Candidates never receive the oracle route or path values. The harness does not yet capture calibrated physical energy or peak resident memory, and its latency values are local process wall-clock measurements rather than hardware-independent claims.
+
+Before a competitive claim, expand the held-out map families, freeze the generator and candidate configs, use paired cluster-aware uncertainty, publish every failed/incomplete episode, and independently replay the result capsule. This pilot should first be used to discover engineering defects and establish realistic baselines, not to claim SOTA.
