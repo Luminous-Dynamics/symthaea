@@ -15,7 +15,13 @@ pub mod calibration;
 pub mod change_blindness;
 pub mod feeling_of_knowing;
 pub mod selective_prediction;
+pub mod selective_prediction_task;
 
 pub use calibration::MetacognitiveCalibrationBenchmark;
 pub use change_blindness::ChangeBlindnessBenchmark;
 pub use feeling_of_knowing::FeelingOfKnowingBenchmark;
+
+pub use selective_prediction_task::{
+    SelectivePredictionBaseline, SelectivePredictionTaskReport,
+    run_reference_suite as run_selective_prediction_reference_suite,
+};
