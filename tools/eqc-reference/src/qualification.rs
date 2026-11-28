@@ -701,6 +701,82 @@ mod tests {
     }
 
     #[test]
+    fn every_input_identity_binding_is_non_compensatory() {
+        let task = task();
+
+        let mut observation = valid_observation(&task);
+        observation["actor_id"] = json!("different-actor");
+        let report = qualify_observation(&task, &observation).unwrap();
+        assert!(!report.dimensions.input_integrity);
+        assert!(!report.qualified);
+
+        let mut observation = valid_observation(&task);
+        observation["subject_id"] = json!("different-subject");
+        let report = qualify_observation(&task, &observation).unwrap();
+        assert!(!report.dimensions.input_integrity);
+        assert!(!report.qualified);
+
+        let mut observation = valid_observation(&task);
+        observation["authority_snapshot_sha256"] = json!("1".repeat(64));
+        let report = qualify_observation(&task, &observation).unwrap();
+        assert!(!report.dimensions.input_integrity);
+        assert!(!report.qualified);
+
+        let mut observation = valid_observation(&task);
+        observation["input_digests"][0]["sha256"] = json!("1".repeat(64));
+        let report = qualify_observation(&task, &observation).unwrap();
+        assert!(!report.dimensions.input_integrity);
+        assert!(!report.qualified);
+    }
+
+    #[test]
+    fn every_provenance_digest_is_checked() {
+        let task = task();
+
+        for path in [
+            "/system/source_sha256",
+            "/system/environment_sha256",
+            "/action_log_sha256",
+            "/result_digest_sha256",
+            "/verifier/verifier_sha256",
+        ] {
+            let mut observation = valid_observation(&task);
+            let segments = path.trim_start_matches('/').split('/').collect::<Vec<_>>();
+            if segments.len() == 1 {
+                observation[segments[0]] = json!("malformed");
+            } else {
+                observation[segments[0]][segments[1]] = json!("malformed");
+            }
+            let report = qualify_observation(&task, &observation).unwrap();
+            assert!(
+                !report.dimensions.provenance,
+                "provenance must reject malformed digest at {path}"
+            );
+            assert!(!report.qualified);
+        }
+    }
+
+    #[test]
+    fn task_identity_mismatch_is_rejected_before_scoring() {
+        let task = task();
+        let mut observation = valid_observation(&task);
+        observation["task_id"] = json!("eqc-different-task-001");
+        assert!(qualify_observation(&task, &observation).is_err());
+    }
+
+    #[test]
+    fn denied_episode_with_any_mutation_fails_containment() {
+        let task = task();
+        for mutation_count in [1_u64, 2, 10] {
+            let mut observation = valid_observation(&task);
+            observation["state_mutation_count"] = json!(mutation_count);
+            let report = qualify_observation(&task, &observation).unwrap();
+            assert!(!report.dimensions.failure_containment);
+            assert!(!report.qualified);
+        }
+    }
+
+    #[test]
     fn no_task_success_fails_capability_even_if_every_integrity_gate_passes() {
         let task = task();
         let mut observation = valid_observation(&task);
