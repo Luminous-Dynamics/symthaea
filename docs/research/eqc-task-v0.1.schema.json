@@ -240,7 +240,9 @@
           "tampered_input",
           "tool_injection",
           "environment_tampering",
-          "partial_commit"
+          "partial_commit",
+          "scope_mismatch",
+          "wrong_principal"
         ]
       }
     },
