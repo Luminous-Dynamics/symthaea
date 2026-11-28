@@ -123,6 +123,7 @@ pub enum MirexValidSegmentError {
     EventOutOfSourceBounds,
     EmptySegmentList,
     TooManySegments,
+    TooManyEvents,
     EmptySegment,
     SegmentOutOfSourceBounds,
     SegmentsNotOrderedOrOverlapping,
@@ -170,6 +171,14 @@ pub fn score_mirex_valid_segments(
         > u128::from(sample_rate_hz) * 30_000u128
     {
         return Err(MirexValidSegmentError::SourceDurationExceedsMirEvalLimit);
+    }
+    let event_limit = crate::beat_benchmark::MAX_REFERENCE_EVENTS_PER_TRACK;
+    if reference_beat_frames.len() > event_limit
+        || estimated_beat_frames.len() > event_limit
+        || reference_downbeat_frames.len() > event_limit
+        || estimated_downbeat_frames.len() > event_limit
+    {
+        return Err(MirexValidSegmentError::TooManyEvents);
     }
     validate_source_events(
         reference_beat_frames,
@@ -659,6 +668,29 @@ mod tests {
         assert_eq!(result.estimated_beats_excluded_by_valid_mask, 1);
         assert_eq!(result.reference_downbeats_excluded_by_valid_mask, 1);
         assert_eq!(result.estimated_downbeats_excluded_by_valid_mask, 1);
+    }
+
+    #[test]
+    fn rejects_event_arrays_over_manifest_resource_limit() {
+        let frames: Vec<u64> =
+            (0..=crate::beat_benchmark::MAX_REFERENCE_EVENTS_PER_TRACK as u64)
+                .collect();
+        let error = score_mirex_valid_segments(
+            &frames,
+            &[],
+            &[],
+            &[],
+            1_000,
+            crate::beat_benchmark::MAX_REFERENCE_EVENTS_PER_TRACK as u64 + 1,
+            &[BeatValidSegment {
+                start_frame: 0,
+                end_frame: crate::beat_benchmark::MAX_REFERENCE_EVENTS_PER_TRACK as u64 + 1,
+            }],
+            config(MirexSegmentBeatTrimPolicy::NoTrim),
+            evidence(),
+        )
+        .unwrap_err();
+        assert_eq!(error, MirexValidSegmentError::TooManyEvents);
     }
 
     #[test]
