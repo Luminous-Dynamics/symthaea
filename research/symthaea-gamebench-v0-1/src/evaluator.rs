@@ -21,7 +21,7 @@ pub struct F1DecisionRecord {
     pub forecasts: Vec<FeatureForecast>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct F1EpisodeReport {
     /// Environment-computed task outcome, independent of candidate protocol status.
     pub success: bool,
