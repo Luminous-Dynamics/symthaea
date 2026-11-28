@@ -394,7 +394,10 @@ fn test_is_surprised() {
 
     // Check surprise status
     let surprised = agent.is_surprised();
-    assert!(!surprised, "A neutral initial observation should not trigger surprise");
+    assert!(
+        !surprised,
+        "A neutral initial observation should not trigger surprise"
+    );
 }
 
 #[test]
