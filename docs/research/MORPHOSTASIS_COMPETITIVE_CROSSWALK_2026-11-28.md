@@ -248,6 +248,10 @@ Partial observation, uncertain damage and costly diagnostics. The controller can
 8. Symthaea candidates: HDC only; temporal dynamics only; HDC × CfC/LTC; adaptive graph/communication only where a real implementation exists; full combination only after individual arms qualify.
 9. Centralized MPC/optimizer or exact solver as an explicitly labelled upper bound, not a peer distributed baseline.
 10. Random, no-memory, no-remapping, no-slow-channel, fixed-topology, shuffled-channel and target-blind controls.
+11. TOPO-ADAPT tournament: fixed topology, weight-only adaptation, local greedy repair, fixed-topology distributed routing, adaptive edge editing and degree-matched random rewiring.
+12. GNN communication rewiring: Delaunay/dynamic triangulation, spectral-gap/FOSR or expander-inspired augmentation, curvature/effective-resistance ranking, spectrum-preserving sparsification and virtual-node/hub shortcuts. These are message-propagation baselines, not capacity-aware service policies.
+13. Resilience-based topology/capacity design: exact MILP or max-flow/min-cost upper bound on small cases, plus PSDA-style stochastic design and GA where the online-available early-access study's objective/constraints and artifacts can be reconciled.
+14. One-step candidate-sweep oracle: full-visibility evaluation of no edit and all allowed single-edge edits, maximizing served flow then minimizing edit/maintenance cost. Upper bound only, not a decentralized or learned controller.
 
 Every baseline receives the same observable inputs and target-memory privileges. Report both parameter-matched and work/communication-matched comparisons when both cannot be satisfied simultaneously.
 
