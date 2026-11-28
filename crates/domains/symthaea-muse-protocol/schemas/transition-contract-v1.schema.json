@@ -75,12 +75,12 @@
         "start_frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         },
         "end_frame": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         }
       }
     },
@@ -110,7 +110,7 @@
         "total_frames": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 18446744073709552000
+          "maximum": 9007199254740991
         }
       }
     },
@@ -240,8 +240,8 @@
         },
         "beat_ordinal_milli": {
           "type": "integer",
-          "minimum": -9223372036854776000,
-          "maximum": 9223372036854776000
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "confidence_ppm": {
           "type": "integer",
