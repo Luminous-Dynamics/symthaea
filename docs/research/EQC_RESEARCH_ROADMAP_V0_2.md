@@ -125,3 +125,14 @@ Initial acceptance: zero mismatches on the analytic/frozen deterministic corpus;
 ## 10. Definition of a meaningful win
 
 A meaningful win is not a higher number on a narrow public leaderboard. It is a reproducible improvement in qualified capability: more valid tasks completed, fewer unsafe or unauthorized actions, better-calibrated abstention, stronger independent replay, lower cost, and no hidden weakening of task validity or controls.
+
+
+## 11. Reference literature and specifications
+
+These are comparison references, not endorsements or evidence that Symthaea has achieved their reported results.
+
+- [NIST: Methods of Uncertainty Quantification in Computational Modeling and Simulation](https://www.nist.gov/publications/methods-uncertainty-quantification-computational-modeling-and-simulation-harmonizing) (2026): risk-based credibility assessment harmonizing computational-model UQ and metrology.
+- [SLSA Build Provenance v1.2](https://slsa.dev/spec/v1.2/build-provenance): machine-readable description of where, when and how an artifact was produced.
+- [OSWorld 2.0](https://arxiv.org/abs/2606.29537) (2026): long-horizon computer-use workflows, including cross-source reasoning, implicit state, and stateful task completion.
+- [ManiSkill3, Robotics: Science and Systems 2025](https://www.roboticsproceedings.org/rss21/p021.pdf): GPU-parallelized, contact-rich robotics simulation for generalizable manipulation.
+- [ManiSkill performance benchmarking methodology](https://maniskill.readthedocs.io/en/latest/user_guide/additional_resources/performance_benchmarking.html): useful reminder that simulator speed comparisons are workload- and hardware-dependent.
