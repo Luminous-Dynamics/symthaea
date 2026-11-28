@@ -753,7 +753,7 @@ fn hash_optional_u16(hasher: &mut blake3::Hasher, value: Option<u16>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Accounting, DemandSchedule, Node};
+    use crate::{evaluate_episode, Accounting, DemandSchedule, Intervention, Node};
 
     fn edge(
         id: Option<&str>,
@@ -901,6 +901,23 @@ mod tests {
             .active_edges()
             .iter()
             .any(|edge| edge.id.as_deref() == Some("route_c_out") && edge.capacity == 4));
+    }
+
+    #[test]
+    fn static_snapshot_evaluator_cannot_fail_a_runtime_created_edge() {
+        let (mut episode, semantics) = episode();
+        episode.interventions.push(Intervention {
+            time: 2,
+            kind: "edge_capacity_failure".to_string(),
+            from: Some(2),
+            to: Some(3),
+            capacity_after: Some(0),
+        });
+
+        // Route B would exist only after a prior controller action. The v0.1
+        // snapshot evaluator validates interventions against the original
+        // active-edge set and therefore cannot express this later failure.
+        assert!(evaluate_episode(&episode, &semantics, 2, &["route_b_out"]).is_err());
     }
 
     #[test]
