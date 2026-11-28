@@ -97,22 +97,27 @@ impl FiniteEnumeratorBaseline {
         }
         let report = numeric::discover(&log, access)
             .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?;
+        let challenge_complete = next_unobserved_numeric_input(&log).is_none();
         if view.remaining_probe_actions == 0
-            || report.compatible_models.is_empty()
-            || next_unobserved_numeric_input(&log).is_none()
+            || ((report.compatible_models.is_empty() || report.compatible_models.len() == 1)
+                && challenge_complete)
         {
             return Ok(submit(
                 view,
                 AgentClaim::Numeric {
                     disposition: disposition_with_adequacy(
                         report.compatible_models.len(),
-                        next_unobserved_numeric_input(&log).is_none(),
+                        challenge_complete,
                     ),
                     compatible_models: report.compatible_models,
                 },
             ));
         }
-        if report.compatible_models.len() == 1 {
+        // If the declared candidate set has been falsified, continue the
+        // finite intervention sweep before concluding that the grammar is
+        // inadequate. A zero-sized version space is not a reason to stop
+        // observing while part of the declared challenge domain remains.
+        if report.compatible_models.is_empty() || report.compatible_models.len() == 1 {
             if let Some(value) = next_unobserved_numeric_input(&log) {
                 return Ok(probe(AgentIntervention::Numeric(value)));
             }
@@ -260,10 +265,10 @@ impl StrategyEnumeratorBaseline {
                         .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?
                         .compatible_models
                 };
+                let challenge_complete = next_unobserved_numeric_input(&log).is_none();
                 if !log.interventions.is_empty()
                     && (view.remaining_probe_actions == 0
-                        || models.is_empty()
-                        || (models.len() == 1 && next_unobserved_numeric_input(&log).is_none()))
+                        || ((models.is_empty() || models.len() == 1) && challenge_complete))
                 {
                     let count = models.len();
                     return Ok((
@@ -271,16 +276,13 @@ impl StrategyEnumeratorBaseline {
                             view,
                             AgentClaim::Numeric {
                                 compatible_models: models,
-                                disposition: disposition_with_adequacy(
-                                    count,
-                                    next_unobserved_numeric_input(&log).is_none(),
-                                ),
+                                disposition: disposition_with_adequacy(count, challenge_complete),
                             },
                         ),
                         ProbeScoringWork::default(),
                     ));
                 }
-                if models.len() == 1 {
+                if models.is_empty() || models.len() == 1 {
                     if let Some(input) = next_unobserved_numeric_input(&log) {
                         return Ok((
                             probe(AgentIntervention::Numeric(input)),
@@ -305,10 +307,10 @@ impl StrategyEnumeratorBaseline {
                         .map_err(|error| PolicyError::DiscoveryFailure(error.to_string()))?
                         .compatible_models
                 };
+                let challenge_complete = next_unobserved_interaction_input(&log).is_none();
                 if !log.interventions.is_empty()
                     && (view.remaining_probe_actions == 0
-                        || models.is_empty()
-                        || (models.len() == 1 && next_unobserved_interaction_input(&log).is_none()))
+                        || ((models.is_empty() || models.len() == 1) && challenge_complete))
                 {
                     let count = models.len();
                     return Ok((
@@ -316,16 +318,13 @@ impl StrategyEnumeratorBaseline {
                             view,
                             AgentClaim::Interaction {
                                 compatible_models: models,
-                                disposition: disposition_with_adequacy(
-                                    count,
-                                    next_unobserved_interaction_input(&log).is_none(),
-                                ),
+                                disposition: disposition_with_adequacy(count, challenge_complete),
                             },
                         ),
                         ProbeScoringWork::default(),
                     ));
                 }
-                if models.len() == 1 {
+                if models.is_empty() || models.len() == 1 {
                     if let Some(input) = next_unobserved_interaction_input(&log) {
                         return Ok((
                             probe(AgentIntervention::Pair(input)),
