@@ -163,3 +163,55 @@ These should be separate benchmark tracks with their own contracts and denominat
 ## 11. Claim boundary
 
 This document is a design specification. It adds no executable verifier, environment adapter, cryptographic implementation, test result, benchmark score, or safety certification. The exact F6 source path and API must be inspected before implementation. All proposed gates remain unqualified until run against exact source heads with reproducible receipts.
+
+
+## 12. New benchmark primitive: decision-distinguishability frontier
+
+The next conceptual advance is to measure not only whether a candidate chooses a useful experiment, but the minimum intervention burden required to make a decision safe.
+
+For each evaluator-defined finite world support, construct a **decision-equivalence quotient**: worlds belong to the same class when their terminal optimal-action sets share the relevant common action under the declared loss contract. Mechanism distinctions inside one decision-equivalence class are not automatically worth resolving.
+
+Define the **Decision-Sufficient Experiment Cost (DSEC)** as the minimum cost of an admissible intervention policy that reaches a belief/support state with at least one common optimal terminal action. Report two versions:
+
+- **Prior-free robust DSEC:** minimize worst-case cumulative cost over all admissible outcomes and compatible worlds; use when only a support set is defensible.
+- **Bayesian expected DSEC:** minimize expected cumulative cost under a preregistered, defensible prior and likelihood model.
+
+The finite-horizon policy oracle may calculate these values for evaluator analysis, but it is not a learned competitor and must not leak its policy or hidden state to candidates.
+
+Candidate reporting should include:
+- realized intervention cost / robust DSEC (where denominator is nonzero);
+- excess cost above the oracle lower bound;
+- probability or worst-case guarantee of reaching a decision-sufficient support state;
+- decision regret if the candidate stops before reaching one;
+- unnecessary mechanism-resolution cost after action equivalence is already established.
+
+This creates a principled target for the central claim: **minimum sufficient causal investigation**, not maximum information acquisition. It also provides a way to compare active causal discovery methods whose graph-F1 scores are not comparable to game outcomes.
+
+## 13. Multi-objective qualification, not a single leaderboard scalar
+
+Publish the primary result as a Pareto frontier over:
+
+1. terminal decision quality (success, expected regret, worst-case regret);
+2. intervention burden (count, time, resource vector, irreversible exposure);
+3. evidence integrity (accepted invalid-event rate, replay agreement, evidence tier);
+4. uncertainty quality (support coverage, false-unique rate, OOD detection, calibration);
+5. transfer (held-out mechanisms, compositions, observation shifts);
+6. systems cost (latency, compute, memory, energy at a declared measurement boundary).
+
+A candidate that improves success by violating an intervention constraint is not a better point on the frontier; it is disqualified for that safety regime. A candidate that improves graph F1 but spends more interventions without improving terminal decisions should not be declared better on decision-sufficiency.
+
+Use lexicographic constraints for hard safety/integrity gates, then Pareto comparison for the remaining objectives. If a scalar is needed for a deployment-specific decision, publish the weights and sensitivity analysis separately; never make that scalar the only benchmark result.
+
+## 14. Stronger research targets
+
+Keep the v0.1 targets in the parent specification as the initial qualification hypothesis. For a mature v1 confirmatory track, investigate these stretch targets (not current results):
+
+- at least 95% correct action on exact action-equivalence controls with zero unnecessary probes after sufficiency is established;
+- at least 90% terminal success on held-out compositional tasks, with worst-family results reported;
+- at least 25% lower intervention burden than the strongest preregistered non-oracle baseline at matched terminal quality, or at least 20% lower regret at matched budget;
+- zero accepted hard safety violations and zero accepted invalid/replayed transitions in the frozen negative-control suite;
+- 100% replay agreement on deterministic fixtures;
+- calibrated coverage of evaluator-compatible world support, with false-unique claims at zero on exact-equivalence controls;
+- report the DSEC gap (actual candidate cost minus the relevant oracle bound) with paired uncertainty intervals.
+
+These stretch targets should be retained only if a pilot power analysis shows that the task count and seed count can distinguish the proposed effect sizes. Do not tune the holdout after inspecting candidate results.
