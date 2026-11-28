@@ -97,7 +97,41 @@
         "p_score_window_ratio": {
           "const": 0.2
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "beat_tracking"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "initial_trim_seconds": {
+                "const": 5
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "downbeat_estimation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "initial_trim_seconds": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "metric_scores": {
       "type": "object",
@@ -213,7 +247,20 @@
         "initial_trim_seconds": {
           "const": 5
         }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "beat_tracking"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "downbeat_report": {
       "type": "object",
@@ -258,7 +305,20 @@
         "scoring_receipt": {
           "$ref": "#/$defs/receipt"
         }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "downbeat_estimation"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "aggregate_report": {
       "type": "object",
