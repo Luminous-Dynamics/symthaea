@@ -306,7 +306,8 @@
         "pulse_anchors",
         "downbeat_anchors",
         "tempo_map",
-        "meter_map"
+        "meter_map",
+        "tempo_interpolation"
       ],
       "properties": {
         "hypothesis_id": {
@@ -342,6 +343,19 @@
           "items": {
             "$ref": "#/$defs/meter_segment"
           }
+        },
+        "tempo_interpolation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "stepwise_constant",
+                "linear_in_frame_time"
+              ]
+            }
+          ]
         }
       }
     }
