@@ -80,6 +80,15 @@ impl PreferenceInfluenceModeV1 {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct PreferenceInfluenceDecisionV1 {
+    pub preference_id: String,
+    pub mode: PreferenceInfluenceModeV1,
+    /// Required only for Dominate; it must be issued by an independent authority.
+    pub dominant_preference_authority_receipt_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PreferenceInfluenceSelectionV1 {
     pub selection_id: String,
     pub run_id: String,
@@ -97,11 +106,10 @@ pub struct PreferenceInfluenceSelectionV1 {
     pub known_until_ms: Option<i64>,
     pub decision_policy_sha256: String,
     pub selection_authority_receipt_sha256: String,
-    pub mode: PreferenceInfluenceModeV1,
-    /// Canonically sorted IDs of the preferences whose influence is being decided.
-    pub preference_ids: Vec<String>,
-    /// Required only for Dominate; it must be issued by an independent authority.
-    pub dominant_preference_authority_receipt_sha256: Option<String>,
+    /// One independently selected influence mode per candidate preference.
+    /// Decisions must be sorted by preference_id and cover every preference
+    /// considered for this model invocation.
+    pub decisions: Vec<PreferenceInfluenceDecisionV1>,
     pub canonical_sha256: String,
 }
 
@@ -119,6 +127,7 @@ pub enum PreferenceExposureRejectV1 {
     InvalidPreferenceIdSet,
     InvalidSourceMapping,
     DuplicateSourceMapping,
+    UnselectedPreferenceWasExposed,
     DuplicateSpan,
     NonCanonicalSpanOrder,
     OverlappingMemorySpans,
@@ -154,6 +163,7 @@ impl PreferenceExposureRejectV1 {
             Self::InvalidPreferenceIdSet => "invalid_preference_id_set",
             Self::InvalidSourceMapping => "invalid_source_mapping",
             Self::DuplicateSourceMapping => "duplicate_source_mapping",
+            Self::UnselectedPreferenceWasExposed => "unselected_preference_was_exposed",
             Self::DuplicateSpan => "duplicate_span",
             Self::NonCanonicalSpanOrder => "non_canonical_span_order",
             Self::OverlappingMemorySpans => "overlapping_memory_spans",
@@ -211,17 +221,17 @@ fn selection_digest(selection: &PreferenceInfluenceSelectionV1) -> String {
         }
         None => hasher.update([0]),
     }
-    hasher.update([selection.mode.code()]);
-    put_u64(&mut hasher, selection.preference_ids.len() as u64);
-    for preference_id in &selection.preference_ids {
-        put_text(&mut hasher, preference_id);
-    }
-    match selection.dominant_preference_authority_receipt_sha256.as_deref() {
-        Some(value) => {
-            hasher.update([1]);
-            put_text(&mut hasher, value);
+    put_u64(&mut hasher, selection.decisions.len() as u64);
+    for decision in &selection.decisions {
+        put_text(&mut hasher, &decision.preference_id);
+        hasher.update([decision.mode.code()]);
+        match decision.dominant_preference_authority_receipt_sha256.as_deref() {
+            Some(value) => {
+                hasher.update([1]);
+                put_text(&mut hasher, value);
+            }
+            None => hasher.update([0]),
         }
-        None => hasher.update([0]),
     }
     digest_hex(hasher)
 }
@@ -238,8 +248,7 @@ fn validate_selection_fields(
         || !nonempty(&selection.audience_id, 256)
         || !lower_sha256(&selection.decision_policy_sha256)
         || !lower_sha256(&selection.selection_authority_receipt_sha256)
-        || selection.preference_ids.is_empty()
-        || selection.preference_ids.len() > MAX_PREFERENCE_IDS_V1
+        || selection.decisions.is_empty()
         || selection.valid_at_ms < 0
         || selection.known_at_ms < 0
         || selection.valid_from_ms < 0
@@ -255,24 +264,28 @@ fn validate_selection_fields(
     {
         return Err(PreferenceExposureRejectV1::InvalidSelection);
     }
-    if selection.preference_ids.len() > MAX_PREFERENCE_IDS_V1 {
+    if selection.decisions.len() > MAX_PREFERENCE_IDS_V1 {
         return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
     }
-    if selection.preference_ids.iter().any(|id| !nonempty(id, 256))
-        || selection.preference_ids.windows(2).any(|pair| pair[0] >= pair[1])
-    {
-        return Err(PreferenceExposureRejectV1::InvalidPreferenceIdSet);
-    }
-    match (
-        selection.mode,
-        selection.dominant_preference_authority_receipt_sha256.as_deref(),
-    ) {
-        (PreferenceInfluenceModeV1::Dominate, Some(value)) if lower_sha256(value) => {}
-        (PreferenceInfluenceModeV1::Dominate, _) => {
-            return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
+    let mut prior_preference_id: Option<&str> = None;
+    for decision in &selection.decisions {
+        if !nonempty(&decision.preference_id, 256)
+            || prior_preference_id.is_some_and(|prior| prior >= decision.preference_id.as_str())
+        {
+            return Err(PreferenceExposureRejectV1::InvalidPreferenceIdSet);
         }
-        (_, None) => {}
-        (_, Some(_)) => return Err(PreferenceExposureRejectV1::InvalidSelection),
+        prior_preference_id = Some(decision.preference_id.as_str());
+        match (
+            decision.mode,
+            decision.dominant_preference_authority_receipt_sha256.as_deref(),
+        ) {
+            (PreferenceInfluenceModeV1::Dominate, Some(value)) if lower_sha256(value) => {}
+            (PreferenceInfluenceModeV1::Dominate, _) => {
+                return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
+            }
+            (_, None) => {}
+            (_, Some(_)) => return Err(PreferenceExposureRejectV1::InvalidSelection),
+        }
     }
     Ok(())
 }
@@ -497,6 +510,7 @@ pub trait ContextExposureVerifierV1 {
     fn verify_dominance_authority(
         &self,
         selection: &PreferenceInfluenceSelectionV1,
+        decision: &PreferenceInfluenceDecisionV1,
     ) -> Result<(), PreferenceExposureRejectV1>;
 
     fn verify_memory_source(
@@ -525,7 +539,7 @@ pub trait ContextExposureVerifierV1 {
 pub struct VerifiedPreferenceExposureV1 {
     selection_id: String,
     manifest_sha256: String,
-    mode: PreferenceInfluenceModeV1,
+    decisions: BTreeMap<String, PreferenceInfluenceModeV1>,
     exposed_preference_ids: BTreeSet<String>,
     preference_span_counts: BTreeMap<String, u64>,
 }
@@ -539,8 +553,8 @@ impl VerifiedPreferenceExposureV1 {
         &self.manifest_sha256
     }
 
-    pub fn mode(&self) -> PreferenceInfluenceModeV1 {
-        self.mode
+    pub fn decision_mode(&self, preference_id: &str) -> Option<PreferenceInfluenceModeV1> {
+        self.decisions.get(preference_id).copied()
     }
 
     pub fn preference_was_exposed(&self, preference_id: &str) -> bool {
@@ -608,13 +622,15 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
     verifier
         .verify_preference_selection(selection)
         .map_err(|_| PreferenceExposureRejectV1::SelectionVerifierRejected)?;
-    if selection.mode == PreferenceInfluenceModeV1::Dominate {
-        if selection.dominant_preference_authority_receipt_sha256.is_none() {
-            return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
+    for decision in &selection.decisions {
+        if decision.mode == PreferenceInfluenceModeV1::Dominate {
+            if decision.dominant_preference_authority_receipt_sha256.is_none() {
+                return Err(PreferenceExposureRejectV1::DominanceAuthorityMissing);
+            }
+            verifier
+                .verify_dominance_authority(selection, decision)
+                .map_err(|_| PreferenceExposureRejectV1::DominanceAuthorityRejected)?;
         }
-        verifier
-            .verify_dominance_authority(selection)
-            .map_err(|_| PreferenceExposureRejectV1::DominanceAuthorityRejected)?;
     }
 
     let context_text = std::str::from_utf8(model_context_bytes)
@@ -706,28 +722,36 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
         .verify_provider_request_capture(manifest, provider_request_bytes, model_context_bytes)
         .map_err(|_| PreferenceExposureRejectV1::ProviderCaptureRejected)?;
 
-    let selected: BTreeSet<&str> = selection.preference_ids.iter().map(String::as_str).collect();
-    let exposed_selected = selected
+    let decisions: BTreeMap<String, PreferenceInfluenceModeV1> = selection
+        .decisions
         .iter()
-        .filter(|preference_id| exposed_preference_ids.contains(**preference_id))
-        .count();
-    match selection.mode {
-        PreferenceInfluenceModeV1::Ignore => {
-            if exposed_selected != 0 {
+        .map(|decision| (decision.preference_id.clone(), decision.mode))
+        .collect();
+    if exposed_preference_ids
+        .iter()
+        .any(|preference_id| !decisions.contains_key(preference_id))
+    {
+        return Err(PreferenceExposureRejectV1::UnselectedPreferenceWasExposed);
+    }
+    for decision in &selection.decisions {
+        let exposed = exposed_preference_ids.contains(&decision.preference_id);
+        match decision.mode {
+            PreferenceInfluenceModeV1::Ignore if exposed => {
                 return Err(PreferenceExposureRejectV1::IgnoredPreferenceWasExposed);
             }
-        }
-        PreferenceInfluenceModeV1::Support | PreferenceInfluenceModeV1::Dominate => {
-            if exposed_selected != selected.len() {
+            PreferenceInfluenceModeV1::Support | PreferenceInfluenceModeV1::Dominate
+                if !exposed =>
+            {
                 return Err(PreferenceExposureRejectV1::RequiredPreferenceNotExposed);
             }
+            _ => {}
         }
     }
 
     Ok(VerifiedPreferenceExposureV1 {
         selection_id: selection.selection_id.clone(),
         manifest_sha256: manifest.canonical_sha256.clone(),
-        mode: selection.mode,
+        decisions,
         exposed_preference_ids,
         preference_span_counts,
     })
@@ -758,10 +782,11 @@ mod tests {
 
         fn verify_dominance_authority(
             &self,
-            selection: &PreferenceInfluenceSelectionV1,
+            _selection: &PreferenceInfluenceSelectionV1,
+            decision: &PreferenceInfluenceDecisionV1,
         ) -> Result<(), PreferenceExposureRejectV1> {
             if self.dominance_authorized
-                && selection.dominant_preference_authority_receipt_sha256
+                && decision.dominant_preference_authority_receipt_sha256
                     == Some(digest_bytes(b"dominance-authority"))
             {
                 Ok(())
@@ -837,10 +862,12 @@ mod tests {
             known_until_ms: Some(1_000),
             decision_policy_sha256: digest(b"policy"),
             selection_authority_receipt_sha256: digest(b"selection-authority"),
-            mode,
-            preference_ids: vec!["pref:outreach".into()],
-            dominant_preference_authority_receipt_sha256: (mode == PreferenceInfluenceModeV1::Dominate)
-                .then(|| digest(b"dominance-authority")),
+            decisions: vec![PreferenceInfluenceDecisionV1 {
+                preference_id: "pref:outreach".into(),
+                mode,
+                dominant_preference_authority_receipt_sha256: (mode == PreferenceInfluenceModeV1::Dominate)
+                    .then(|| digest(b"dominance-authority")),
+            }],
             canonical_sha256: String::new(),
         }
         .seal_integrity()
@@ -939,8 +966,74 @@ mod tests {
             &trusted_verifier(),
         )
         .unwrap();
-        assert_eq!(verified.mode(), PreferenceInfluenceModeV1::Ignore);
+        assert_eq!(verified.decision_mode("pref:outreach"), Some(PreferenceInfluenceModeV1::Ignore));
         assert!(!verified.preference_was_exposed("pref:outreach"));
+    }
+
+    #[test]
+    fn one_invocation_can_ignore_one_preference_and_support_another() {
+        let mut selection = selection(PreferenceInfluenceModeV1::Ignore);
+        selection.decisions = vec![
+            PreferenceInfluenceDecisionV1 {
+                preference_id: "pref:outreach".into(),
+                mode: PreferenceInfluenceModeV1::Ignore,
+                dominant_preference_authority_receipt_sha256: None,
+            },
+            PreferenceInfluenceDecisionV1 {
+                preference_id: "pref:verbosity".into(),
+                mode: PreferenceInfluenceModeV1::Support,
+                dominant_preference_authority_receipt_sha256: None,
+            },
+        ];
+        selection = selection.seal_integrity().unwrap();
+        let context = b"the user prefers concise answers";
+        let request = b"{\"input\":\"the user prefers concise answers\"}";
+        let manifest = manifest(
+            &selection,
+            context,
+            request,
+            vec![span(
+                context,
+                "span-1",
+                0,
+                context.len(),
+                vec![source(vec!["pref:verbosity".into()], "mem:verbosity")],
+            )],
+        );
+        let verified = verify_preference_exposure_v1(
+            &selection,
+            &manifest,
+            context,
+            request,
+            &trusted_verifier(),
+        ).unwrap();
+        assert_eq!(verified.decision_mode("pref:outreach"), Some(PreferenceInfluenceModeV1::Ignore));
+        assert_eq!(verified.decision_mode("pref:verbosity"), Some(PreferenceInfluenceModeV1::Support));
+        assert!(!verified.preference_was_exposed("pref:outreach"));
+        assert!(verified.preference_was_exposed("pref:verbosity"));
+    }
+
+    #[test]
+    fn exposure_of_a_preference_without_a_selection_decision_is_rejected() {
+        let selection = selection(PreferenceInfluenceModeV1::Ignore);
+        let context = b"unselected preference was included";
+        let request = b"{\"input\":\"unselected preference was included\"}";
+        let manifest = manifest(
+            &selection,
+            context,
+            request,
+            vec![span(
+                context,
+                "span-1",
+                0,
+                context.len(),
+                vec![source(vec!["pref:unselected".into()], "mem:unselected")],
+            )],
+        );
+        assert_eq!(
+            verify_preference_exposure_v1(&selection, &manifest, context, request, &trusted_verifier()),
+            Err(PreferenceExposureRejectV1::UnselectedPreferenceWasExposed)
+        );
     }
 
     #[test]
