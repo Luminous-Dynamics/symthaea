@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-dj/beat-grid-report-v1.schema.json",
+  "title": "Melothaea Beat Grid Report v1",
+  "description": "Portable audio-derived pulse, downbeat, tempo-map and meter hypotheses. Cross-field semantics are checked by validate_beat_grid_report; this schema does not establish detector accuracy or execution authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source",
+    "evidence",
+    "disposition",
+    "hypotheses",
+    "abstention_reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source": {
+      "$ref": "#/$defs/audio_source"
+    },
+    "evidence": {
+      "$ref": "#/$defs/analysis_evidence"
+    },
+    "disposition": {
+      "enum": [
+        "resolved",
+        "ambiguous",
+        "abstained",
+        "not_evaluated"
+      ]
+    },
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    },
+    "abstention_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "resolved"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hypotheses": {
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "abstention_reason": {
+            "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "ambiguous"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hypotheses": {
+            "minItems": 2
+          },
+          "abstention_reason": {
+            "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "enum": [
+              "abstained",
+              "not_evaluated"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hypotheses": {
+            "maxItems": 0
+          },
+          "abstention_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_frame",
+        "end_frame"
+      ],
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "audio_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "analysis_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_sha256",
+        "source_audio_sha256",
+        "analysis_version",
+        "covered_window"
+      ],
+      "properties": {
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "covered_window": {
+          "$ref": "#/$defs/sample_window"
+        }
+      }
+    },
+    "pulse_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "beat_index",
+        "confidence_ppm"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beat_index": {
+          "type": "integer"
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "downbeat_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "beat_index",
+        "bar_index",
+        "confidence_ppm"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beat_index": {
+          "type": "integer"
+        },
+        "bar_index": {
+          "type": "integer"
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "tempo_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "bpm_milli",
+        "confidence_ppm"
+      ],
+      "properties": {
+        "frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bpm_milli": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "meter_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_beat_index",
+        "numerator",
+        "denominator",
+        "grouping",
+        "confidence_ppm"
+      ],
+      "properties": {
+        "start_beat_index": {
+          "type": "integer"
+        },
+        "numerator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        },
+        "grouping": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 255
+          }
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "confidence_ppm",
+        "pulse_anchors",
+        "downbeat_anchors",
+        "tempo_map",
+        "meter_map",
+        "tempo_interpolation"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "pulse_anchors": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/pulse_anchor"
+          }
+        },
+        "downbeat_anchors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/downbeat_anchor"
+          }
+        },
+        "tempo_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tempo_point"
+          }
+        },
+        "meter_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/meter_segment"
+          }
+        },
+        "tempo_interpolation": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "stepwise_constant",
+                "linear_in_frame_time"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
