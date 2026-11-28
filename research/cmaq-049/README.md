@@ -107,6 +107,20 @@ Primary alternatives:
 
 Use at least 10,000 independent full-horizon conditional-pair null paths and 5,000 alternatives per primary cell. Report full-horizon ever-alarm probability with exact/Wilson intervals, unconditional detection and miss fraction, H+1-restricted delay, p50/p90/p95 delay, worst context and common-cause block, pair coverage, p50/p95/p99 ingestion latency, memory and feature/context scaling. Use CMAQ-044 paired effective-block inference.
 
+## What differs from SCPT
+
+SCPT's standard construction works with a measurable positive-definite characteristic kernel bounded in [0,1]. It estimates conditional RKHS mean embeddings with sequential k-nearest neighbors using only earlier pairs, then applies a covariate-indexed predictable betting fraction. Its main proof uses a conditional-independence structure: given the covariate sequence, pairs are mutually independent and each pair's conditional law depends on the sequence through its current covariate. The paper treats broader dependence structures in separate extensions.
+
+CMAQ-049 deliberately takes a different engineering trade:
+- no online nearest-neighbor index or growing conditional estimator;
+- a pre-registered finite context partition and finite Fourier map;
+- a fixed, explicitly dimension-bounded vector with one-hot context blocks;
+- an OCO witness over the full blocked feature vector, with a simple support-box null envelope.
+
+The trade is bounded state and an easier deterministic execution contract in exchange for approximation and discretization gaps. It is not automatically more powerful or more general than SCPT. On high-cardinality or continuous covariates, SCPT's local conditional estimator may preserve distinctions that our context partition loses. On low-cardinality, safety-critical modes, our fixed context inventory can be easier to audit and can report per-context feature contributions.
+
+For fair comparison, run SCPT with its native sequential KNN and kernel pipeline on identical paired inputs and covariates. Also compare CMAQ-049 with a pooled finite-feature detector using no context blocks. Report compute and memory against pair count and covariate dimension, not only detection delay.
+
 ## External comparison and claim boundary
 
 SCPT (Zheng & Zhang, 17 Nov 2026) tests conditional paired-sample equality and uses nearest-neighbor conditional kernel discrepancy plus test martingales. CMAQ-049 is a bounded finite Fourier-feature/one-hot-context conditional-mean implementation. It is not a reproduction of SCPT and does not inherit SCPT's method-specific results.
