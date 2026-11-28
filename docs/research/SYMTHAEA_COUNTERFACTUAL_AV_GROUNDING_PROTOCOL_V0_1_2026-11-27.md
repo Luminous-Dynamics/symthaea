@@ -144,6 +144,27 @@ JSON Schema validates record shape. A paired-item verifier must separately compa
 
 The fixture manifest contains hashes and annotations only; it does not include raw audio/video, identity, or biometric data. The schema/fixtures have been authored and should next be run through an independent Draft 2020-12 validator and paired-invariant verifier.
 
+## 10. Rust paired-manifest verifier (2026-11-28)
+
+A pure Rust evaluator contract now exists at `crates/domains/symthaea-soma/src/embodiment_av_counterfactual.rs`.
+
+It validates:
+- exact same audio digest across all audio-bearing conditions;
+- exact matching timing profiles across AV conditions;
+- valid condition-specific payload visibility;
+- cue annotation bounds within clip duration;
+- one unique ID per condition;
+- required AV-positive, counterfactual, irrelevant-control, and audio-only conditions;
+- decision contrast when the task explicitly requires a visual cue;
+- task-relevant annotation on the positive visual cue and explicit removal/substitution in the counterfactual condition.
+
+It also accepts independent grader decisions for each condition and reports per-item visual causal contribution, counterfactual sensitivity, irrelevant-visual invariance, temporal-shuffle rejection and captioning-collapse flags as separate outputs. It does not load media, run a model, or grade natural-language output itself.
+
+Seven Rust tests cover same-audio/timing preservation, audio mismatch, timing mismatch, cue interval overflow, missing relevant cue, missing counterfactual contrast, and per-item metric calculation.
+
+The Rust unit tests are authored but unexecuted. The machine-readable JSON fixtures were separately parsed and their cross-condition invariants checked. Full JSON Schema 2020-12 validation, media playback, model inference, annotation reliability and benchmark execution remain outstanding.
+
+
 ## 9. Qualification status
 
 This protocol is a proposed benchmark lane. No paired dataset, annotation set, runtime harness, counterfactual run, or Symthaea score has been produced by this document.
