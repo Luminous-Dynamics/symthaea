@@ -77,7 +77,7 @@ An end-to-end episode should expose distinct receipts for retrieval, admissibili
 
 ## Tests and validation
 
-Fourteen deterministic tests are authored, covering:
+Fifteen deterministic tests are authored, covering:
 - Ignore with complete inventory and unrelated memory only;
 - Ignore rejecting a selected preference hidden inside a composed summary;
 - incomplete inventory failing closed;
@@ -88,7 +88,7 @@ Fourteen deterministic tests are authored, covering:
 - canonical, non-overlapping and UTF-8-safe spans;
 - repeated item exposure across separate spans and per-preference span counting;
 - selection/manifest JSON round-trip with unknown-field rejection;
-- negative bitemporal timestamps;
+- negative bitemporal timestamps and use after preference expiry;
 - manifest identity/snapshot rebinding;
 - resource-limit rejection.
 
