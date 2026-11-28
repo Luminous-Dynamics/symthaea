@@ -3,6 +3,7 @@
 pub mod binary_metrics;
 pub mod ca_ocrc_bounded;
 pub mod calibration_requalification;
+pub mod delayed_aci;
 pub mod delayed_aci_controller;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
@@ -19,6 +20,8 @@ pub mod secom_missingness;
 pub mod secom_observation_drift;
 pub mod secom_raw;
 pub mod secom_tabular_baselines;
+pub mod selection_risk_bounds;
+pub mod semi_vm_joint_risk_trace;
 pub mod split_manifest;
 pub mod stratified_repeat;
 pub mod vm_snapshot_dependency_impact;
@@ -172,4 +175,19 @@ pub use ca_ocrc_bounded::{
     CaOcrcSetKindV1, CaOcrcTrackedEntryV1, close_ca_ocrc_feedback_horizon_v1,
     create_ca_ocrc_engine_v1, optimal_arbitrary_delay_proxy_policy_v1, proxy_survival_vector,
     proxy_tracking_load, seal_ca_ocrc_policy_v1, step_ca_ocrc_round_v1,
+};
+
+pub use selection_risk_bounds::{
+    IndependentAuditEstimateV1, IndependentAuditLossObservationV1, PopulationOutcomeStateV1,
+    QualifiedLossObservationV1, SELECTION_AUDIT_DESIGN_SCHEMA_V1, SELECTION_RISK_INPUT_SCHEMA_V1,
+    SELECTION_RISK_REPORT_SCHEMA_V1, SelectionAuditDesignV1, SelectionRiskErrorV1,
+    SelectionRiskInputV1, SelectionRiskReportV1, evaluate_selection_adjusted_population_risk_v1,
+};
+
+pub use semi_vm_joint_risk_trace::{
+    JOINT_RISK_TRACE_REPORT_SCHEMA_V1, JOINT_RISK_TRACE_SCHEMA_V1, JointArmRiskSummaryV1,
+    JointBenchmarkArmV1, JointBenchmarkModeV1, JointCaOcrcArmEvidenceV1, JointControllerEvidenceV1,
+    JointComparisonScopeV1, JointControllerMethodV1, JointPopulationRowV1, JointRiskTraceErrorV1,
+    JointRiskTraceInputV1, JointRiskTraceReportV1, JointTauAciArmEvidenceV1, JointTraceStatusV1,
+    evaluate_joint_risk_trace_v1, seal_joint_risk_trace_v1,
 };
