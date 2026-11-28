@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 
 use crate::manifold::VisionManifold;
 use crate::types::{ManifoldState, VisionConfig, VisionTelemetry, VisualModality};
@@ -13,12 +14,13 @@ use crate::types::{ManifoldState, VisionConfig, VisionTelemetry, VisualModality}
 /// Stable observer profile identifier for this wire-contract revision.
 pub const TEMPORAL_OBSERVER_PROFILE_ID_V0_1: &str = "symthaea-spacecraft-temporal-observer-v0.1";
 /// Current serialized temporal observer checkpoint schema.
-pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 1;
+pub const TEMPORAL_OBSERVER_CHECKPOINT_SCHEMA_V0_1: u32 = 2;
 /// Current emitted temporal witness schema.
 pub const TEMPORAL_PERCEPTION_WITNESS_SCHEMA_V0_1: u32 = 1;
 const Q16_16_SCALE: f32 = 65_536.0;
 const DEFAULT_MAX_FRAME_BYTES: u64 = 64 * 1024 * 1024;
 const DEFAULT_MAX_INTERFRAME_GAP_US: u64 = 1_000_000;
+const MAX_EXPECTED_FRAME_COUNT: u64 = 100_000;
 
 /// Immutable resource and timing contract for one scored episode.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -54,8 +56,10 @@ impl TemporalObserverProfileV0_1 {
         if self.profile_id != TEMPORAL_OBSERVER_PROFILE_ID_V0_1 {
             return Err("unsupported temporal observer profile id".to_string());
         }
-        if self.expected_frame_count < 2 {
-            return Err("observer expected_frame_count must be at least two".to_string());
+        if !(2..=MAX_EXPECTED_FRAME_COUNT).contains(&self.expected_frame_count) {
+            return Err(format!(
+                "observer expected_frame_count must be in 2..={MAX_EXPECTED_FRAME_COUNT}"
+            ));
         }
         if self.fixed_horizon_us == 0 || self.max_interframe_gap_us == 0 {
             return Err("observer horizon and inter-frame gap must be non-zero".to_string());
@@ -226,6 +230,12 @@ pub struct TemporalObserverCheckpointV0_1 {
     pub first_timestamp_us: Option<u64>,
     pub last_identity: Option<ObserverFrameIdentityV0_1>,
     pub frame_geometry: Option<TemporalObserverFrameGeometryV0_1>,
+    /// Sorted SHA-256 digests of every accepted frame ID; raw IDs are not retained.
+    #[serde(default)]
+    pub seen_frame_id_sha256: Vec<String>,
+    /// Sorted SHA-256 digests of every accepted source-evidence ID.
+    #[serde(default)]
+    pub seen_source_evidence_id_sha256: Vec<String>,
     pub manifold_state: ManifoldState,
 }
 
@@ -238,6 +248,8 @@ pub struct ObserverOnlyVisionManifold {
     first_timestamp_us: Option<u64>,
     last_identity: Option<ObserverFrameIdentityV0_1>,
     frame_geometry: Option<TemporalObserverFrameGeometryV0_1>,
+    seen_frame_id_sha256: BTreeSet<String>,
+    seen_source_evidence_id_sha256: BTreeSet<String>,
     cross_scale_enabled: bool,
     poisoned: bool,
 }
@@ -307,6 +319,8 @@ impl ObserverOnlyVisionManifold {
             first_timestamp_us: None,
             last_identity: None,
             frame_geometry: None,
+            seen_frame_id_sha256: BTreeSet::new(),
+            seen_source_evidence_id_sha256: BTreeSet::new(),
             cross_scale_enabled,
             poisoned: false,
         })
@@ -361,6 +375,12 @@ impl ObserverOnlyVisionManifold {
             checkpoint.frame_geometry,
             checkpoint.manifold_state.frame_count,
         )?;
+        validate_seen_identity_digests(
+            &checkpoint.seen_frame_id_sha256,
+            &checkpoint.seen_source_evidence_id_sha256,
+            checkpoint.last_identity.as_ref(),
+            checkpoint.manifold_state.frame_count,
+        )?;
 
         let mut observer =
             Self::try_new_with_profile(config.clone(), width, height, checkpoint.profile.clone())?;
@@ -375,6 +395,13 @@ impl ObserverOnlyVisionManifold {
         observer.first_timestamp_us = checkpoint.first_timestamp_us;
         observer.last_identity = checkpoint.last_identity.clone();
         observer.frame_geometry = checkpoint.frame_geometry;
+        observer.seen_frame_id_sha256 =
+            checkpoint.seen_frame_id_sha256.iter().cloned().collect();
+        observer.seen_source_evidence_id_sha256 = checkpoint
+            .seen_source_evidence_id_sha256
+            .iter()
+            .cloned()
+            .collect();
         observer.cross_scale_enabled = false;
         Ok(observer)
     }
@@ -452,6 +479,10 @@ impl ObserverOnlyVisionManifold {
                 }
             };
 
+        self.seen_frame_id_sha256
+            .insert(sha256_bytes(identity.frame_id.as_bytes()));
+        self.seen_source_evidence_id_sha256
+            .insert(sha256_bytes(identity.source_evidence_id.as_bytes()));
         self.first_timestamp_us = Some(first_timestamp_us);
         self.last_identity = Some(identity.clone());
         self.frame_geometry = Some(TemporalObserverFrameGeometryV0_1 {
@@ -523,6 +554,16 @@ impl ObserverOnlyVisionManifold {
         if byte_len as u64 > self.profile.max_frame_bytes {
             return Err("observer frame exceeds configured byte budget".to_string());
         }
+        let frame_id_digest = sha256_bytes(identity.frame_id.as_bytes());
+        if self.seen_frame_id_sha256.contains(&frame_id_digest) {
+            return Err("observer frame_id was already used in this episode".to_string());
+        }
+        let evidence_id_digest = sha256_bytes(identity.source_evidence_id.as_bytes());
+        if self.seen_source_evidence_id_sha256.contains(&evidence_id_digest) {
+            return Err(
+                "observer source_evidence_id was already used in this episode".to_string(),
+            );
+        }
         let accepted = self.inner.frame_count();
         if accepted >= self.profile.expected_frame_count {
             return Err("observer expected frame budget is exhausted".to_string());
@@ -538,14 +579,6 @@ impl ObserverOnlyVisionManifold {
                     return Err(
                         "observer episode, target, sensor, clock or calibration scope changed"
                             .to_string(),
-                    );
-                }
-                if previous.frame_id == identity.frame_id {
-                    return Err("observer frame_id must not repeat within an episode".to_string());
-                }
-                if previous.source_evidence_id == identity.source_evidence_id {
-                    return Err(
-                        "observer source_evidence_id must not repeat within an episode".to_string(),
                     );
                 }
                 let expected_sequence = previous
@@ -589,6 +622,19 @@ impl ObserverOnlyVisionManifold {
             self.frame_geometry,
             manifold_state.frame_count,
         )?;
+        let seen_frame_id_sha256: Vec<_> =
+            self.seen_frame_id_sha256.iter().cloned().collect();
+        let seen_source_evidence_id_sha256: Vec<_> = self
+            .seen_source_evidence_id_sha256
+            .iter()
+            .cloned()
+            .collect();
+        validate_seen_identity_digests(
+            &seen_frame_id_sha256,
+            &seen_source_evidence_id_sha256,
+            self.last_identity.as_ref(),
+            manifold_state.frame_count,
+        )?;
         let frozen_model_sha256 = model_sha256(&manifold_state)?;
         if frozen_model_sha256 != self.frozen_model_sha256 {
             return Err("observer model digest changed before checkpoint".to_string());
@@ -602,6 +648,8 @@ impl ObserverOnlyVisionManifold {
             first_timestamp_us: self.first_timestamp_us,
             last_identity: self.last_identity.clone(),
             frame_geometry: self.frame_geometry,
+            seen_frame_id_sha256,
+            seen_source_evidence_id_sha256,
             manifold_state,
         })
     }
@@ -657,6 +705,49 @@ fn validate_run_state(
         }
         _ => Err("observer checkpoint cursor or fixed geometry is incomplete".to_string()),
     }
+}
+
+fn validate_seen_identity_digests(
+    frame_ids: &[String],
+    evidence_ids: &[String],
+    last_identity: Option<&ObserverFrameIdentityV0_1>,
+    frame_count: u64,
+) -> Result<(), String> {
+    let expected = usize::try_from(frame_count)
+        .map_err(|_| "observer frame count exceeds addressable memory".to_string())?;
+    if frame_ids.len() != expected || evidence_ids.len() != expected {
+        return Err("observer checkpoint identity-digest count does not match frame count".to_string());
+    }
+    if frame_ids.windows(2).any(|pair| pair[0] >= pair[1])
+        || evidence_ids.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(
+            "observer checkpoint identity digests must be unique and canonically sorted"
+                .to_string(),
+        );
+    }
+    if frame_ids.iter().any(|digest| !is_sha256_hex(digest))
+        || evidence_ids.iter().any(|digest| !is_sha256_hex(digest))
+    {
+        return Err("observer checkpoint contains malformed identity digest".to_string());
+    }
+    match (frame_count, last_identity) {
+        (0, None) => {}
+        (count, Some(last)) if count > 0 => {
+            if !frame_ids.iter().any(|digest| digest == &sha256_bytes(last.frame_id.as_bytes()))
+                || !evidence_ids
+                    .iter()
+                    .any(|digest| digest == &sha256_bytes(last.source_evidence_id.as_bytes()))
+            {
+                return Err(
+                    "observer checkpoint identity digest set omits the last accepted identity"
+                        .to_string(),
+                );
+            }
+        }
+        _ => return Err("observer checkpoint identity cursor is incomplete".to_string()),
+    }
+    Ok(())
 }
 
 fn validate_observer_state(state: &ManifoldState) -> Result<(), String> {
@@ -875,6 +966,76 @@ mod tests {
         );
 
         assert_eq!(observer.frame_count(), 1);
+    }
+
+    #[test]
+    fn nonconsecutive_frame_and_source_evidence_replays_are_rejected() {
+        let mut observer = observer();
+        let frame = vec![64_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+        observer
+            .observe_frame(identity(1, 1_033_000), &frame, 32, 32, 1)
+            .unwrap();
+        assert_eq!(observer.frame_count(), 2);
+
+        let mut replayed_frame = identity(2, 1_066_000);
+        replayed_frame.frame_id = "frame-0".to_string();
+        assert!(
+            observer
+                .observe_frame(replayed_frame, &frame, 32, 32, 1)
+                .is_err()
+        );
+        assert_eq!(observer.frame_count(), 2);
+
+        let mut replayed_evidence = identity(2, 1_066_000);
+        replayed_evidence.source_evidence_id = "evidence-0".to_string();
+        assert!(
+            observer
+                .observe_frame(replayed_evidence, &frame, 32, 32, 1)
+                .is_err()
+        );
+        assert_eq!(observer.frame_count(), 2);
+    }
+
+    #[test]
+    fn checkpoint_carries_bounded_identity_replay_guard() {
+        let mut observer = observer();
+        let frame = vec![64_u8; 32 * 32];
+        observer
+            .observe_frame(identity(0, 1_000_000), &frame, 32, 32, 1)
+            .unwrap();
+        observer
+            .observe_frame(identity(1, 1_033_000), &frame, 32, 32, 1)
+            .unwrap();
+        let checkpoint = observer.save_checkpoint().unwrap();
+        assert_eq!(checkpoint.seen_frame_id_sha256.len(), 2);
+        assert_eq!(checkpoint.seen_source_evidence_id_sha256.len(), 2);
+
+        let mut restored = ObserverOnlyVisionManifold::from_checkpoint(
+            VisionConfig::default(),
+            32,
+            32,
+            &checkpoint,
+        )
+        .unwrap();
+        let mut replayed = identity(2, 1_066_000);
+        replayed.frame_id = "frame-0".to_string();
+        assert!(restored.observe_frame(replayed, &frame, 32, 32, 1).is_err());
+        assert_eq!(restored.frame_count(), 2);
+
+        let mut tampered = checkpoint;
+        tampered.seen_frame_id_sha256.pop();
+        assert!(
+            ObserverOnlyVisionManifold::from_checkpoint(
+                VisionConfig::default(),
+                32,
+                32,
+                &tampered,
+            )
+            .is_err()
+        );
     }
 
     #[test]
