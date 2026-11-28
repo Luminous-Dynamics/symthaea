@@ -14,6 +14,8 @@ use std::fmt;
 pub const REGISTRY_SCHEMA_VERSION: u32 = 1;
 pub const PILOT_REGISTRY_JSON: &str =
     include_str!("../registry/psych_bench_registry_v0.1.json");
+pub const PILOT_REGISTRY_SCHEMA_JSON: &str =
+    include_str!("../registry/psych_bench_registry_v0.1.schema.json");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -505,7 +507,44 @@ mod tests {
         assert_eq!(registry.schema_version, REGISTRY_SCHEMA_VERSION);
         assert_eq!(registry.maturity, RegistryMaturity::PilotIncomplete);
         assert_eq!(registry.benchmarks.len(), 8);
-        assert_eq!(registry.benchmarks.iter().map(|benchmark| benchmark.metrics.len()).sum::<usize>(), 40);
+        assert_eq!(registry.benchmarks.iter().map(|benchmark| benchmark.metrics.len()).sum::<usize>(), 44);
+    }
+
+    #[test]
+    fn bundled_json_schema_is_valid_json_and_matches_the_registry_draft() {
+        let schema: serde_json::Value =
+            serde_json::from_str(PILOT_REGISTRY_SCHEMA_JSON).expect("schema JSON should parse");
+        assert_eq!(
+            schema["$schema"].as_str(),
+            Some("https://json-schema.org/draft/2020-12/schema")
+        );
+        assert!(schema["$defs"]["benchmark"].is_object());
+        assert_eq!(
+            schema["$defs"]["metric"]["properties"]["validation_status"]["enum"]
+                .as_array()
+                .expect("metric validation status enum")
+                .len(),
+            4
+        );
+    }
+
+    #[test]
+    fn selective_control_entry_is_explicitly_synthetic_and_not_normed() {
+        let registry = PsychBenchRegistry::pilot().expect("pilot registry");
+        let benchmark = registry
+            .benchmarks
+            .iter()
+            .find(|benchmark| benchmark.id == "metacognition.selective_control")
+            .expect("selective control entry");
+
+        assert_eq!(benchmark.validation_status, BenchmarkValidationStatus::Unvalidated);
+        assert!(benchmark.evidence_classes.contains(&EvidenceClass::SyntheticMechanism));
+        assert_eq!(benchmark.metrics.len(), 10);
+        assert!(benchmark
+            .comparison_eligibility
+            .inter_system_same_protocol
+            .contains("not_eligible"));
+        assert!(benchmark.comparison_eligibility.human_normative.contains("not_eligible"));
     }
 
     #[test]
