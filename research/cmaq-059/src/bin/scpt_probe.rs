@@ -35,26 +35,26 @@ fn run_scenario(kind: ScenarioKind, label: &str) -> Result<(), Box<dyn Error>> {
             .collect::<Vec<_>>()
             .join(";");
         println!(
-            "{label},{},{:.12},{:.12},{},{},{},{},{}",
+            "{label},{},{:.12},{:.12},{},{},{},{},{},{}",
             update.sequence,
             update.mixture_factor,
             update.log_e_value,
             update.quarantined,
             stream.seed_sha256,
             stream.stream_sha256,
+            neighbors,
             lambdas,
             payoffs
         );
         if update.quarantined {
             break;
         }
-        let _ = neighbors;
     }
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("scenario,sequence,mixture_factor,log_e_value,quarantined,seed_sha256,stream_sha256,lambdas,payoffs");
+    println!("scenario,sequence,mixture_factor,log_e_value,quarantined,seed_sha256,stream_sha256,neighbors,lambdas,payoffs");
     run_scenario(ScenarioKind::EqualConditionalIid, "equal-conditional-iid")?;
     run_scenario(
         ScenarioKind::EqualMarginalConditionalPairingShift,
