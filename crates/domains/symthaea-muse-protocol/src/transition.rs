@@ -160,6 +160,9 @@ pub struct TransitionAlignment {
     /// Maximum permitted absolute tempo difference at the two alignment anchors,
     /// in milli-BPM. Both selected hypotheses must provide tempo-map support.
     pub max_tempo_delta_milli_bpm: u32,
+    /// Maximum permitted relative tempo difference, in parts per million,
+    /// normalized by the slower of the two tempo estimates (0..=1,000,000).
+    pub max_tempo_ratio_error_ppm: u32,
     /// Producer-supplied score in parts per million, 0..=1,000,000.
     /// It is not a calibrated probability unless a separate calibration record says so.
     pub confidence_ppm: u32,
@@ -268,6 +271,7 @@ pub enum TransitionViolationCode {
     EmptySourceGridHypothesisId,
     EmptyTargetGridHypothesisId,
     AlignmentPhaseToleranceOutOfRange,
+    AlignmentTempoRatioToleranceOutOfRange,
     AlignmentBeatOrdinalExceedsJsonSafeInteger,
     AlignmentConfidenceOutOfRange,
     EmptyProtectedRegionReason,
@@ -349,6 +353,13 @@ pub fn validate_transition_contract(
                 &mut violations,
                 TransitionViolationCode::AlignmentPhaseToleranceOutOfRange,
                 "alignment.max_phase_error_milli",
+            );
+        }
+        if alignment.max_tempo_ratio_error_ppm > 1_000_000 {
+            push_violation(
+                &mut violations,
+                TransitionViolationCode::AlignmentTempoRatioToleranceOutOfRange,
+                "alignment.max_tempo_ratio_error_ppm",
             );
         }
         if alignment.transition_beat_ordinal_milli.unsigned_abs() > MAX_SAFE_JSON_INTEGER {
@@ -666,6 +677,7 @@ mod tests {
                 transition_beat_ordinal_milli: 16_000,
                 max_phase_error_milli: 100,
                 max_tempo_delta_milli_bpm: 1_000,
+                max_tempo_ratio_error_ppm: 10_000,
                 confidence_ppm: 850_000,
             }),
             protected_regions: vec![ProtectedRegion {
@@ -766,6 +778,14 @@ mod tests {
         assert!(found.contains(
             &TransitionViolationCode::TargetFrameCountExceedsJsonSafeInteger
         ));
+    }
+
+    #[test]
+    fn rejects_tempo_ratio_tolerance_above_one_hundred_percent() {
+        let mut contract = valid_contract();
+        contract.alignment.as_mut().unwrap().max_tempo_ratio_error_ppm = 1_000_001;
+        assert!(codes(&contract)
+            .contains(&TransitionViolationCode::AlignmentTempoRatioToleranceOutOfRange));
     }
 
     #[test]
