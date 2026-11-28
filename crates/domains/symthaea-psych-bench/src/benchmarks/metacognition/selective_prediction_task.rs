@@ -763,6 +763,178 @@ where
     Ok(&replayed == observed_report)
 }
 
+/// Reconcile the ordered receipts against the evaluator-owned manifest and
+/// recompute the report's aggregate metrics without invoking the policy.
+///
+/// This catches semantic receipt/report inconsistencies even if an unkeyed
+/// report digest has been recomputed after mutation. It is a separate
+/// consistency path in this crate, not a cryptographically independent verifier.
+pub fn verify_report_receipts(
+    items: &[SyntheticSelectivePredictionItem],
+    report: &SelectivePredictionTaskReport,
+    cost_model: SelectivePredictionCostModel,
+) -> Result<bool, SelectivePredictionTaskError> {
+    validate_items(items)?;
+    cost_model.validate()?;
+    if !verify_report_integrity(report)? {
+        return Ok(false);
+    }
+
+    let manifest = serde_json::to_vec(items)
+        .map_err(|error| SelectivePredictionTaskError::Serialization(error.to_string()))?;
+    if report.manifest_digest != blake3::hash(&manifest).to_hex().to_string()
+        || report.scenario_id != SCENARIO_ID
+        || report.generator_version != GENERATOR_VERSION
+        || report.policy.trim().is_empty()
+        || report.items != items.len()
+        || report.receipts.len() != items.len()
+    {
+        return Ok(false);
+    }
+
+    let close = |left: f64, right: f64| (left - right).abs() <= 1e-10;
+    let mut trials = Vec::with_capacity(items.len());
+    let mut request_count = 0usize;
+    let mut useful_request_count = 0usize;
+    let mut opportunity_count = 0usize;
+    let mut resolved_count = 0usize;
+    let mut final_answer_count = 0usize;
+    let mut final_correct_count = 0usize;
+    let mut post_answer_count = 0usize;
+    let mut post_correct_count = 0usize;
+    let mut total_cost = 0.0;
+    let mut post_cost = 0.0;
+
+    for (item, receipt) in items.iter().zip(&report.receipts) {
+        if item.id != receipt.item_id || receipt.initial.stage != SelectivePredictionStage::Initial
+        {
+            return Ok(false);
+        }
+
+        let initial = &receipt.initial;
+        if !initial.confidence.is_finite()
+            || !(0.0..=1.0).contains(&initial.confidence)
+            || !close(initial.cost_units, cost_model.charge(initial.action))
+            || (initial.action == DecisionAction::RequestInformation)
+                != initial.clarification_target.is_some()
+        {
+            return Ok(false);
+        }
+
+        let expected_target_match = if initial.action == DecisionAction::RequestInformation {
+            request_count += 1;
+            Some(initial.clarification_target == item.clarification_target)
+        } else {
+            None
+        };
+        if receipt.clarification_target_matched != expected_target_match {
+            return Ok(false);
+        }
+
+        if item.clarification_resolves {
+            opportunity_count += 1;
+        }
+        let expected_resolved = expected_target_match == Some(true) && item.clarification_resolves;
+        if receipt.clarification_resolved != expected_resolved {
+            return Ok(false);
+        }
+
+        let mut expected_final_correct = None;
+        if initial.action == DecisionAction::Answer {
+            final_answer_count += 1;
+            let correct = item.answerable_now && item.answer_correct_if_given;
+            expected_final_correct = Some(correct);
+            if correct {
+                final_correct_count += 1;
+            }
+        }
+
+        if expected_resolved {
+            useful_request_count += 1;
+            resolved_count += 1;
+            let Some(updated_observation) = item.post_clarification_observation.as_ref() else {
+                return Ok(false);
+            };
+            let updated_bytes = serde_json::to_vec(updated_observation)
+                .map_err(|error| SelectivePredictionTaskError::Serialization(error.to_string()))?;
+            if receipt.updated_observation_digest
+                != Some(blake3::hash(&updated_bytes).to_hex().to_string())
+            {
+                return Ok(false);
+            }
+            let Some(follow_up) = receipt.follow_up.as_ref() else {
+                return Ok(false);
+            };
+            if follow_up.stage != SelectivePredictionStage::AfterClarification
+                || !follow_up.confidence.is_finite()
+                || !(0.0..=1.0).contains(&follow_up.confidence)
+                || !close(follow_up.cost_units, cost_model.charge(follow_up.action))
+                || (follow_up.action == DecisionAction::RequestInformation)
+                    != follow_up.clarification_target.is_some()
+            {
+                return Ok(false);
+            }
+
+            if follow_up.action == DecisionAction::Answer {
+                final_answer_count += 1;
+                post_answer_count += 1;
+                let correct = item.answer_correct_after_clarification;
+                expected_final_correct = Some(correct);
+                if correct {
+                    final_correct_count += 1;
+                    post_correct_count += 1;
+                }
+            } else {
+                expected_final_correct = None;
+            }
+            total_cost += follow_up.cost_units;
+            post_cost += follow_up.cost_units;
+        } else if receipt.updated_observation_digest.is_some() || receipt.follow_up.is_some() {
+            return Ok(false);
+        }
+
+        if receipt.final_answer_correct != expected_final_correct {
+            return Ok(false);
+        }
+
+        total_cost += initial.cost_units;
+        trials.push(SelectivePredictionTrial {
+            is_answerable: item.answerable_now,
+            action: initial.action,
+            answer_correct_if_given: item.answer_correct_if_given,
+            confidence: initial.confidence,
+            cost_units: initial.cost_units,
+        });
+    }
+
+    let metrics = SelectivePredictionMetrics::from_trials(&trials)
+        .map_err(|error| SelectivePredictionTaskError::Scoring(error.to_string()))?;
+    let precision = (request_count > 0)
+        .then(|| useful_request_count as f64 / request_count as f64);
+    let recall = (opportunity_count > 0)
+        .then(|| useful_request_count as f64 / opportunity_count as f64);
+    let final_accuracy = (final_answer_count > 0)
+        .then(|| final_correct_count as f64 / final_answer_count as f64);
+    let post_accuracy = (post_answer_count > 0)
+        .then(|| post_correct_count as f64 / post_answer_count as f64);
+
+    Ok(report.clarification_opportunities == opportunity_count
+        && report.total_information_requests == request_count
+        && report.useful_information_requests == useful_request_count
+        && report.clarification_precision == precision
+        && report.clarification_recall == recall
+        && report.resolved_clarifications == resolved_count
+        && report.final_answer_count == final_answer_count
+        && report.final_correct_count == final_correct_count
+        && report.post_clarification_answer_count == post_answer_count
+        && report.post_clarification_correct_count == post_correct_count
+        && report.final_answer_accuracy == final_accuracy
+        && report.post_clarification_accuracy == post_accuracy
+        && close(report.total_cost_units, total_cost)
+        && close(report.post_clarification_cost_units, post_cost)
+        && report.metrics == metrics)
+}
+
 /// Run matched policy controls over the same frozen fixture and manifest.
 pub fn run_reference_suite(
 ) -> Result<Vec<SelectivePredictionTaskReport>, SelectivePredictionTaskError> {
