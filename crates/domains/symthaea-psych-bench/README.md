@@ -109,20 +109,19 @@ baselines, not evidence of general cognitive capability or state-of-the-art
 performance. PCE's Rust tests and build have not yet been executed on this
 research branch.
 
-## Selective prediction (scorer substrate)
+## Selective prediction and clarification-control task (synthetic v0.1)
 
-`benchmarks/metacognition/selective_prediction.rs` provides reusable scoring
-for answer, abstain and request-information decisions. It reports coverage,
-selective risk, false abstention, inappropriate answers on unanswerable items,
-counterfactual-answer Brier/ECE, a confidence-ranked risk/coverage curve and
-decision cost. It is a scorer primitive, not yet a complete item adapter or
-a measured Symthaea result.
+- `benchmarks/metacognition/selective_prediction.rs` is the reusable scorer for answer, abstain and request-information decisions. It reports coverage, selective risk, false abstention, inappropriate answers on unanswerable items, counterfactual-answer Brier/ECE, a confidence-ranked risk/coverage curve and evaluator-charged decision cost.
+- `benchmarks/metacognition/selective_prediction_task.rs` adds a frozen 14-item synthetic task fixture and four matched policy controls: always-answer, always-abstain, evidence-threshold and premise/freshness-aware. It keeps answerability, counterfactual correctness and clarification outcomes evaluator-side; policies receive only the observation state.
+- `examples/selective_prediction_baselines.rs` emits one JSON report per baseline. Reports bind to a BLAKE3 manifest digest and separate answer quality, false nonanswers, inappropriate answers, clarification precision/recall and cost rather than collapsing them into an opaque composite.
+- This fixture is a small policy smoke test, not a validated benchmark, a trained Symthaea result, a human norm or an external SOTA comparison. Its costs are relative fixture units, not latency, tokens, joules or money. Replace it with held-out task-family generators, independent answer/clarification oracles, multi-turn interactions and matched public benchmark adapters before making performance claims.
 
 Research specifications and external comparisons:
 - `docs/research/PSYCHBENCH_COGNITIVE_ECOLOGY_SPEC_v0.1.md`
 - `docs/research/PSYCHBENCH_VNEXT_RESEARCH_AND_EXECUTION_PLAN_2026-11.md`
 - `docs/research/PSYCHBENCH_AWARENESSBENCH_CROSSWALK_2026-11.md`
 - `docs/research/PSYCHBENCH_INDUSTRY_CROSSWALK_AND_PARADIGM_SHIFTS_2026-11.md`
+- `docs/research/PSYCHBENCH_SELECTIVE_CONTROL_PROTOCOL_v0.1.md`
 
 Benchmark targets include CogBench, AwarenessBench, HumanBaseline, ToMBench/BigToM,
 ARC-AGI-2/3 and GAIA. Each is a distinct task family, not a single interchangeable
@@ -136,7 +135,7 @@ workflow is not validation.
 
 ## Evidence-qualified benchmark registry (pilot v0.1)
 
-The initial pilot registry covers seven selected tasks/environments and 30
+The initial pilot registry covers seven selected tasks/environments and 34
 metric definitions. It records stable IDs, implementation paths, construct
 cards, evidence classes, stimulus provenance, metric units/bounds/directions,
 validation status and comparison eligibility.
