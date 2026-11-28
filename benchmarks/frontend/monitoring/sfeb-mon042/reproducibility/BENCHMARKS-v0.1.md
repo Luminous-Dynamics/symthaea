@@ -13,7 +13,7 @@ Counting dependency clusters instead of raw replay runs reduces overconfident re
 | Transitive dependency closure | 100% of seeded A-B-C overlap chains |
 | Missing/incomplete replay denominator | 100% retained as cluster non-success |
 | Duplicate units, seeds and replay IDs | 100% blocked |
-| Receipt/domain manifest tampering | 100% blocked |
+| Receipt/domain manifest tampering | 100% blocked |\n| Sampling-frame / selection-receipt tampering or ordinal duplication | 100% blocked |
 | Mixed-stratum pooling | 0 accepted |\n| Mixed cluster-size pooling | 0 accepted without a stratified plan |\n| Replay scope / seed schedule drift | 100% blocked |
 | Exact confidence bounds | 100% known-answer arithmetic |
 | Campaign authorization from hash-only input | 0 permitted |
@@ -56,4 +56,4 @@ Use matched seeds within units where useful, but do not confuse matched seeds wi
 
 ## Execution and non-claims
 
-The v0 module is an offline evaluator. There is no live infrastructure inventory adapter, signed dependency attestation, runtime fault campaign, hierarchical estimator, cluster bootstrap or independent replication. The unit tests are synthetic controls. No production reliability or SOTA result is claimed.
+The v0 module is an offline evaluator. There is no live infrastructure inventory adapter, signed dependency attestation, runtime fault campaign, hierarchical estimator, cluster bootstrap or independent replication. The unit tests are synthetic controls. Sampling-frame and unit-selection receipts are hash-bound here but not authenticated. No production reliability or SOTA result is claimed.
