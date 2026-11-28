@@ -341,6 +341,10 @@ The numeric goals are research gates, not predictions. The 80% Terminal-Bench an
 5. Freeze external leaderboard snapshots, model versions, prompts, tools, trial counts, costs and graders before each run. Publish per-task artifacts, failures and paired cluster intervals.
 6. Do not claim “better than SOTA” until the paired held-out lower confidence bound exceeds the version-matched reference and all integrity / false-confidence gates remain satisfied.
 
+### Terminal-Bench Science provisional lab comparison — do not treat as an official matched result
+
+OpenScience's own benchmark page displays 75.7% versus Codex/GPT-6 Astra at 68.1%, but the same page's 1 October update says the authors had found evaluation-setup issues and imperfect comparability and planned to rerun. Its notes further state the OpenScience row counts one trial per task while leaderboard entries average three; the underlying public snapshots are dated 26 September. The 75.7% is therefore a lab-reported, provisional result, not a same-trial-count official leaderboard win. A valid follow-up should reproduce the exact 70 tasks, grader version, worker/lead model configuration, attempt count, and time budget before ranking the harness. Source: https://www.openscience.sh/benchmark (retrieved 28 November 2026).
+
 ## 4.5 Research-method quality, trajectory reliability and independent oversight
 
 The Section 4.4 agent-workflow score should be decomposed into three additional scientific competencies. A system can score well on the final answer while choosing a weak experiment, silently diverging during execution, or failing to expose errors to a scientist.
