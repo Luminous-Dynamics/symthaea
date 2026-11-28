@@ -19,6 +19,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub const MAX_PREFERENCE_IDS_V1: usize = 256;
+pub const MAX_MEMORY_SPANS_V1: usize = 4_096;
+pub const MAX_SOURCES_PER_SPAN_V1: usize = 256;
+pub const MAX_CONTEXT_BYTES_V1: usize = 64 * 1024 * 1024;
+
 fn put_bytes(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update((bytes.len() as u64).to_be_bytes());
     hasher.update(bytes);
@@ -131,6 +136,7 @@ pub enum PreferenceExposureRejectV1 {
     IgnoredPreferenceWasExposed,
     RequiredPreferenceNotExposed,
     SerializationFailure,
+    ResourceLimitExceeded,
 }
 
 impl PreferenceExposureRejectV1 {
@@ -165,6 +171,7 @@ impl PreferenceExposureRejectV1 {
             Self::IgnoredPreferenceWasExposed => "ignored_preference_was_exposed",
             Self::RequiredPreferenceNotExposed => "required_preference_not_exposed",
             Self::SerializationFailure => "serialization_failure",
+            Self::ResourceLimitExceeded => "resource_limit_exceeded",
         }
     }
 }
@@ -232,6 +239,7 @@ fn validate_selection_fields(
         || !lower_sha256(&selection.decision_policy_sha256)
         || !lower_sha256(&selection.selection_authority_receipt_sha256)
         || selection.preference_ids.is_empty()
+        || selection.preference_ids.len() > MAX_PREFERENCE_IDS_V1
         || selection.valid_at_ms < 0
         || selection.known_at_ms < 0
         || selection.valid_from_ms < 0
@@ -444,6 +452,7 @@ fn validate_manifest_fields(
         || !nonempty(&manifest.purpose_id, 128)
         || !nonempty(&manifest.audience_id, 256)
         || !nonempty(&manifest.model_invocation_id, 256)
+        || manifest.memory_spans.len() > MAX_MEMORY_SPANS_V1
     {
         return Err(PreferenceExposureRejectV1::InvalidIdentity);
     }
@@ -573,6 +582,11 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
     {
         return Err(PreferenceExposureRejectV1::SelectionManifestMismatch);
     }
+    if model_context_bytes.len() > MAX_CONTEXT_BYTES_V1
+        || provider_request_bytes.len() > MAX_CONTEXT_BYTES_V1
+    {
+        return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
+    }
     if digest_bytes(model_context_bytes) != manifest.model_context_sha256 {
         return Err(PreferenceExposureRejectV1::ModelContextDigestMismatch);
     }
@@ -606,7 +620,11 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
             return Err(PreferenceExposureRejectV1::DuplicateSpan);
         }
         if span.byte_start >= span.byte_end || span.sources.is_empty() {
+
             return Err(PreferenceExposureRejectV1::InvalidSourceMapping);
+        }
+        if span.sources.len() > MAX_SOURCES_PER_SPAN_V1 {
+            return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
         }
         if span.byte_end > model_context_bytes.len() {
             return Err(PreferenceExposureRejectV1::SpanOutOfBounds);
@@ -646,6 +664,9 @@ pub fn verify_preference_exposure_v1<V: ContextExposureVerifierV1>(
                 return Err(PreferenceExposureRejectV1::DuplicateSourceMapping);
             }
             prior_source_id = Some(source.memory_item_id.as_str());
+            if source.preference_ids.len() > MAX_PREFERENCE_IDS_V1 {
+                return Err(PreferenceExposureRejectV1::ResourceLimitExceeded);
+            }
             if source.preference_ids.iter().any(|id| !nonempty(id, 256))
                 || source.preference_ids.windows(2).any(|pair| pair[0] >= pair[1])
             {
@@ -1124,6 +1145,23 @@ mod tests {
         let restored_manifest =
             ContextExposureManifestV1::from_json_value(manifest_value).unwrap();
         assert_eq!(restored_manifest, manifest);
+    }
+
+    #[test]
+    fn oversized_context_is_rejected_before_hashing_or_inventory_walk() {
+        let selection = selection(PreferenceInfluenceModeV1::Ignore);
+        let context = vec![b'x'; MAX_CONTEXT_BYTES_V1 + 1];
+        let manifest = manifest(&selection, &context, b"provider request", vec![]);
+        assert_eq!(
+            verify_preference_exposure_v1(
+                &selection,
+                &manifest,
+                &context,
+                b"provider request",
+                &trusted_verifier()
+            ),
+            Err(PreferenceExposureRejectV1::ResourceLimitExceeded)
+        );
     }
 
     #[test]
