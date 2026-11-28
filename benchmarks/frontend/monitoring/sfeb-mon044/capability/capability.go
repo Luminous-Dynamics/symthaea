@@ -108,6 +108,8 @@ type Input struct {
  CapabilityIdentitySHA256 string `json:"capability_identity_sha256"`
  CapabilityManifestSHA256 string `json:"capability_manifest_sha256"`
  RequiredScopeSHA256 string `json:"required_scope_sha256"`
+ RequiredScopeSourceID string `json:"required_scope_source_id"`
+ RequiredScopeProvenanceSHA256 string `json:"required_scope_provenance_sha256"`
  RequiredItems []RequiredItem `json:"required_items"`
  Manifest Manifest `json:"manifest"`
 }
@@ -132,6 +134,7 @@ type Result struct {
  ExcludedRequired []string `json:"excluded_required"`
  UnknownRequired []string `json:"unknown_required"`
  MissingRequired []string `json:"missing_required"`
+ OutOfScopeDeclarations []string `json:"out_of_scope_declarations"`
  OptionalNegativeSpace []string `json:"optional_negative_space"`
  Items []ItemResult `json:"items"`
  ReasonCodes []string `json:"reason_codes"`
@@ -163,6 +166,11 @@ func ManifestDigest(v Manifest)string{
  }
  sort.Slice(c.Items,func(i,j int)bool{return c.Items[i].ItemID<c.Items[j].ItemID})
  return digest(c)
+}
+func validateIdentity(v ConnectorIdentity,f *flags){
+ if !validID(v.ConnectorID)||!validID(v.ConnectorVersion)||!validID(v.DatabaseEngine)||!validID(v.DatabaseVersion)||!validID(v.LogicalDecodingPlugin)||!validID(v.BrokerVersion)||!validID(v.ClientVersion)||!validID(v.SnapshotMode){f.block("capability_identity_fields_incomplete")}
+ for name,d:=range map[string]string{"distribution":v.DistributionSHA256,"configuration":v.ConfigurationSHA256,"publication":v.PublicationSHA256,"schema_history":v.SchemaHistorySHA256,"operation_filters":v.OperationFiltersSHA256,"column_policy":v.ColumnPolicySHA256,"topic_routing":v.TopicRoutingSHA256}{if !validDigest(d){f.block("capability_identity_digest_invalid:"+name)}}
+ if v.TransactionMetadataEnabled&&!validID(v.TransactionMetadataEpoch){f.block("transaction_metadata_activation_epoch_missing")}
 }
 func validStatus(s CapabilityStatus)bool{
  switch s{case Supported,Conditional,Unsupported,Excluded,NotApplicable,Unknown:return true};return false
@@ -202,7 +210,7 @@ func prereqCheck(item CapabilityItem,f *flags){
 }
 
 func Evaluate(in Input)Result{
- out:=Result{Profile:"mon044-capture-capability-result-v1",Version:Version,TrialID:in.TrialID,CapabilityVerdict:Indeterminate,CoverageVerdict:Indeterminate,CampaignVerdict:Indeterminate,ProductionActionPermitted:false,RequiredItemCount:len(in.RequiredItems),UnsupportedRequired:[]string{},ExcludedRequired:[]string{},UnknownRequired:[]string{},MissingRequired:[]string{},OptionalNegativeSpace:[]string{},Items:[]ItemResult{},ReasonCodes:[]string{}}
+ out:=Result{Profile:"mon044-capture-capability-result-v1",Version:Version,TrialID:in.TrialID,CapabilityVerdict:Indeterminate,CoverageVerdict:Indeterminate,CampaignVerdict:Indeterminate,ProductionActionPermitted:false,RequiredItemCount:len(in.RequiredItems),UnsupportedRequired:[]string{},ExcludedRequired:[]string{},UnknownRequired:[]string{},MissingRequired:[]string{},OutOfScopeDeclarations:[]string{},OptionalNegativeSpace:[]string{},Items:[]ItemResult{},ReasonCodes:[]string{}}
  f:=newFlags()
  if in.Profile!=Profile||in.Version!=Version{f.block("profile_version_invalid")}
  if in.Mode!=OfflineFixture&&in.Mode!=RuntimeCandidate{f.block("mode_invalid")}
@@ -210,7 +218,9 @@ func Evaluate(in Input)Result{
  if in.EvaluatedAt.IsZero(){f.hold("evaluation_time_missing")}
  if len(in.RequiredItems)==0{f.block("required_scope_missing")}
  if len(in.RequiredItems)>MaxItems||len(in.Manifest.Items)>MaxItems{f.block("item_limit_exceeded")}
- if in.Manifest.Identity.ConnectorID==""||in.Manifest.Identity.ConnectorVersion==""||in.Manifest.Identity.DatabaseEngine==""||in.Manifest.Identity.DatabaseVersion==""{f.block("capability_identity_incomplete")}
+ validateIdentity(in.Manifest.Identity,f)
+ if !validID(in.RequiredScopeSourceID){f.block("required_scope_source_missing")}
+ if !validDigest(in.RequiredScopeProvenanceSHA256){f.hold("required_scope_provenance_missing")}
  identity:=IdentityDigest(in.Manifest.Identity)
  if !validDigest(in.CapabilityIdentitySHA256){f.block("capability_identity_digest_invalid")}else if in.CapabilityIdentitySHA256!=identity{f.block("capability_identity_digest_mismatch")}
  if !validDigest(in.CapabilityManifestSHA256){f.block("capability_manifest_digest_invalid")}else if in.CapabilityManifestSHA256!=ManifestDigest(in.Manifest){f.block("capability_manifest_digest_mismatch")}
@@ -262,9 +272,10 @@ func Evaluate(in Input)Result{
   for _,code:=range local.sorted(){if local.blocked{f.block(id+":"+code)}else{f.hold(id+":"+code)}}
   out.Items=append(out.Items,ItemResult{ItemID:id,Status:item.Status,Required:req.Required,Verdict:verdict,ReasonCodes:local.sorted()})
  }
- for id,item:=range declared{
-  if _,ok:=required[id];!ok{f.block("capability_item_outside_required_scope:"+id)}
+ for id:=range declared{
+  if _,ok:=required[id];!ok{out.OutOfScopeDeclarations=append(out.OutOfScopeDeclarations,id)}
  }
+ sort.Strings(out.OutOfScopeDeclarations)
  sort.Strings(out.UnsupportedRequired);sort.Strings(out.ExcludedRequired);sort.Strings(out.UnknownRequired);sort.Strings(out.MissingRequired);sort.Strings(out.OptionalNegativeSpace)
  sort.Slice(out.Items,func(i,j int)bool{return out.Items[i].ItemID<out.Items[j].ItemID})
  out.CapabilityVerdict=f.verdict()
