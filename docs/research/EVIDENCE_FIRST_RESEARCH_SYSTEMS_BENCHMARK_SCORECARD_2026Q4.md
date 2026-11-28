@@ -341,6 +341,85 @@ The numeric goals are research gates, not predictions. The 80% Terminal-Bench an
 5. Freeze external leaderboard snapshots, model versions, prompts, tools, trial counts, costs and graders before each run. Publish per-task artifacts, failures and paired cluster intervals.
 6. Do not claim “better than SOTA” until the paired held-out lower confidence bound exceeds the version-matched reference and all integrity / false-confidence gates remain satisfied.
 
+## 4.5 Research-method quality, trajectory reliability and independent oversight
+
+The Section 4.4 agent-workflow score should be decomposed into three additional scientific competencies. A system can score well on the final answer while choosing a weak experiment, silently diverging during execution, or failing to expose errors to a scientist.
+
+### Experiment design is a distinct capability, not a by-product of planning or search
+
+SCOPE evaluates experiment planning from 300 papers across 19 domains, separating high-level coverage (main experiments, ablations and analyses) from low-level configuration (datasets, baselines and metrics). Its paper reports a persistent configuration bottleneck: no evaluated model exceeded 3/5 on any low-level subdimension, and search access alone did not improve total design quality for most tested models; in one reported model it reduced the score and nearly doubled the redline rate.
+
+**Symthaea consequence:** split the workflow into (a) scientific objective and falsifiable hypothesis, (b) evidence-backed dataset/baseline/metric selection, (c) executable protocol compilation, (d) preflight verification, and (e) execution. Reuse #12471 for method-to-execution contracts and #13818 for independent review. Search is a source-acquisition mechanism, not a configuration validator.
+
+Before execution, require a machine-checkable manifest for dataset/version, population, split, preprocessing, exclusions, baseline identity, metric direction/definition, uncertainty method, stopping rule, compute/time budget and expected artifacts. The compiler validates structure; the auditor independently checks semantic/method fidelity. Deviations remain explicit and cannot be scored as faithful reproduction.
+
+Proposed internal target (not result): on a reproduced SCOPE-compatible held-out subset, reach at least 4/5 mean on each low-level configuration dimension, zero critical split/dataset/metric substitutions, and no high-level plan-quality regression. Report each subdimension and human-adjudication agreement; do not optimize the average while hiding a fatal configuration error.
+
+### Ideation must separate novelty from grounding and feasibility
+
+AgentIdeaBench evaluates matched Static and Active exploration across 40 densely scored subfields and five disciplines. The paper reports active retrieval improves feasibility, clarity and specificity, while its measured originality change is not statistically significant. The authors also note that originality is their least reliable dimension and that a direct expert novelty study remains an important missing validation.
+
+**Symthaea consequence:** do not let retrieval volume, fluency, feasibility or a critic's novelty score become a discovery claim. Score at least four distinct stages:
+1. prior-art coverage as of the proposal timestamp;
+2. originality against date-filtered prior art;
+3. falsifiability and feasibility under real resource constraints;
+4. empirical support and independent reproduction after the proposal.
+
+Use a blind expert panel for close novelty calls, with calibrated adjudicator agreement and explicit known-rediscovery controls. Preserve negative results and previously rejected directions. Cross-domain analogy can be an ideation operator, but it earns novelty credit only when it yields a distinct, testable mechanism and survives prior-art search plus discriminating evidence.
+
+Proposed acceptance gate (not result): active exploration must improve feasibility without reducing originality versus its paired static control; all claimed novel contributions must be judged against timestamped prior art and independently reviewed. If the human panel cannot reliably distinguish the originality cases, publish the metric as unresolved rather than treating the model critic as truth.
+
+### End-state score is insufficient: measure trajectory stability and completion reliability
+
+SCI-AGENT-EXAM contains 120 expert-curated tasks across 11 scientific fields and seven research task types. It requires both executable and textual artifacts and uses deterministic programmatic checks for code/artifacts plus a calibrated, expert-validated LLM judge for text. The current public snapshot lists GPT-6 Astra at 80.9 overall; the paper reports only 26.0% of its runs above the 0.95 success threshold. The leaderboard snapshot has not added more recent frontier model releases, so this is a versioned reference, not the current capability ceiling.
+
+**Symthaea consequence:** record more than final-state correctness. Track artifact correctness, report fidelity, criterion-level regressions/dips, recovery, number of retries, and probability of a fully successful run. The candidate must preserve every consequential intermediate state and never silently overwrite a previously passing artifact with a weaker one.
+
+Proposed target ladder (not results): reproduce the public SCI-AGENT-EXAM protocol; first beat 80.9 overall under the same model/harness/task snapshot, then target ≥84.0 overall and ≥30% Pass@0.95 on three or more independent trials, with no worsening of executable-artifact score or worst-domain results. Report mean, full-success rate, trial variability, cost and trajectory dips separately.
+
+### Domain-specific real-workflow lane: biology
+
+The V1 benchmarks.bio snapshot (updated 25 November 2026) combines 13 capability benchmarks and 23 individual leaderboards. Its published capability aggregate lists Claude Opus 5.5 with LSVP exemption at 58.0% and $4.82/run; the highest listed non-exempt configuration is Claude Sonnet 5.5/Pi at 52.5%, while GPT-6 Astra/Pi is 49.3% at $1.06/run with 13/13 coverage. Missing benchmarks are excluded from the weighted score, and LSVP is a safety-filter-exempt variant, so the scores must retain those provenance labels.
+
+**Symthaea consequence:** benchmark the same V1 task set and report every native capability track, artifact coverage, per-run cost, token/turn usage and safety variant. Do not compare exempt and standard runs as if they had the same operating policy. Proposed initial target (not result): exceed 52.5% on a fully covered, non-exempt, version-matched run; treat 58.0% as a stretch comparison only with the same exemption and coverage regime. Require no hard safety or evidence-integrity failure.
+
+### Scientist–auditor collaboration as a factorial experiment
+
+Reuse #13818, not a new audit agent or checkpoint database. Its six-arm design should be reported as a factorial comparison of:
+- self-review vs independent audit;
+- scientist steering absent vs present;
+- read-only deterministic replay as a verifier baseline.
+
+The primary audit endpoint is **expert-adjudicated valid errors found per inclusive human-review hour**, not number of objections. Also report precision, severity-weighted recall, independently reproduced objection fraction, false objections, missed errors, claim/source traceability, replay cost and downstream correction impact. A valid audit finding must point to a reproducible defect in the immutable checkpoint; the audit agent cannot adjudicate final truth or promote claims.
+
+For the human-steering factor, measure whether a scientist's intervention improves held-out decision quality and hypothesis quality after charging their time. A high intervention count is not inherently good. Record the exact checkpoint, scientist identity/authority, requested change and resulting child checkpoint; missing response is not approval.
+
+DiscoveryAgent's reported 14× increase in valid errors with scientist-plus-audit support is a result from its own task setup, not a transferable benchmark target. Replicate the comparison and confidence interval locally before making any such claim.
+
+### Combined claim-quality ladder
+
+A scientific work product should advance through explicit states:
+- **proposed** — hypothesis or method idea, with prior-art search and falsifiable predictions;
+- **planned** — executable protocol and dataset/baseline/metric manifest reviewed;
+- **executed** — immutable code, data, environment and run receipts;
+- **audited** — independent reproducibility and objection resolution recorded;
+- **supported** — evidence and independent adjudication support the scoped claim;
+- **replicated** — result independently reproduced on the frozen task;
+- **transferred** — result survives a preregistered held-out family, site, device, time or regime.
+
+These states are not a confidence ladder and cannot be skipped by a high model score. A claim may remain proposed, unresolved or non-identifiable indefinitely. The system should be rewarded for a correct abstention and penalized for false promotion.
+
+### Updated execution order
+
+1. Keep #11171 as the only production policy/callable owner.
+2. Use the typed ResearchState / claim-source relationship contract (#13665 / #13796) and the action-trace/replay contracts (#11015 / #13933) as the public input/output boundary.
+3. Use #12471 to compile and validate the full experimental method configuration, not just code shape.
+4. Use #13818 for append-only checkpoints, scientist steering and separate-process audit; the auditor only challenges and reproduces.
+5. Use #13691/#13567 for active-science episodes and evaluator-only small-world regret.
+6. Run matched SCOPE, AgentIdeaBench, SCI-AGENT-EXAM and benchmarks.bio subsets with exact task, harness, model, version, access, cost and coverage parity before external superiority claims.
+
+No new evaluator, source classifier, planner, audit agent, checkpoint service or promotion authority is introduced by this scorecard section.
+
 ## 5. Shared architecture that unlocks the combined programme
 
 ### 5.1 Canonical source-event projection
@@ -552,6 +631,12 @@ This contract is only a fail-closed reference. It shape-checks receipt hashes bu
 - AstaBench current benchmark inventory: https://allenai.org/asta/bench
 - SciAgentArena benchmark and native task metrics: https://sciagentarena.github.io/
 - R-IDeA, AISTATS 2026 / PMLR 300: https://proceedings.mlr.press/v300/tang26d.html
+- SCOPE, autonomous experimental design benchmark (4 August 2026): https://arxiv.org/abs/2608.03501
+- AgentIdeaBench, active versus static scientific ideation (7 September 2026): https://arxiv.org/abs/2609.07611
+- SCI-AGENT-EXAM, scientific workflow benchmark (23 October 2026): https://arxiv.org/abs/2610.32441
+- SCI-AGENT-EXAM public score snapshot (retrieved 28 November 2026): https://www.benchmarkalmanac.com/benchmarks/sci-agent-exam/
+- DiscoveryAgent, scientist steering and checkpointed audit agents (16 November 2026): https://arxiv.org/abs/2611.21950
+- benchmarks.bio V1 leaderboard and methodology (updated 25 November 2026): https://benchmarks.bio/
 
 - AML Cycle 2 official results (19 November 2026): https://agentmemoryleaderboard.ai/results/cycle-2/
 - LongMemEval-V2 official benchmark and live LAFS board: https://xiaowu0162.github.io/longmemeval-v2/
