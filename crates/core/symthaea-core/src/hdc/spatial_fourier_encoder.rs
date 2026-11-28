@@ -146,12 +146,19 @@ impl SpatialFourierEncoder {
         };
 
         let mut rng_state = seed;
-        let frequencies = (0..dimension / 2)
+        let frequencies: Vec<[f64; 2]> = (0..dimension / 2)
             .map(|_| {
                 let (normal_x, normal_y) = standard_normal_pair(&mut rng_state);
                 [normal_x / length_scale, normal_y / length_scale]
             })
             .collect();
+        if frequencies
+            .iter()
+            .flatten()
+            .any(|frequency| !frequency.is_finite())
+        {
+            return Err(SpatialFourierError::InvalidLengthScale);
+        }
 
         Ok(Self {
             identity,
