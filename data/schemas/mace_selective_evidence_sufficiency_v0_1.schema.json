@@ -86,7 +86,8 @@
         "cluster_sampling_design_sha256",
         "cluster_workload_policy_sha256",
         "cluster_assignment_manifest_sha256",
-        "cluster_design_receipt_sha256"
+        "cluster_design_receipt_sha256",
+        "manifest_sha256"
       ],
       "properties": {
         "schema_version": {
@@ -252,6 +253,9 @@
         },
         "cluster_design_receipt_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },
@@ -271,10 +275,8 @@
         "accepted_example_count",
         "risk_target_alpha",
         "threshold",
-        "empirical_selective_risk",
         "risk_upper_bound",
         "coverage",
-        "multiplicity_adjustment",
         "risk_bound_method",
         "certificate_scope",
         "distribution_shift_detected",
@@ -284,7 +286,6 @@
         "hard_gate_rejected_count",
         "empirical_cluster_unsafe_rate",
         "mean_selective_loss",
-        "adjusted_delta",
         "parent_fallback_certificate_sha256",
         "decision_policy_sha256",
         "sufficiency_score_definition_sha256",
@@ -292,7 +293,10 @@
         "decision_coverage",
         "cluster_unit_definition_sha256",
         "cluster_sampling_design_sha256",
-        "cluster_workload_policy_sha256"
+        "cluster_workload_policy_sha256",
+        "parent_group_id",
+        "parent_fallback_group_id",
+        "multiplicity_adjusted_delta"
       ],
       "properties": {
         "schema_version": {
@@ -353,16 +357,6 @@
             }
           ]
         },
-        "empirical_selective_risk": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/risk_bound"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "risk_upper_bound": {
           "oneOf": [
             {
@@ -377,18 +371,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/risk_bound"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "multiplicity_adjustment": {
-          "oneOf": [
-            {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 1
             },
             {
               "type": "null"
@@ -410,7 +392,6 @@
         "certificate_scope": {
           "type": "string",
           "enum": [
-            "marginal",
             "group_conditional",
             "parent_fallback"
           ]
@@ -420,13 +401,6 @@
             "string",
             "null"
           ]
-        },
-        "failure_reason": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "maxLength": 1024
         },
         "distribution_shift_detected": {
           "type": "boolean"
@@ -461,18 +435,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/risk_bound"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "adjusted_delta": {
-          "oneOf": [
-            {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "maximum": 1
             },
             {
               "type": "null"
@@ -516,6 +478,18 @@
         },
         "cluster_workload_policy_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "multiplicity_adjusted_delta": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -584,11 +558,47 @@
               },
               "parent_fallback_group_id": {
                 "$ref": "#/$defs/identifier"
+              },
+              "parent_group_id": {
+                "$ref": "#/$defs/identifier"
+              },
+              "parent_fallback_certificate_sha256": {
+                "$ref": "#/$defs/sha256"
               }
             },
             "required": [
-              "parent_fallback_group_id"
+              "parent_fallback_group_id",
+              "parent_group_id",
+              "parent_fallback_certificate_sha256"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "risk_exceeds_target"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "threshold",
+              "risk_upper_bound",
+              "accepted_cluster_count",
+              "unsafe_cluster_count"
+            ],
+            "properties": {
+              "threshold": {
+                "$ref": "#/$defs/threshold"
+              },
+              "risk_upper_bound": {
+                "$ref": "#/$defs/risk_bound"
+              }
+            }
           }
         }
       ]
@@ -617,7 +627,9 @@
         "group_hierarchy_sha256",
         "cluster_unit_definition_sha256",
         "cluster_sampling_design_sha256",
-        "cluster_workload_policy_sha256"
+        "cluster_workload_policy_sha256",
+        "distribution_shift_detected",
+        "reason"
       ],
       "properties": {
         "schema_version": {
@@ -692,14 +704,6 @@
         },
         "policy_sha256": {
           "$ref": "#/$defs/sha256"
-        },
-        "unresolved_evidence_count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "missing_dependency_count": {
-          "type": "integer",
-          "minimum": 0
         },
         "distribution_shift_detected": {
           "type": "boolean"
