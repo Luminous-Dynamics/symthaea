@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cmaq-052-\${{ github.ref }}
+  group: cmaq-052-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
