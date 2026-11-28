@@ -13,6 +13,7 @@
 pub mod calibration;
 pub mod change_blindness;
 pub mod feeling_of_knowing;
+pub mod selective_prediction;
 
 pub use calibration::MetacognitiveCalibrationBenchmark;
 pub use change_blindness::ChangeBlindnessBenchmark;
