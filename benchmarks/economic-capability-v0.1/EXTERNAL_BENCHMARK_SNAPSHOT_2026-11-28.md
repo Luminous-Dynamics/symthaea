@@ -162,6 +162,22 @@ Recommended evidence ladder:
 
 Keep code verification, solution verification, validation and uncertainty quantification distinct. The parser slice in PR #14252 is only parser groundwork: it does not establish convergence, model validity, structural safety or design adequacy.
 
+## Task-matched SOTA challenge goals — prospective, not Luminous results
+
+The following are stretch goals only when the exact external task set, release, model/tool environment, scoring rubric, resource budget and grader can be reproduced or licensed. Otherwise use the cited figures as context and run a separate matched comparison; never claim to have beaten an incomparable result.
+
+| Comparator | Reported reference in this snapshot | Stretch challenge for an exact reproduction | Hard interpretation boundary |
+|---|---|---|---|
+| OSWorld 2.0 full workflow | 20.6% binary end-to-end completion at the reported 500-step budget; 54.8% partial score | At least **25.6% binary completion** at the same 500-step budget, with no deterioration in grader-audited correctness or action safety | Do not compare partial score to binary completion; OSWorld 2.1 grading audit is an independent evaluator warning, not a corrected score |
+| ITBench-AA diagnosis | 56.2% average precision at full recall on its 59 Kubernetes root-cause tasks | At least **61.2%** on the identical task set and metric, without reducing the required recall | This is root-cause entity attribution—not remediation, restoration or safe action |
+| SWEOps-Bench verified recovery | 52.7% highest reported end-to-end recovery across six configurations; detection 72.7–90.9% | At least **60% independently verified recovery** on the same 55 incident tasks, while reporting detection and repair separately | Requires the same operator repositories, injected faults, workload, source repair process, functional checks and environment—not a new easier SRE suite |
+| LADDER long-horizon robotics | 71.5% completed tasks at $1.73 API/tool cost per completed task for the top listed configuration | At least **76.5% completion** at no more than the same reported API/tool cost on the same suite and embodiment | API/tool cost is not industrial total cost of ownership; simulation and real transfer remain separate |
+| Finance Agent v2.1 | 69.47% partial-credit accuracy at $4.83/test for the leading listed entry | At least **74.5% partial-credit accuracy** at no more than $4.83/test on the identical v2.1 set and harness | Does not qualify accounting truth, point-in-time investment decisions, alpha, return or authority |
+
+These thresholds are deliberately expressed as challenge hypotheses, not minimum acceptance criteria for unrelated deployments. A team should first reproduce the reference entry and confirm its confidence interval, cost denominator, task exclusions and evaluator version. A one-off point estimate above a published leaderboard entry is not persuasive evidence of superiority.
+
+For the broader Luminous architecture, the primary claim should remain: improvement over the **same base model and tools** on matched tasks, with the increment attributable to Symthaea's state, reconciliation, planning and verification modules. External leaderboards measure system configurations, not necessarily those components individually.
+
 ## What these comparisons imply for Luminous
 
 1. **Benchmark evaluators, not only agents.** A task score is conditional on task validity, reference quality, grader reliability, environment integrity and exact accounting. CEB's #10138/#10370/#10167/#10212 should be composed into every Luminous benchmark programme.
