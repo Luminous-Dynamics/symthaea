@@ -4,22 +4,19 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use symthaea_semiconductor::benchmark::{
-    CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_SCHEMA_V1,
-    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1,
     BoundedConformalScoreContractV1, BoundedConformalScoreKindV1, BoundedPredictionSetInputV1,
-    DELAYED_ACI_PREDICTION_SCHEMA_V1, CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1,
-    CONFORMAL_INTERVAL_INPUT_SCHEMA_V1, CONFORMAL_SCORE_POLICY_SCHEMA_V1,
-    CaOcrcFeedbackV1, CaOcrcPolicyV1,
-    CaOcrcPredictionKindV1, CaOcrcRoundInputV1, CaOcrcTrackingDispositionV1,
-    ConformalCalibrationSampleV1, ConformalIntervalInputV1, ConformalScoreKindV1,
-    ConformalScorePolicyV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
-    DelayedAciPredictionInputV1,
-    DelayedAciDispositionV1, LabelConsumptionEligibilityReportV1,
+    CA_OCRC_FEEDBACK_SCHEMA_V1, CA_OCRC_POLICY_SCHEMA_V1, CA_OCRC_ROUND_SCHEMA_V1,
+    CONFORMAL_CALIBRATION_SAMPLE_SCHEMA_V1, CONFORMAL_INTERVAL_INPUT_SCHEMA_V1,
+    CONFORMAL_SCORE_POLICY_SCHEMA_V1, CaOcrcFeedbackV1, CaOcrcPolicyV1, CaOcrcPredictionKindV1,
+    CaOcrcRoundInputV1, CaOcrcTrackingDispositionV1, ConformalCalibrationSampleV1,
+    ConformalIntervalInputV1, ConformalScoreKindV1, ConformalScorePolicyV1,
+    DELAYED_ACI_DELIVERY_SCHEMA_V1, DELAYED_ACI_POLICY_SCHEMA_V1, DELAYED_ACI_PREDICTION_SCHEMA_V1,
+    DelayedAciDispositionV1, DelayedAciLabelDeliveryV1, DelayedAciPolicyV1,
+    DelayedAciPredictionInputV1, LabelConsumptionEligibilityReportV1,
     LabelConsumptionEligibilityV1, LabelEvidenceFrontierV1,
     bounded_conformal_score_contract_sha256_v1, build_bounded_score_prediction_set_v1,
     build_conformal_interval_v1, ca_ocrc_proxy_survival_v1, ca_ocrc_risk_gap_bound_v1,
-    create_ca_ocrc_engine_v1, create_delayed_aci_engine_v1,
-    deliver_delayed_aci_label_v1,
+    create_ca_ocrc_engine_v1, create_delayed_aci_engine_v1, deliver_delayed_aci_label_v1,
     register_delayed_aci_prediction_v1, start_ca_ocrc_round_v1,
 };
 
@@ -88,9 +85,8 @@ fn ca_policy() -> CaOcrcPolicyV1 {
         target_risk: 0.05,
         learning_rate: 0.10,
         score_bound_b: 1.0,
-        score_contract_sha256: bounded_conformal_score_contract_sha256_v1(
-            &bounded_score_contract(),
-        ).unwrap(),
+        score_contract_sha256:
+            bounded_conformal_score_contract_sha256_v1(&bounded_score_contract()).unwrap(),
         initial_threshold: 0.5,
         tracking_capacity: 2,
         maximum_feedback_delay: 4,
@@ -114,7 +110,8 @@ fn ca_round(index: u64, draw: f64) -> CaOcrcRoundInputV1 {
             prediction_scale: 2.0,
             threshold: 0.5,
         },
-    ).unwrap();
+    )
+    .unwrap();
     CaOcrcRoundInputV1 {
         schema: CA_OCRC_ROUND_SCHEMA_V1.into(),
         round_index: index,
@@ -181,13 +178,7 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
         let event_id = format!("aci-event-{index}");
         let payload = format!("{:064x}", index + 1);
         let residual = index as f64 + 1.0;
-        let mut report = eligibility_report(
-            &label_id,
-            1,
-            &event_id,
-            100.0 + residual,
-            &payload,
-        );
+        let mut report = eligibility_report(&label_id, 1, &event_id, 100.0 + residual, &payload);
         report.report_sha256.clear();
         report.report_sha256 = sha256_json(&report);
         calibration.push(ConformalCalibrationSampleV1 {
@@ -226,7 +217,8 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
             target_miscoverage: 0.05,
         },
         &calibration,
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(set.lower_bound, Some(81.0));
     assert_eq!(set.upper_bound, Some(119.0));
 
@@ -243,7 +235,8 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
             fixed_delay_rounds: 0,
             require_source_authenticity_assertion: false,
         },
-    ).unwrap();
+    )
+    .unwrap();
     let prediction = register_delayed_aci_prediction_v1(
         &mut engine,
         &DelayedAciPredictionInputV1 {
@@ -261,7 +254,8 @@ fn k1_conformal_interval_builder_feeds_the_immutable_delayed_aci_prediction() {
             lower_bound: set.lower_bound.unwrap(),
             upper_bound: set.upper_bound.unwrap(),
         },
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(prediction.prediction_set_sha256, set.receipt_sha256);
     assert_eq!(prediction.lower_bound, 81.0);
     assert_eq!(prediction.upper_bound, 119.0);
@@ -288,7 +282,10 @@ fn ca_ocrc_ipw_update_matches_independent_closed_form() {
         &ca_feedback(0, 2, 2.0),
     )
     .unwrap();
-    assert_eq!(receipt.disposition, CaOcrcTrackingDispositionV1::FeedbackUpdated);
+    assert_eq!(
+        receipt.disposition,
+        CaOcrcTrackingDispositionV1::FeedbackUpdated
+    );
     assert_eq!(receipt.prediction_set_sha256, Some(digest('g')));
 
     // L = 1; alpha = 0.05; F(2) = 0.5; eta = 0.1.
@@ -308,7 +305,8 @@ fn ca_ocrc_risk_gap_bound_matches_independent_formula() {
     let h = |x: f64| x - 1.0 - x.ln();
     let boundary = policy.score_bound_b / (policy.learning_rate * horizon as f64);
     let feedback = (policy.tracking_capacity as f64 + 1.0) / (f_at_max * horizon as f64);
-    let capacity = (-((policy.tracking_capacity as f64) * h(ell_f / policy.tracking_capacity as f64))).exp();
+    let capacity =
+        (-((policy.tracking_capacity as f64) * h(ell_f / policy.tracking_capacity as f64))).exp();
     let independently_computed = boundary + feedback + capacity;
 
     assert!((bound.tracking_load_ell_f - ell_f).abs() < 1e-12);
