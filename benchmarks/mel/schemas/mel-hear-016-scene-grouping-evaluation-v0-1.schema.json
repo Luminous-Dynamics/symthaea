@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/mel-hear-016-scene-grouping-evaluation-v0-1.schema.json",
+  "title": "MEL-HEAR-016 auditory scene grouping evaluation bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case",
+    "prediction",
+    "reference"
+  ],
+  "properties": {
+    "case": {
+      "$ref": "#/$defs/case"
+    },
+    "prediction": {
+      "$ref": "#/$defs/prediction"
+    },
+    "reference": {
+      "$ref": "#/$defs/reference"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_sample",
+        "end_sample"
+      ],
+      "properties": {
+        "start_sample": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_sample": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "benchmark_id",
+        "benchmark_version",
+        "case_id",
+        "split",
+        "source_audio_sha256",
+        "rights_manifest_sha256",
+        "components"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-hear-016-scene-grouping-case-v0.1"
+        },
+        "benchmark_id": {
+          "const": "MEL-AUDITORY-SCENE-GROUPING"
+        },
+        "benchmark_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "development",
+            "test"
+          ]
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rights_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component_id",
+              "support"
+            ],
+            "properties": {
+              "component_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "support": {
+                "$ref": "#/$defs/support"
+              }
+            }
+          }
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_id",
+        "source_audio_sha256",
+        "model_identity_sha256",
+        "analysis_manifest_sha256",
+        "components"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-hear-016-scene-grouping-prediction-v0.1"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component_id",
+              "predicted_source_group",
+              "assignment_confidence"
+            ],
+            "properties": {
+              "component_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "predicted_source_group": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "assignment_confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_id",
+        "source_audio_sha256",
+        "annotation_manifest_sha256",
+        "components"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-hear-016-scene-grouping-reference-v0.1"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "annotation_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component_id",
+              "reference_source_group",
+              "disposition"
+            ],
+            "properties": {
+              "component_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference_source_group": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "disposition": {
+                "enum": [
+                  "resolved",
+                  "ambiguous",
+                  "not_estimable"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
