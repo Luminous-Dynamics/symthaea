@@ -695,9 +695,7 @@ pub fn deliver_qualified_stream_label_v1(
     if report.frontier != LabelEvidenceFrontierV1::CurrentAtK1 {
         reasons.push(StreamingUpdateReasonV1::LabelNotCurrentK1);
     }
-    if engine.policy.require_source_authenticity_assertion
-        && !report.source_authenticity_proven
-    {
+    if engine.policy.require_source_authenticity_assertion && !report.source_authenticity_proven {
         reasons.push(StreamingUpdateReasonV1::SourceAuthenticityNotProven);
     }
     match report.eligibility {
