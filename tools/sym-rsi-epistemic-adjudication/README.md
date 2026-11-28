@@ -131,7 +131,7 @@ The production module `src/web_research/predictable_audit.rs` adds the eventwise
 
 - The custodian supplies each q_t, an independent u64 random word, the exact pre-label history digest, and frozen audit/random-stream manifest references and SHA-256 digests.
 - Inclusion probabilities use an exact dyadic grid: numerator over 2^64, restricted to multiples of 2^11, so q_t is exactly representable in binary64. A numerator of 2^64 is certainty.
-- A unit is selected exactly when random_word < q_numerator. The returned custodian receipt includes selection status, q_t, pre-label history digest and random-stream index, but omits the raw random word.
+- A unit is selected exactly when random_word < q_numerator. The returned custodian receipt includes selection status, q_t, pre-label history digest, pre-label priority score and random-stream index, but omits the raw random word.
 - The full receipt is custodian-private. Do not provide it or its selected flags to the candidate researcher.
 - q_t may vary with pre-label history. The new `LinearPrelabelPriority` policy maps an exact pre-label priority score in [0, 2^53] to q_min..q_max, rounds down to the exact dyadic grid, and verifies every supplied q_t against the frozen rule. The policy remains external to the candidate. The code cannot prove the score was computed without current-outcome leakage; this still requires audit of the pre-label history and policy manifest.
 - The adapter to SOWRC requires exactly one true-label nonconformity score for every selected audit event and rejects missing labels, nonselected labels, unknown records and invalid scores. Selected-label nonresponse is not silently treated as successful observation.
