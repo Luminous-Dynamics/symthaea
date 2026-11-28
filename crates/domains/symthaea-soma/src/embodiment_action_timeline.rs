@@ -308,6 +308,7 @@ pub struct ActionExecutionGate {
     last_now_monotonic_ns: Option<u64>,
     seen_segment_ids: HashSet<String>,
     active_segment_ids: HashSet<String>,
+    stop_command_accepted_ids: HashSet<String>,
     cancelled: bool,
     expired: bool,
 }
@@ -331,6 +332,7 @@ impl ActionExecutionGate {
             last_now_monotonic_ns: None,
             seen_segment_ids: HashSet::new(),
             active_segment_ids: HashSet::new(),
+            stop_command_accepted_ids: HashSet::new(),
             cancelled: false,
             expired: false,
         })
@@ -342,6 +344,18 @@ impl ActionExecutionGate {
 
     pub fn is_cancelled(&self) -> bool { self.cancelled }
     pub fn is_expired(&self) -> bool { self.expired }
+
+    /// Record that the output adapter accepted a stop command for a dispatched
+    /// segment. This is not independent evidence that output physically ceased.
+    /// Returns false for unknown or already-acknowledged segments.
+    pub fn acknowledge_stop_command_accepted(&mut self, segment_id: &str) -> bool {
+        if self.active_segment_ids.remove(segment_id) {
+            self.stop_command_accepted_ids.insert(segment_id.to_owned());
+            true
+        } else {
+            false
+        }
+    }
 
     /// Advance the schedule at a timestamp from the timeline's source clock.
     ///
@@ -370,13 +384,18 @@ impl ActionExecutionGate {
         self.last_now_monotonic_ns = Some(now_monotonic_ns);
 
         if self.cancelled || self.expired {
-            return Ok(empty_execution_tick(self.cancelled, self.expired));
+            let mut stop_required_segment_ids: Vec<_> =
+                self.active_segment_ids.iter().cloned().collect();
+            stop_required_segment_ids.sort();
+            let mut tick = empty_execution_tick(self.cancelled, self.expired);
+            tick.stop_required_segment_ids = stop_required_segment_ids;
+            return Ok(tick);
         }
 
         if now_monotonic_ns >= self.timeline.expires_at_monotonic_ns {
             self.expired = true;
             let mut stop_required_segment_ids: Vec<_> =
-                self.active_segment_ids.drain().collect();
+                self.active_segment_ids.iter().cloned().collect();
             stop_required_segment_ids.sort();
             return Ok(ActionExecutionTick {
                 dispatch_segment_ids: Vec::new(),
@@ -396,7 +415,7 @@ impl ActionExecutionGate {
             }
             self.cancelled = true;
             let mut stop_required_segment_ids: Vec<_> =
-                self.active_segment_ids.drain().collect();
+                self.active_segment_ids.iter().cloned().collect();
             stop_required_segment_ids.sort();
             return Ok(ActionExecutionTick {
                 dispatch_segment_ids: Vec::new(),
@@ -409,19 +428,15 @@ impl ActionExecutionGate {
         }
 
         let mut scheduled_stop_segment_ids = Vec::new();
-        let mut still_active_segment_ids = HashSet::new();
-        for id in self.active_segment_ids.drain() {
-            let still_active = self.timeline.segments.iter().any(|segment| {
-                segment.segment_id == id
-                    && segment.ends_at_monotonic_ns > now_monotonic_ns
+        for id in &self.active_segment_ids {
+            let scheduled_end_reached = self.timeline.segments.iter().any(|segment| {
+                segment.segment_id == *id
+                    && segment.ends_at_monotonic_ns <= now_monotonic_ns
             });
-            if still_active {
-                still_active_segment_ids.insert(id);
-            } else {
-                scheduled_stop_segment_ids.push(id);
+            if scheduled_end_reached && !self.stop_command_accepted_ids.contains(id) {
+                scheduled_stop_segment_ids.push(id.clone());
             }
         }
-        self.active_segment_ids = still_active_segment_ids;
 
         let mut dispatch_segment_ids = Vec::new();
         let mut missed_segment_ids = Vec::new();
@@ -803,6 +818,45 @@ mod tests {
             ActionExecutionGate::new(compiled, "clock:other"),
             Err(ActionExecutionError::WrongExecutionClockDomain)
         );
+    }
+
+
+    #[test]
+    fn scheduled_stop_is_repeated_until_adapter_accepts_it() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled, "clock:source-1").unwrap();
+        gate.advance(2_000, "clock:source-1", None).unwrap();
+        let first = gate.advance(4_000, "clock:source-1", None).unwrap();
+        let second = gate.advance(4_001, "clock:source-1", None).unwrap();
+        assert_eq!(first.scheduled_stop_segment_ids, vec!["gesture-1"]);
+        assert_eq!(second.scheduled_stop_segment_ids, vec!["gesture-1"]);
+        assert!(gate.acknowledge_stop_command_accepted("gesture-1"));
+        let acknowledged = gate.advance(4_002, "clock:source-1", None).unwrap();
+        assert!(acknowledged.scheduled_stop_segment_ids.is_empty());
+    }
+
+    #[test]
+    fn cancellation_retries_stop_until_adapter_acknowledgement() {
+        let compiled = compile_action_timeline_v1(timeline()).unwrap();
+        let mut gate = ActionExecutionGate::new(compiled.clone(), "clock:source-1").unwrap();
+        gate.advance(2_000, "clock:source-1", None).unwrap();
+        let cancellation = ActionCancellationV1 {
+            plan_id: compiled.plan_id.clone(),
+            clock_domain_id: compiled.clock_domain_id.clone(),
+            cancelled_at_monotonic_ns: 3_000,
+            cause_event_id: "stop-retry-1".to_owned(),
+            reason: ActionCancellationReason::UserStop,
+            replacement_plan_id: None,
+            timeline_digest: compiled.timeline_digest.clone(),
+        };
+        let first = gate.advance(3_000, "clock:source-1", Some(&cancellation)).unwrap();
+        assert_eq!(first.stop_required_segment_ids.len(), 3);
+        let retry = gate.advance(3_001, "clock:source-1", None).unwrap();
+        assert_eq!(retry.stop_required_segment_ids.len(), 3);
+        assert!(gate.acknowledge_stop_command_accepted("speech-1"));
+        let after_ack = gate.advance(3_002, "clock:source-1", None).unwrap();
+        assert_eq!(after_ack.stop_required_segment_ids.len(), 2);
+        assert!(!gate.acknowledge_stop_command_accepted("unknown"));
     }
 
     #[test]
