@@ -146,7 +146,7 @@ impl WorldState {
 pub struct Observation {
     pub tick: u32,
     pub location: Site,
-    pub goal: &'static str,
+    pub goal: String,
     pub visible_items: Vec<Item>,
     pub known_clues: Vec<Clue>,
     pub gate_state: Option<GateState>,
@@ -189,6 +189,8 @@ pub enum TransitionError {
     NotAdjacent { from: Site, to: Site },
     GateNotTraversable(GateState),
     ItemUnavailable { site: Site, item: Item },
+    SiteNotInspected(Site),
+    MechanismNotDiscovered,
     MissingValveKey,
     WrongLocation { expected: Site, actual: Site },
     MissingWaterFilter,
@@ -203,6 +205,8 @@ impl std::fmt::Display for TransitionError {
             Self::NotAdjacent { from, to } => write!(f, "no direct route from {from:?} to {to:?}"),
             Self::GateNotTraversable(state) => write!(f, "crossing gate is not traversable: {state:?}"),
             Self::ItemUnavailable { site, item } => write!(f, "{item:?} is not available at {site:?}"),
+            Self::SiteNotInspected(site) => write!(f, "inspect {site:?} before collecting hidden resources"),
+            Self::MechanismNotDiscovered => write!(f, "inspect the crossing to discover the gate mechanism"),
             Self::MissingValveKey => write!(f, "valve key is required to operate the crossing gate"),
             Self::WrongLocation { expected, actual } => write!(f, "action requires {expected:?}, currently at {actual:?}"),
             Self::MissingWaterFilter => write!(f, "water filter is required for delivery"),
@@ -229,11 +233,11 @@ pub fn observe(state: &WorldState) -> Observation {
     Observation {
         tick: state.tick,
         location: state.location,
-        goal: "Deliver the water filter to the outpost.",
+        goal: "Deliver the water filter to the outpost.".to_string(),
         visible_items,
         known_clues: state.known_clues.iter().copied().collect(),
         gate_state: (state.location == Site::Crossing && inspected).then_some(state.gate_state),
-        delivery_complete: (state.location == Site::Outpost && inspected).then_some(state.delivered),
+        delivery_complete: (state.location == Site::Outpost).then_some(state.delivered),
         observation_budget_remaining: state.observation_budget_remaining,
     }
 }
@@ -300,6 +304,9 @@ pub fn step(
             EventKind::Moved { from, to: destination }
         }
         Action::Collect(item) => {
+            if !next.inspected_sites.contains(&next.location) {
+                return Err(TransitionError::SiteNotInspected(next.location));
+            }
             if !next.items_at.remove(&(next.location, item)) {
                 return Err(TransitionError::ItemUnavailable {
                     site: next.location,
@@ -315,6 +322,9 @@ pub fn step(
                     expected: Site::Crossing,
                     actual: next.location,
                 });
+            }
+            if !next.known_clues.contains(&Clue::ValveKeyOpensCrossingGate) {
+                return Err(TransitionError::MechanismNotDiscovered);
             }
             if !next.inventory.contains(&Item::ValveKey) {
                 return Err(TransitionError::MissingValveKey);
@@ -481,6 +491,6 @@ mod tests {
         let (b, receipt_b) = step(&manifest, &initial, Action::Inspect).expect("inspect b");
         assert_eq!(a, b);
         assert_eq!(receipt_a, receipt_b);
-        assert_eq!(receipt_a.before_state_digest, receipt_a.after_state_digest /* replaced below */);
+        assert_ne!(receipt_a.before_state_digest, receipt_a.after_state_digest);
     }
 }
