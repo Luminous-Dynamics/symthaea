@@ -411,18 +411,32 @@ mod tests {
     }
 
     #[test]
-    fn increasing_uncertainty_radii_cannot_increase_robust_power() {
-        let points = [
-            (Q::new(0, 1), Q::new(0, 1)),
-            (Q::new(1, 10), Q::new(1, 10)),
-            (Q::new(3, 20), Q::new(1, 20)),
-            (Q::new(3, 10), Q::new(1, 5)),
-            (Q::new(2, 5), Q::new(1, 5)),
-            (Q::new(9, 20), Q::new(1, 5)),
+    fn increasing_either_uncertainty_radius_cannot_increase_robust_power() {
+        let fixed_null_radius = Q::new(1, 20);
+        let alternative_radii = [
+            Q::new(0, 1),
+            Q::new(1, 10),
+            Q::new(3, 20),
+            Q::new(2, 5),
+            Q::new(9, 20),
         ];
         let mut previous = Q::one();
-        for (epsilon_a, epsilon_b) in points {
-            let value = robust_tv_ball_value(epsilon_a, epsilon_b);
+        for epsilon_a in alternative_radii {
+            let value = robust_tv_ball_value(epsilon_a, fixed_null_radius);
+            assert!(value.is_le(previous));
+            previous = value;
+        }
+
+        let fixed_alt_radius = Q::new(3, 20);
+        let null_radii = [
+            Q::new(0, 1),
+            Q::new(1, 20),
+            Q::new(1, 5),
+            Q::new(9, 20),
+        ];
+        previous = Q::one();
+        for epsilon_b in null_radii {
+            let value = robust_tv_ball_value(fixed_alt_radius, epsilon_b);
             assert!(value.is_le(previous));
             previous = value;
         }
