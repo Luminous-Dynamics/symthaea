@@ -67,6 +67,7 @@ pub struct JointPopulationRowV1 {
     pub k1_report_sha256: Option<String>,
     pub label_value: Option<f64>,
     pub label_available_at_unix_seconds: Option<i64>,
+    pub eligibility_report_available_at_unix_seconds: Option<i64>,
     pub label_delivered_at_unix_seconds: Option<i64>,
 }
 
@@ -135,7 +136,18 @@ pub struct JointArmRiskSummaryV1 {
     pub selection_risk_report_sha256: String,
     pub observed_miscoverage_count: Option<usize>,
     pub observed_miscoverage_count_denominator: Option<usize>,
+    pub aci_held_unknown_count: Option<usize>,
+    pub aci_blocked_count: Option<usize>,
+    pub aci_rejected_count: Option<usize>,
+    pub aci_missing_feedback_count: Option<usize>,
+    pub aci_degenerate_resolution_count: Option<usize>,
     pub ca_ocrc_weighted_feedback_sum: Option<f64>,
+    pub ca_ocrc_updated_feedback_count: Option<usize>,
+    pub ca_ocrc_held_unknown_count: Option<usize>,
+    pub ca_ocrc_blocked_count: Option<usize>,
+    pub ca_ocrc_not_tracked_count: Option<usize>,
+    pub ca_ocrc_rejected_count: Option<usize>,
+    pub ca_ocrc_duplicate_count: Option<usize>,
     pub ca_ocrc_max_tracking_occupancy: Option<usize>,
     pub ca_ocrc_tracking_capacity: Option<usize>,
     pub ca_ocrc_theorem_assumptions_intact: Option<bool>,
@@ -298,6 +310,9 @@ fn validate_population(
                     || row.label_payload_sha256.is_some()
                     || row.k1_report_sha256.is_some()
                     || row.label_value.is_some()
+                    || row.label_available_at_unix_seconds.is_some()
+                    || row.eligibility_report_available_at_unix_seconds.is_some()
+                    || row.label_delivered_at_unix_seconds.is_some()
                 {
                     return Err(JointRiskTraceErrorV1(format!(
                         "unmeasured round {} contains physical label evidence",
@@ -324,9 +339,21 @@ fn validate_population(
                         .as_deref()
                         .is_some_and(valid_sha256)
                     || !row.k1_report_sha256.as_deref().is_some_and(valid_sha256)
+                    || row.label_available_at_unix_seconds.is_none()
+                    || row.eligibility_report_available_at_unix_seconds.is_none()
+                    || row.label_delivered_at_unix_seconds.is_none()
                 {
                     return Err(JointRiskTraceErrorV1(format!(
                         "measured round {} lacks a revision or valid label/K1 digest",
+                        row.round_id
+                    )));
+                }
+                let label_available = row.label_available_at_unix_seconds.unwrap();
+                let report_available = row.eligibility_report_available_at_unix_seconds.unwrap();
+                let label_delivered = row.label_delivered_at_unix_seconds.unwrap();
+                if label_available > report_available || report_available > label_delivered {
+                    return Err(JointRiskTraceErrorV1(format!(
+                        "measured round {} has invalid label/report/delivery chronology",
                         row.round_id
                     )));
                 }
@@ -493,6 +520,10 @@ fn validate_aci_delivery(
         || Some(delivery.label_payload_sha256.as_str()) != row.label_payload_sha256.as_deref()
         || Some(report.report_sha256.as_str()) != row.k1_report_sha256.as_deref()
         || row.label_value.is_some_and(|value| delivery.label_value != value)
+        || Some(delivery.label_available_at_unix_seconds) != row.label_available_at_unix_seconds
+        || Some(delivery.eligibility_report_available_at_unix_seconds)
+            != row.eligibility_report_available_at_unix_seconds
+        || Some(delivery.delivered_at_unix_seconds) != row.label_delivered_at_unix_seconds
         || report.label_id != delivery.label_id
         || report.label_revision != delivery.label_revision
         || report.measurement_event_id != delivery.measurement_event_id
@@ -530,7 +561,16 @@ fn validate_ca_feedback_input(
         || Some(feedback.label_revision) != row.label_revision
         || Some(feedback.label_payload_sha256.as_str()) != row.label_payload_sha256.as_deref()
         || Some(report.report_sha256.as_str()) != row.k1_report_sha256.as_deref()
-        || feedback.label_value != row.label_value.unwrap_or(f64::NAN)
+        || row.label_value.is_some_and(|value| feedback.label_value != value)
+        || Some(feedback.label_available_at_unix_seconds) != row.label_available_at_unix_seconds
+        || Some(feedback.eligibility_report_available_at_unix_seconds)
+            != row.eligibility_report_available_at_unix_seconds
+        || Some(feedback.delivered_at_unix_seconds) != row.label_delivered_at_unix_seconds
+        || feedback.delivered_at_unix_seconds < feedback.label_available_at_unix_seconds
+        || feedback.eligibility_report_available_at_unix_seconds
+            < feedback.label_available_at_unix_seconds
+        || feedback.delivered_at_unix_seconds
+            < feedback.eligibility_report_available_at_unix_seconds
         || report.label_id != feedback.label_id
         || report.label_revision != feedback.label_revision
         || report.measurement_event_id != feedback.measurement_event_id
@@ -613,7 +653,7 @@ fn validate_aci_arm(
     arm: &JointBenchmarkArmV1,
     evidence: &JointTauAciArmEvidenceV1,
     population: &BTreeMap<u64, &JointPopulationRowV1>,
-) -> Result<Option<usize>, JointRiskTraceErrorV1> {
+) -> Result<Option<(usize, usize, usize, usize, usize)>, JointRiskTraceErrorV1> {
     if evidence.predictions.len() != population.len() {
         return Err(JointRiskTraceErrorV1(format!(
             "tau-ACI arm {} must issue exactly one prediction per population row",
@@ -700,10 +740,15 @@ fn validate_aci_arm(
     }
 
     let mut update_receipts = BTreeSet::new();
+    let mut update_samples = BTreeSet::new();
     let mut observed_miscoverage = 0_usize;
     let mut observed_count = 0_usize;
+    let mut held_unknown_count = 0_usize;
+    let mut blocked_count = 0_usize;
+    let mut rejected_count = 0_usize;
     for update in &evidence.updates {
         if !update_receipts.insert(update.receipt_sha256.as_str())
+            || !update_samples.insert(update.sample_id.as_str())
             || aci_update_digest(update)? != update.receipt_sha256
         {
             return Err(JointRiskTraceErrorV1(format!(
@@ -756,6 +801,14 @@ fn validate_aci_arm(
                     arm.arm_id
                 )));
             }
+        }
+        match update.disposition {
+            AciUpdateDispositionV1::HeldUnknown => held_unknown_count += 1,
+            AciUpdateDispositionV1::Blocked => blocked_count += 1,
+            AciUpdateDispositionV1::Rejected | AciUpdateDispositionV1::PendingPredictionMissing => {
+                rejected_count += 1;
+            }
+            AciUpdateDispositionV1::Updated | AciUpdateDispositionV1::Duplicate => {}
         }
         match row.outcome_state {
             PopulationOutcomeStateV1::Qualified if !matches!(
@@ -847,7 +900,14 @@ fn validate_aci_arm(
         }
     }
 
+    let mut degenerate_samples = BTreeSet::new();
     for resolution in &evidence.degenerate_resolutions {
+        if !degenerate_samples.insert(resolution.sample_id.as_str()) {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} repeats a degenerate resolution",
+                arm.arm_id
+            )));
+        }
         let Some(prediction) = predictions.get(resolution.sample_id.as_str()) else {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} degenerate resolution has no prediction",
@@ -896,11 +956,17 @@ fn validate_aci_arm(
             .any(|update| update.sample_id == prediction.sample_id);
         let has_delivery = deliveries_by_sample.contains_key(prediction.sample_id.as_str());
         let has_missing = missing_by_sample.contains_key(prediction.sample_id.as_str());
-        let has_degenerate = evidence
-            .degenerate_resolutions
-            .iter()
-            .any(|entry| entry.sample_id == prediction.sample_id);
+        let has_degenerate = degenerate_samples.contains(prediction.sample_id.as_str());
         let due_outcome_present = has_update || has_delivery || has_missing || has_degenerate;
+        if usize::from(has_update)
+            + usize::from(has_missing)
+            + usize::from(has_degenerate) > 1
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} has multiple terminal outcomes for sample {}",
+                arm.arm_id, prediction.sample_id
+            )));
+        }
         if !due_outcome_present {
             return Err(JointRiskTraceErrorV1(format!(
                 "tau-ACI arm {} omits due feedback/forfeit/degenerate record for sample {}",
@@ -924,6 +990,14 @@ fn validate_aci_arm(
                 arm.arm_id, prediction.sample_id
             )));
         }
+        if has_degenerate
+            && prediction.interval.kind == AciIntervalKindV1::Bounded
+        {
+            return Err(JointRiskTraceErrorV1(format!(
+                "tau-ACI arm {} records degenerate resolution for bounded interval {}",
+                arm.arm_id, prediction.sample_id
+            )));
+        }
     }
     let should_be_uncertified = !evidence.missing_feedback.is_empty()
         || evidence
@@ -938,6 +1012,10 @@ fn validate_aci_arm(
             row.outcome_state != PopulationOutcomeStateV1::Qualified
                 && prediction.interval.kind == AciIntervalKindV1::Bounded
         });
+    for resolution in &evidence.degenerate_resolutions {
+        observed_count += 1;
+        observed_miscoverage += usize::from(resolution.miscoverage_observed);
+    }
     if should_be_uncertified
         && evidence.guarantee_state == AciGuaranteeStateV1::UnderDeclaredFixedDelayAssumptions
     {
@@ -952,7 +1030,13 @@ fn validate_aci_arm(
             arm.arm_id
         )));
     }
-    Ok(Some(observed_miscoverage))
+    Ok(Some((
+        observed_miscoverage,
+        observed_count,
+        held_unknown_count,
+        blocked_count,
+        rejected_count,
+    )))
 }
 
 fn validate_ca_arm(
@@ -990,6 +1074,13 @@ fn validate_ca_arm(
         )));
     }
     let mut reports = BTreeMap::new();
+    let mut seen_feedback_results = BTreeSet::new();
+    let mut updated_feedback_count = 0_usize;
+    let mut held_unknown_feedback_count = 0_usize;
+    let mut blocked_feedback_count = 0_usize;
+    let mut not_tracked_feedback_count = 0_usize;
+    let mut rejected_feedback_count = 0_usize;
+    let mut duplicate_feedback_count = 0_usize;
     let mut weighted_feedback_sum = 0.0;
     let mut max_occupancy = 0_usize;
     let mut capacity: Option<usize> = None;
@@ -1074,11 +1165,29 @@ fn validate_ca_arm(
                     arm.arm_id, report.round
                 )));
             };
-            if ca_feedback_digest(result)? != result.feedback_receipt_sha256 {
+            let result_key = (
+                result.originating_round.unwrap_or(u64::MAX),
+                result.sample_id.as_str(),
+                result.label_id.as_str(),
+                result.label_revision,
+            );
+            if !seen_feedback_results.insert(result_key)
+                || result.originating_round.is_none()
+                || result.actual_delay_steps.is_none()
+                || ca_feedback_digest(result)? != result.feedback_receipt_sha256
+            {
                 return Err(JointRiskTraceErrorV1(format!(
-                    "CA-OCRC arm {} has a tampered feedback result receipt",
+                    "CA-OCRC arm {} has a duplicate, incomplete or tampered feedback result receipt",
                     arm.arm_id
                 )));
+            }
+            match result.disposition {
+                CaOcrcFeedbackDispositionV1::Updated => updated_feedback_count += 1,
+                CaOcrcFeedbackDispositionV1::HeldUnknown => held_unknown_feedback_count += 1,
+                CaOcrcFeedbackDispositionV1::Blocked => blocked_feedback_count += 1,
+                CaOcrcFeedbackDispositionV1::NotTracked => not_tracked_feedback_count += 1,
+                CaOcrcFeedbackDispositionV1::Rejected => rejected_feedback_count += 1,
+                CaOcrcFeedbackDispositionV1::Duplicate => duplicate_feedback_count += 1,
             }
         }
         weighted_feedback_sum += report.weighted_feedback_sum;
@@ -1118,6 +1227,26 @@ fn validate_ca_arm(
             }
         }
     }
+    let input_feedback_keys: BTreeSet<(u64, &str, &str, u64)> = evidence
+        .round_inputs
+        .iter()
+        .flat_map(|input| {
+            input.feedbacks.iter().map(move |feedback| {
+                (
+                    feedback.feedback_round,
+                    feedback.sample_id.as_str(),
+                    feedback.label_id.as_str(),
+                    feedback.label_revision,
+                )
+            })
+        })
+        .collect();
+    if seen_feedback_results != input_feedback_keys {
+        return Err(JointRiskTraceErrorV1(format!(
+            "CA-OCRC arm {} has a feedback result without exactly one original input",
+            arm.arm_id
+        )));
+    }
     if population
         .values()
         .any(|row| !row.physical_measurement_selected)
@@ -1133,6 +1262,12 @@ fn validate_ca_arm(
         max_occupancy,
         capacity.unwrap_or(0),
         theorem_intact,
+        updated_feedback_count,
+        held_unknown_feedback_count,
+        blocked_feedback_count,
+        not_tracked_feedback_count,
+        rejected_feedback_count,
+        duplicate_feedback_count,
     ))
 }
 
@@ -1146,13 +1281,14 @@ fn validate_shared_audit(
             "first arm has no independent audit design".into(),
         ));
     };
-    let mut first_audit: Vec<(u64, f64, String)> = first_input
+    let mut first_audit: Vec<(u64, u64, u64, String)> = first_input
         .independent_audit_losses
         .iter()
         .map(|row| {
             (
                 row.round_id,
-                row.inclusion_probability,
+                row.inclusion_probability.to_bits(),
+                row.loss.to_bits(),
                 row.audit_measurement_receipt_sha256.clone(),
             )
         })
@@ -1172,13 +1308,14 @@ fn validate_shared_audit(
                 arm.arm_id
             )));
         }
-        let mut audit: Vec<(u64, f64, String)> = input
+        let mut audit: Vec<(u64, u64, u64, String)> = input
             .independent_audit_losses
             .iter()
             .map(|row| {
                 (
                     row.round_id,
-                    row.inclusion_probability,
+                    row.inclusion_probability.to_bits(),
+                    row.loss.to_bits(),
                     row.audit_measurement_receipt_sha256.clone(),
                 )
             })
@@ -1274,7 +1411,14 @@ pub fn evaluate_joint_risk_trace_v1(
         let selection_report = validate_selection_risk_input(arm, input, &population)?;
         let summary = match (&arm.controller_evidence, arm.method) {
             (JointControllerEvidenceV1::FixedDelayTauAci(evidence), JointControllerMethodV1::FixedDelayTauAci) => {
-                let observed = validate_aci_arm(arm, evidence, &population)?;
+                let (
+                    observed_miscoverage,
+                    observed_count,
+                    held_unknown,
+                    blocked,
+                    rejected,
+                ) = validate_aci_arm(arm, evidence, &population)?
+                    .expect("ACI validator returns observed counts");
                 JointArmRiskSummaryV1 {
                     arm_id: arm.arm_id.clone(),
                     method: arm.method,
@@ -1299,23 +1443,38 @@ pub fn evaluate_joint_risk_trace_v1(
                         .as_ref()
                         .map(|value| value.hoeffding_upper),
                     selection_risk_report_sha256: selection_report.report_sha256,
-                    observed_miscoverage_count: observed,
-                    observed_miscoverage_count_denominator: Some(
-                        evidence
-                            .updates
-                            .iter()
-                            .filter(|update| update.phase_state_mutated)
-                            .count(),
-                    ),
+                    observed_miscoverage_count: Some(observed_miscoverage),
+                    observed_miscoverage_count_denominator: Some(observed_count),
+                    aci_held_unknown_count: Some(held_unknown),
+                    aci_blocked_count: Some(blocked),
+                    aci_rejected_count: Some(rejected),
+                    aci_missing_feedback_count: Some(evidence.missing_feedback.len()),
+                    aci_degenerate_resolution_count: Some(evidence.degenerate_resolutions.len()),
                     ca_ocrc_weighted_feedback_sum: None,
+                    ca_ocrc_updated_feedback_count: None,
+                    ca_ocrc_held_unknown_count: None,
+                    ca_ocrc_blocked_count: None,
+                    ca_ocrc_not_tracked_count: None,
+                    ca_ocrc_rejected_count: None,
+                    ca_ocrc_duplicate_count: None,
                     ca_ocrc_max_tracking_occupancy: None,
                     ca_ocrc_tracking_capacity: None,
                     ca_ocrc_theorem_assumptions_intact: None,
                 }
             }
             (JointControllerEvidenceV1::BoundedDelayCaOcrc(evidence), JointControllerMethodV1::BoundedDelayCaOcrc) => {
-                let (weighted_sum, occupancy, capacity, theorem_intact) =
-                    validate_ca_arm(arm, evidence, &population)?;
+                let (
+                    weighted_sum,
+                    occupancy,
+                    capacity,
+                    theorem_intact,
+                    updated,
+                    held_unknown,
+                    blocked,
+                    not_tracked,
+                    rejected,
+                    duplicate,
+                ) = validate_ca_arm(arm, evidence, &population)?;
                 JointArmRiskSummaryV1 {
                     arm_id: arm.arm_id.clone(),
                     method: arm.method,
@@ -1342,7 +1501,18 @@ pub fn evaluate_joint_risk_trace_v1(
                     selection_risk_report_sha256: selection_report.report_sha256,
                     observed_miscoverage_count: None,
                     observed_miscoverage_count_denominator: None,
+                    aci_held_unknown_count: None,
+                    aci_blocked_count: None,
+                    aci_rejected_count: None,
+                    aci_missing_feedback_count: None,
+                    aci_degenerate_resolution_count: None,
                     ca_ocrc_weighted_feedback_sum: weighted_sum,
+                    ca_ocrc_updated_feedback_count: Some(updated),
+                    ca_ocrc_held_unknown_count: Some(held_unknown),
+                    ca_ocrc_blocked_count: Some(blocked),
+                    ca_ocrc_not_tracked_count: Some(not_tracked),
+                    ca_ocrc_rejected_count: Some(rejected),
+                    ca_ocrc_duplicate_count: Some(duplicate),
                     ca_ocrc_max_tracking_occupancy: Some(occupancy),
                     ca_ocrc_tracking_capacity: Some(capacity),
                     ca_ocrc_theorem_assumptions_intact: Some(theorem_intact),
