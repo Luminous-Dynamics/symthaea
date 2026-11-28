@@ -445,8 +445,17 @@ fn solve_flow(
     let subset_count = 1_usize
         .checked_shl(node_count as u32)
         .ok_or_else(|| format!("{}: min-cut subset count overflow", case.id))?;
-    let mut min_cut = u64::MAX;
+    let mut cut_arcs = Vec::new();
+    for from in 0..matrix_size {
+        for to in 0..matrix_size {
+            let capacity = capacities[from][to];
+            if capacity > 0 {
+                cut_arcs.push((from, to, capacity));
+            }
+        }
+    }
 
+    let mut min_cut = u64::MAX;
     for mask in 0..subset_count {
         let in_source_side = |vertex: usize| -> bool {
             if vertex == super_source {
@@ -459,16 +468,11 @@ fn solve_flow(
         };
 
         let mut cut_capacity = 0_u64;
-        for from in 0..matrix_size {
-            if !in_source_side(from) {
-                continue;
-            }
-            for to in 0..matrix_size {
-                if !in_source_side(to) {
-                    cut_capacity = cut_capacity
-                        .checked_add(capacities[from][to])
-                        .ok_or_else(|| format!("{}: cut capacity overflow", case.id))?;
-                }
+        for &(from, to, capacity) in &cut_arcs {
+            if in_source_side(from) && !in_source_side(to) {
+                cut_capacity = cut_capacity
+                    .checked_add(capacity)
+                    .ok_or_else(|| format!("{}: cut capacity overflow", case.id))?;
             }
         }
         min_cut = min_cut.min(cut_capacity);
