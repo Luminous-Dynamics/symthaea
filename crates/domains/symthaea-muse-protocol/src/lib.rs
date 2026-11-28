@@ -38,6 +38,8 @@ pub mod catalog;
 pub mod transition;
 /// Leakage-safe beat benchmark manifests (MEL-DJ-009).
 pub mod beat_benchmark;
+/// Pinned MIREX beat score semantics and known-answer parity (MEL-DJ-010).
+pub mod beat_metrics;
 
 use serde::{Deserialize, Serialize};
 

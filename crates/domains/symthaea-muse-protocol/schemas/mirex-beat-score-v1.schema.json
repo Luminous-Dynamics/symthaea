@@ -1,0 +1,461 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-dj/mirex-beat-score-v1.schema.json",
+  "title": "Melothaea MIREX Beat Score Report V1",
+  "description": "Pinned mir_eval 0.8.2 beat metrics and MIREX evaluator receipt. The first eight score fields are the public MIREX beat columns; Cemgil best metric level is an additional diagnostic.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/beat_track_report"
+    },
+    {
+      "$ref": "#/$defs/downbeat_report"
+    },
+    {
+      "$ref": "#/$defs/aggregate_report"
+    },
+    {
+      "$ref": "#/$defs/qualified_beat_track_report"
+    }
+  ],
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "task",
+        "mirex_evaluator_repository",
+        "mirex_evaluator_commit",
+        "reference_library",
+        "reference_library_version",
+        "reference_library_commit",
+        "sample_rate_hz",
+        "initial_trim_seconds",
+        "event_f_measure_tolerance_ms",
+        "cemgil_sigma_ms",
+        "continuity_phase_threshold_ppm",
+        "continuity_period_threshold_ppm",
+        "goto_error_threshold",
+        "goto_mean_threshold",
+        "goto_std_threshold",
+        "p_score_window_ratio"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "task": {
+          "enum": [
+            "beat_tracking",
+            "downbeat_estimation"
+          ]
+        },
+        "mirex_evaluator_repository": {
+          "const": "ismir-mirex/mirex-evaluation"
+        },
+        "mirex_evaluator_commit": {
+          "const": "b9fa0b0b32e2145af31f35830f78fc9d09a4301b"
+        },
+        "reference_library": {
+          "const": "mir_eval"
+        },
+        "reference_library_version": {
+          "const": "0.8.2"
+        },
+        "reference_library_commit": {
+          "const": "8db0b3812e2032544c1fc00d02d4256cab043f3d"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "initial_trim_seconds": {
+          "enum": [
+            0,
+            5
+          ]
+        },
+        "event_f_measure_tolerance_ms": {
+          "const": 70
+        },
+        "cemgil_sigma_ms": {
+          "const": 40
+        },
+        "continuity_phase_threshold_ppm": {
+          "const": 175000
+        },
+        "continuity_period_threshold_ppm": {
+          "const": 175000
+        },
+        "goto_error_threshold": {
+          "const": 0.35
+        },
+        "goto_mean_threshold": {
+          "const": 0.2
+        },
+        "goto_std_threshold": {
+          "const": 0.2
+        },
+        "p_score_window_ratio": {
+          "const": 0.2
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "beat_tracking"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "initial_trim_seconds": {
+                "const": 5
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "downbeat_estimation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "initial_trim_seconds": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "metric_scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "f_measure",
+        "cemgil",
+        "goto",
+        "p_score",
+        "cmlc",
+        "cmlt",
+        "amlc",
+        "amlt",
+        "cemgil_best_metric_level"
+      ],
+      "properties": {
+        "f_measure": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cemgil": {
+          "type": "number",
+          "minimum": 0
+        },
+        "goto": {
+          "type": "number",
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "p_score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cmlc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cmlt": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "amlc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "amlt": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cemgil_best_metric_level": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "beat_track_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scoring_receipt",
+        "scores",
+        "reference_beats_input",
+        "estimated_beats_input",
+        "reference_beats_scored",
+        "estimated_beats_scored",
+        "sample_rate_hz",
+        "initial_trim_seconds"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "scoring_receipt": {
+          "$ref": "#/$defs/receipt"
+        },
+        "scores": {
+          "$ref": "#/$defs/metric_scores"
+        },
+        "reference_beats_input": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "estimated_beats_input": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reference_beats_scored": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "estimated_beats_scored": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "initial_trim_seconds": {
+          "const": 5
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "beat_tracking"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "downbeat_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "precision",
+        "recall",
+        "f_measure",
+        "matched_events",
+        "reference_events",
+        "estimated_events",
+        "scoring_receipt"
+      ],
+      "properties": {
+        "precision": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recall": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "f_measure": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "matched_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scoring_receipt": {
+          "$ref": "#/$defs/receipt"
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "scoring_receipt": {
+              "properties": {
+                "task": {
+                  "const": "downbeat_estimation"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aggregate_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "track_count",
+        "total_weight_frames",
+        "scores"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "arithmetic_mean_per_track",
+            "duration_weighted"
+          ]
+        },
+        "track_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "total_weight_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "scores": {
+          "$ref": "#/$defs/metric_scores"
+        }
+      }
+    },
+    "valid_segment_policy": {
+      "enum": [
+        "full_track",
+        "declared_valid_segments"
+      ]
+    },
+    "score_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "benchmark_manifest_sha256",
+        "source_audio_sha256",
+        "reference_annotation_sha256",
+        "estimated_event_output_sha256",
+        "source_master_family_id",
+        "valid_segment_policy",
+        "valid_segment_manifest_sha256"
+      ],
+      "properties": {
+        "track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_annotation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "estimated_event_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_master_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "valid_segment_policy": {
+          "$ref": "#/$defs/valid_segment_policy"
+        },
+        "valid_segment_manifest_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "valid_segment_policy": {
+                "const": "full_track"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "valid_segment_manifest_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "valid_segment_policy": {
+                "const": "declared_valid_segments"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "valid_segment_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "qualified_beat_track_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report",
+        "evidence"
+      ],
+      "properties": {
+        "report": {
+          "$ref": "#/$defs/beat_track_report"
+        },
+        "evidence": {
+          "$ref": "#/$defs/score_evidence"
+        }
+      }
+    }
+  }
+}
