@@ -313,6 +313,19 @@ pub fn apply_probe_observation(
     receipt: &ProbeObservationReceipt,
 ) -> Result<AppliedProbeObservation, BridgeError> {
     validate_probe_contract(episode, world, contract)?;
+    if forecast.episode_id != episode.episode_id {
+        return Err(BridgeError::EpisodeMismatch {
+            field: "forecast",
+            expected: episode.episode_id.clone(),
+            actual: forecast.episode_id.clone(),
+        });
+    }
+    if forecast.emitted_at_step != episode.current_step {
+        return Err(BridgeError::ForecastNotPreRegistered {
+            forecast_step: forecast.emitted_at_step,
+            required_step: episode.current_step,
+        });
+    }
     let forecast_brier_score = score_outcome_forecast(contract, forecast, receipt)?;
 
     let option = episode
@@ -405,6 +418,7 @@ fn validate_probe_contract(
         .find(|probe| probe.probe_id == contract.probe_id)
         .ok_or_else(|| BridgeError::UnknownProbe(contract.probe_id.clone()))?;
     if public_option.result_delay_steps != contract.result_delay_steps
+        || evaluator_probe.result_delay_steps != contract.result_delay_steps
         || (public_option.acquisition_cost - evaluator_probe.acquisition_cost).abs()
             > PROBABILITY_TOLERANCE
     {
@@ -840,6 +854,44 @@ mod tests {
         assert!((result.posterior_by_state["B_N0"] - 0.5).abs() < 1.0e-9);
         assert!((result.candidate_expected_loss - 0.4).abs() < 1.0e-9);
         assert!(result.decision_regret.abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn application_rejects_stale_forecast_and_unaffordable_or_late_probe() {
+        let (episode, world, _nuisance, switch) = fixture();
+        let mut stale = forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5);
+        stale.emitted_at_step = 0;
+        let mut progressed = episode.clone();
+        progressed.current_step = 1;
+        assert!(matches!(
+            apply_probe_observation(
+                &progressed, &world, &switch, &stale,
+                &receipt("inspect_switch_trace", "trace_A", 2)
+            ),
+            Err(BridgeError::ForecastNotPreRegistered { .. })
+        ));
+
+        let mut over_budget = episode.clone();
+        over_budget.remaining_probe_budget = 0.01;
+        assert!(matches!(
+            apply_probe_observation(
+                &over_budget, &world, &switch,
+                &forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5),
+                &receipt("inspect_switch_trace", "trace_A", 1)
+            ),
+            Err(BridgeError::ProbeNotAdmissible(ProbeAdmission::OverBudget))
+        ));
+
+        let mut late = episode.clone();
+        late.decision_deadline_step = 0;
+        assert!(matches!(
+            apply_probe_observation(
+                &late, &world, &switch,
+                &forecast("inspect_switch_trace", "trace_A", "trace_B", 0.5),
+                &receipt("inspect_switch_trace", "trace_A", 1)
+            ),
+            Err(BridgeError::ObservationAfterDeadline { .. })
+        ));
     }
 
     #[test]
