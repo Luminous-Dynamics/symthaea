@@ -10,7 +10,7 @@ This is deliberately stricter than per-row selective risk. Mean bounded loss and
 
 ## Calibration/evaluation split firewall
 
-Calibration and evaluation inventories must be supplied separately. Each contains sorted, unique HMAC-SHA256 commitments for independent clusters, episodes and observations; raw identities are never accepted by the inventory contract. Both inventories must use the same commitment namespace, benchmark snapshot, task definition, group hierarchy, score definition, loss definition and independence-unit schema. The audit rejects any cluster, episode or observation overlap, including cases where only the episode or record overlaps. Evaluation outcome labels must be sealed and inaccessible to the candidate. The audit receipt binds both inventory digests and the complete preregistered policy/threshold configuration into the calibration manifest. These checks validate declared inventories; they cannot prove the upstream identity mapping or custodian behavior without an independently authenticated preprocessor.
+Calibration and evaluation inventories must be supplied separately. Each contains sorted, unique HMAC-SHA256 commitments for independent clusters, episodes and observations; raw identities are never accepted by the inventory contract. Both inventories must use the same commitment namespace, benchmark snapshot, task definition, group hierarchy, score definition, loss definition and independence-unit schema. The audit rejects any cluster, episode or observation overlap, including cases where only the episode or record overlaps. Evaluation outcome labels must be sealed and inaccessible to the candidate. The audit receipt binds both inventory digests and the complete preregistered policy/threshold configuration into the calibration manifest. Each calibration row must match the inventory's cluster, episode and observation commitments exactly. Cluster tokens are intended to be HMAC-SHA256 commitments produced by a trusted preprocessor with a key held outside the candidate. Synthetic tests use deterministic SHA-256 fixture tokens only. These checks validate declared inventories; they cannot prove the upstream identity mapping or custodian behavior without an independently authenticated preprocessor and evaluator.
 
 ## Exact bound and post-selection control
 
@@ -45,7 +45,7 @@ No guarantee transfers automatically to a new policy, score, hierarchy, source d
 
 ## Synthetic tests
 
-Sixteen deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
+Nineteen deterministic tests cover the exact zero-violation bound and sample-size consequence, multiplicity conservatism, safe threshold selection, hard-gate dominance, risk-exceeds-target status, explicit parent fallback, shift and exchangeability suspension, hierarchy cycle/digest rejection, retrieve-more behavior, certificate-gated acceptance and tamper rejection.
 
 ## Run
 
