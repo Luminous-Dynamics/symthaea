@@ -25,6 +25,8 @@ pub const MUSIC_EDIT_METAMORPHIC_PATH_SCHEMA_V1: &str =
     "mel-music-edit-metamorphic-path-v1";
 pub const MUSIC_EDIT_METAMORPHIC_PATH_REPORT_SCHEMA_V1: &str =
     "mel-music-edit-metamorphic-path-report-v1";
+pub const MUSIC_EDIT_METAMORPHIC_COMMUTATOR_CASE_SCHEMA_V1: &str =
+    "mel-music-edit-metamorphic-commutator-case-v1";
 pub const MUSIC_EDIT_METAMORPHIC_COMMUTATOR_REPORT_SCHEMA_V1: &str =
     "mel-music-edit-metamorphic-commutator-report-v1";
 
@@ -46,6 +48,21 @@ pub struct MusicEditMetamorphicPathV1 {
     pub path_id: String,
     /// Ordered in execution order: the first step is applied first.
     pub steps: Vec<MusicEditMetamorphicPathStepV1>,
+}
+
+/// Preregistered expectation for a pair of transformation paths.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicCommutatorCaseV1 {
+    pub schema_version: String,
+    pub case_id: String,
+    pub preregistration_sha256: String,
+    pub evaluation_split: String,
+    pub left_path_sha256: String,
+    pub right_path_sha256: String,
+    pub expected_to_commute: bool,
+    pub rationale: String,
+    pub case_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,6 +128,8 @@ pub struct MusicEditMetamorphicPathReportV1 {
 #[serde(deny_unknown_fields)]
 pub struct MusicEditMetamorphicCommutatorReportV1 {
     pub schema_version: String,
+    pub case_id: String,
+    pub case_sha256: String,
     pub left_path_sha256: String,
     pub right_path_sha256: String,
     pub expected_to_commute: bool,
@@ -398,6 +417,58 @@ fn calculate_path_digest(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+
+const COMMUTATOR_CASE_DOMAIN: &[u8] =
+    b"luminous.mel.music-edit-metamorphic-commutator-case.v1";
+
+pub fn music_edit_metamorphic_commutator_case_digest_v1(
+    case: &MusicEditMetamorphicCommutatorCaseV1,
+) -> Result<String, MusicEditMetamorphicCompositionIssueV1> {
+    let mut commitment = case.clone();
+    commitment.case_sha256.clear();
+    let bytes = serde_json::to_vec(&commitment)
+        .map_err(|_| MusicEditMetamorphicCompositionIssueV1::SerializationError)?;
+    let mut hasher = Sha256::new();
+    hasher.update(COMMUTATOR_CASE_DOMAIN);
+    hasher.update(b"\\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn verify_commutator_case(
+    case: &MusicEditMetamorphicCommutatorCaseV1,
+    left: &MusicEditMetamorphicPathReportV1,
+    right: &MusicEditMetamorphicPathReportV1,
+) -> Result<(), MusicEditMetamorphicCompositionIssueV1> {
+    let valid_sha = |value: &str| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    if case.schema_version != MUSIC_EDIT_METAMORPHIC_COMMUTATOR_CASE_SCHEMA_V1
+        || case.case_id.trim().is_empty()
+        || case.rationale.trim().is_empty()
+        || case.evaluation_split.trim().is_empty()
+        || !valid_sha(&case.preregistration_sha256)
+    {
+        return Err(MusicEditMetamorphicCompositionIssueV1::PropertyMapRejected(
+            "commutator case identity, rationale, split or preregistration digest is invalid".to_owned(),
+        ));
+    }
+    if case.left_path_sha256 != left.path_sha256
+        || case.right_path_sha256 != right.path_sha256
+        || case.evaluation_split != left.split
+        || case.evaluation_split != right.split
+    {
+        return Err(MusicEditMetamorphicCompositionIssueV1::PathsDoNotShareStartState);
+    }
+    if music_edit_metamorphic_commutator_case_digest_v1(case)? != case.case_sha256 {
+        return Err(MusicEditMetamorphicCompositionIssueV1::SerializationError);
+    }
+    Ok(())
+}
+
 /// Revalidate each existing pair and receipt, enforce exact edge continuity,
 /// and compose the property mappings along the path.
 pub fn compose_music_edit_metamorphic_path_v1(
@@ -538,12 +609,12 @@ pub fn compose_music_edit_metamorphic_path_v1(
 /// Compare two paths from the same exact start state. The result qualifies
 /// property-map and task-contract commutation, not waveform equivalence.
 pub fn compare_music_edit_metamorphic_paths_v1(
-    left: &MusicEditMetamorphicPathV1,
-    right: &MusicEditMetamorphicPathV1,
-    expected_to_commute: bool,
+    case: &MusicEditMetamorphicCommutatorCaseV1,
+    left_path: &MusicEditMetamorphicPathV1,
+    right_path: &MusicEditMetamorphicPathV1,
 ) -> Result<MusicEditMetamorphicCommutatorReportV1, Vec<MusicEditMetamorphicCompositionIssueV1>> {
-    let left = compose_music_edit_metamorphic_path_v1(left)?;
-    let right = compose_music_edit_metamorphic_path_v1(right)?;
+    let left = compose_music_edit_metamorphic_path_v1(left_path)?;
+    let right = compose_music_edit_metamorphic_path_v1(right_path)?;
 
     let same_start = left.dataset_id == right.dataset_id
         && left.dataset_version == right.dataset_version
@@ -560,6 +631,9 @@ pub fn compare_music_edit_metamorphic_paths_v1(
             MusicEditMetamorphicCompositionIssueV1::PathsDoNotShareStartState,
         ]);
     }
+    if let Err(issue) = verify_commutator_case(case, &left, &right) {
+        return Err(vec![issue]);
+    }
 
     let mapping_commutes = mappings_have_same_semantics(
         &left.composed_property_mapping,
@@ -574,14 +648,16 @@ pub fn compare_music_edit_metamorphic_paths_v1(
 
     Ok(MusicEditMetamorphicCommutatorReportV1 {
         schema_version: MUSIC_EDIT_METAMORPHIC_COMMUTATOR_REPORT_SCHEMA_V1.to_owned(),
+        case_id: case.case_id.clone(),
+        case_sha256: case.case_sha256.clone(),
         left_path_sha256: left.path_sha256,
         right_path_sha256: right.path_sha256,
-        expected_to_commute,
+        expected_to_commute: case.expected_to_commute,
         mapping_commutes,
         terminal_instruction_matches,
         terminal_validity_envelope_matches,
         observed_commutation,
-        passed: observed_commutation == expected_to_commute,
+        passed: observed_commutation == case.expected_to_commute,
     })
 }
 
@@ -801,6 +877,29 @@ mod tests {
         assert_eq!((*scale, *offset, *tolerance), (2.0, 7.0, 0.4));
     }
 
+    fn preregistered_case(
+        case_id: &str,
+        left: &MusicEditMetamorphicPathV1,
+        right: &MusicEditMetamorphicPathV1,
+        expected_to_commute: bool,
+    ) -> MusicEditMetamorphicCommutatorCaseV1 {
+        let left_report = compose_music_edit_metamorphic_path_v1(left).unwrap();
+        let right_report = compose_music_edit_metamorphic_path_v1(right).unwrap();
+        let mut case = MusicEditMetamorphicCommutatorCaseV1 {
+            schema_version: MUSIC_EDIT_METAMORPHIC_COMMUTATOR_CASE_SCHEMA_V1.to_owned(),
+            case_id: case_id.to_owned(),
+            preregistration_sha256: d(29),
+            evaluation_split: "Development".to_owned(),
+            left_path_sha256: left_report.path_sha256,
+            right_path_sha256: right_report.path_sha256,
+            expected_to_commute,
+            rationale: "Frozen synthetic algebra known-answer case.".to_owned(),
+            case_sha256: String::new(),
+        };
+        case.case_sha256 = music_edit_metamorphic_commutator_case_digest_v1(&case).unwrap();
+        case
+    }
+
     #[test]
     fn transposition_and_tempo_scaling_commute_on_disjoint_properties() {
         let (left, right) = disjoint_transform_paths();
@@ -810,10 +909,19 @@ mod tests {
             left_report.composed_property_mapping,
             right_report.composed_property_mapping
         );
-        let report = compare_music_edit_metamorphic_paths_v1(&left, &right, true).unwrap();
+        let case = preregistered_case("pitch-tempo-commute", &left, &right, true);
+        let report = compare_music_edit_metamorphic_paths_v1(&case, &left, &right).unwrap();
         assert!(report.mapping_commutes);
         assert!(report.observed_commutation);
         assert!(report.passed);
+    }
+
+    #[test]
+    fn commutator_expectation_is_digest_bound() {
+        let (left, right) = disjoint_transform_paths();
+        let mut case = preregistered_case("tamper-control", &left, &right, true);
+        case.expected_to_commute = false;
+        assert!(compare_music_edit_metamorphic_paths_v1(&case, &left, &right).is_err());
     }
 
     #[test]
@@ -842,7 +950,8 @@ mod tests {
                 &d(12), &end_instruction, &d(13), &end_envelope,
                 MusicEditMetamorphicTransformFamilyV1::GlobalTransposition, scale),
         ]);
-        let report = compare_music_edit_metamorphic_paths_v1(&left, &right, false).unwrap();
+        let case = preregistered_case("scale-offset-noncommute", &left, &right, false);
+        let report = compare_music_edit_metamorphic_paths_v1(&case, &left, &right).unwrap();
         assert!(!report.mapping_commutes);
         assert!(!report.observed_commutation);
         assert!(report.passed);
