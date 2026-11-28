@@ -226,7 +226,8 @@
         "source_grid_hypothesis_id",
         "target_grid_hypothesis_id",
         "max_phase_error_milli",
-        "max_tempo_delta_milli_bpm"
+        "max_tempo_delta_milli_bpm",
+        "max_tempo_ratio_error_ppm"
       ],
       "properties": {
         "source_anchor_frame": {
@@ -266,6 +267,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 4294967295
+        },
+        "max_tempo_ratio_error_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
         }
       }
     },
