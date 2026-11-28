@@ -229,7 +229,7 @@ pub fn assess_task_outcome_v1(
     };
 
     if dispatch_tick < attempt.authority.effective_from_tick
-        || dispatch_tick > attempt.authority.effective_until_tick
+        || dispatch_tick >= attempt.authority.effective_until_tick
         || attempt
             .authority
             .revoked_at_tick
@@ -338,7 +338,7 @@ pub fn assess_task_outcome_v1(
             if applied_tick < dispatch_tick || observation.observed_at_tick < applied_tick {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectBeforeDispatch);
             }
-            if applied_tick > attempt.authority.effective_until_tick {
+            if applied_tick >= attempt.authority.effective_until_tick {
                 return CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectAfterExpiry);
             }
             if attempt
@@ -540,6 +540,39 @@ mod tests {
         assert_eq!(
             retry_decision_v1(&result),
             CgrbRetryDecisionV1::ReauthorizeThenRetry
+        );
+    }
+
+    #[test]
+    fn false_postcondition_is_a_violation() {
+        let mut observed = observation();
+        observed.postconditions_satisfied = Some(false);
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observed), "world-clock", 21, 5);
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::PostconditionFalse)
+        );
+    }
+
+    #[test]
+    fn assessment_clock_must_match_attempt_clock() {
+        let result = assess_task_outcome_v1(&attempt(), &profile(), Some(&observation()), "other-clock", 21, 5);
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::OutcomeUnknown(CgrbUnknownReasonV1::ClockMismatchOrRegression)
+        );
+    }
+
+    #[test]
+    fn effect_at_expiry_boundary_is_a_violation() {
+        let mut value = attempt();
+        value.authority.effective_until_tick = 19;
+        let mut observed = observation();
+        observed.applied_at_tick = Some(19);
+        let result = assess_task_outcome_v1(&value, &profile(), Some(&observed), "world-clock", 21, 5);
+        assert_eq!(
+            result,
+            CgrbTaskOutcomeV1::Violation(CgrbViolationReasonV1::EffectAfterExpiry)
         );
     }
 
