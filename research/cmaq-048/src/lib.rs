@@ -84,9 +84,7 @@ impl FourierFeatureMap {
         }
 
         let inverse_sqrt_frequency_count = 1.0 / (frequencies.len() as f64).sqrt();
-        if !inverse_sqrt_frequency_count.is_finite()
-            || inverse_sqrt_frequency_count <= 0.0
-        {
+        if !inverse_sqrt_frequency_count.is_finite() || inverse_sqrt_frequency_count <= 0.0 {
             return Err(KernelError::ArithmeticOverflow);
         }
 
@@ -142,11 +140,7 @@ impl FourierFeatureMap {
 
     /// Approximate Gaussian-kernel inner product for two inputs under this
     /// fixed frequency bank.
-    pub fn approximate_rbf_kernel(
-        &self,
-        left: &[f64],
-        right: &[f64],
-    ) -> Result<f64, KernelError> {
+    pub fn approximate_rbf_kernel(&self, left: &[f64], right: &[f64]) -> Result<f64, KernelError> {
         let left_features = self.transform(left)?;
         let right_features = self.transform(right)?;
         dot(&left_features, &right_features)
@@ -197,8 +191,12 @@ impl KernelMeanApproachabilityMonitor {
             &null_reference_receipt_sha256,
             "null_reference_receipt_sha256",
         )?;
-        let monitor =
-            ConvexTargetApproachabilityMonitor::new(target, 1.0, alpha_numerator, alpha_denominator)?;
+        let monitor = ConvexTargetApproachabilityMonitor::new(
+            target,
+            1.0,
+            alpha_numerator,
+            alpha_denominator,
+        )?;
 
         Ok(Self {
             feature_map,
@@ -211,10 +209,7 @@ impl KernelMeanApproachabilityMonitor {
 
     /// Transforms and observes one raw input. Validation or transform failure
     /// occurs before the CMAQ-046 evidence state is mutated.
-    pub fn observe(
-        &mut self,
-        input: &[f64],
-    ) -> Result<KernelApproachabilityUpdate, KernelError> {
+    pub fn observe(&mut self, input: &[f64]) -> Result<KernelApproachabilityUpdate, KernelError> {
         if input.len() != self.feature_map.input_dimension() {
             return Err(KernelError::DimensionMismatch);
         }
@@ -300,9 +295,7 @@ fn dot(left: &[f64], right: &[f64]) -> Result<f64, KernelError> {
 }
 
 fn l2_norm(values: &[f64]) -> f64 {
-    values
-        .iter()
-        .fold(0.0f64, |norm, value| norm.hypot(*value))
+    values.iter().fold(0.0f64, |norm, value| norm.hypot(*value))
 }
 
 #[cfg(test)]
@@ -400,13 +393,15 @@ mod tests {
 
         assert_eq!([0.2f64, -0.2f64].iter().sum::<f64>(), 0.0);
         assert_eq!([0.8f64, -0.8f64].iter().sum::<f64>(), 0.0);
-        assert!(l2_norm(
-            &null_mean
-                .iter()
-                .zip(&shifted_mean)
-                .map(|(left, right)| left - right)
-                .collect::<Vec<_>>()
-        ) > 0.5);
+        assert!(
+            l2_norm(
+                &null_mean
+                    .iter()
+                    .zip(&shifted_mean)
+                    .map(|(left, right)| left - right)
+                    .collect::<Vec<_>>()
+            ) > 0.5
+        );
         assert!(null_mean[1].abs() < 1e-12);
         assert!(shifted_mean[1].abs() < 1e-12);
         assert!(null_mean[3].abs() < 1e-12);
@@ -529,10 +524,7 @@ mod tests {
             REFERENCE_SHA.into(),
         )
         .unwrap();
-        assert_eq!(
-            monitor.observe(&[0.6]),
-            Err(KernelError::InputNormExceeded)
-        );
+        assert_eq!(monitor.observe(&[0.6]), Err(KernelError::InputNormExceeded));
         assert_eq!(monitor.observations_seen(), 0);
     }
 }
