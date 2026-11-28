@@ -257,4 +257,12 @@ Keep all numbers versioned and architecture-stratified:
 - **EVA-Bench 2.0 snapshot (Oct 15):** faithfulness 66.2% Grok Voice 3.0, 49.4% gpt-realtime-2.1, 42.1% Gemini 3.8 Live Extended Thinking (high), for 213 clean-audio enterprise scenarios. Source: https://www.fullduplex.ai/analytics
 - **StreamEval:** 300 scripted 15–300 s sessions; the highest reported Following score among seven avatar-performance models is 36.90. Preserve the task-specific denominator and do not add the custom-avatar bonus when comparing content quality. Source: https://arxiv.org/abs/2610.28402
 
+## CGRB information-flow boundary — 2026-11-28
+
+The CGRB pilot now separates the complete evaluator manifest from the model-visible input projection. The new `crates/domains/symthaea-soma/src/cgrb_scenario.rs` is exported from `symthaea-soma`; it allowlists only scenario identity, task family, opaque media/session tokens, and the exact authority scope the agent needs to reason about. It excludes gold intent/addressee, gold action IDs, expected outcome/final claim, goal postconditions, hidden interruptions, oracle identity, initial-state evidence, grant token and rights/policy internals.
+
+Six Rust regression tests are authored for model-view non-leakage, evaluator-only gold access, invalid visibility/authority/digest rejection, and manifest-digest binding. They remain uncompiled/unexecuted. The projection assumes independent schema validation has already happened; it is an allowlist projection, not a complete JSON Schema validator. The raw media path still requires separate capture and use permissions.
+
+Latest CGRB source inventory: 16 deterministic-world regression tests, 23 state-outcome/read-only-oracle tests, and 6 model/evaluator projection tests. All 45 are authored, not executed. The in-memory world remains reference-only; the read-only oracle is a typed boundary whose actual independently operated service is not yet implemented or qualified.
+
 The strategy is not to beat all these systems in one aggregate leaderboard. It is to run matched adapters and improve on their weak dimensions while adding independently qualified external-state, output-stop and recovery evidence.
