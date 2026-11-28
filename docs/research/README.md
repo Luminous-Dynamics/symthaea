@@ -60,6 +60,9 @@ event contract.
 - [Scene graph v2 fixtures](SYMTHAEA_SCENE_GRAPH_FIXTURES_V2_2026-11-27.json)
 - [Typed scene graph v2 compiler and verifier](../../crates/domains/symthaea-soma/src/embodiment_scene_graph.rs)
 - [Deterministic seven-form Bevy layout](../../renderers/symthaea-soma-bevy/src/visual_grammar.rs)
+- [Event-triggered temporal foveation research](SYMTHAEA_EVENT_TRIGGERED_TEMPORAL_FOVEATION_V0_1_2026-11-28.md)
+- [Temporal pixel-budget foveation scheduler](../../crates/domains/symthaea-foveation/src/temporal_budget.rs)
+- [Foveation manager integration](../../crates/domains/symthaea-foveation/src/manager.rs)
 - [Interaction trace schema](SYMTHAEA_INTERACTION_TRACE_SCHEMA_V1_2026-11-27.json)
 - [Interaction trace fixtures](SYMTHAEA_INTERACTION_TRACE_FIXTURES_V1_2026-11-27.json)
 - [Causal interaction-trace verifier](../../crates/domains/symthaea-soma/src/embodiment_interaction_trace.rs)
@@ -76,11 +79,11 @@ event contract.
 - [Embodiment form registry](SYMTHAEA_EMBODIMENT_FORM_REGISTRY_V1_2026-11-27.json)
 
 The renderer-independent event, projection, policy, receipt, scene, scene-graph, turn-control, continuity, interaction-trace verification, compositor-feedback, audiovisual-counterfactual and benchmark-license modules live under
-`crates/domains/symthaea-soma/src/`. The cross-event trace verifier has a Rust CLI at
+`crates/domains/symthaea-soma/src/`. The optional temporal pixel-budget policy lives in the separate `crates/domains/symthaea-foveation/` package and is disabled by default. The cross-event trace verifier has a Rust CLI at
 `crates/domains/symthaea-soma/src/bin/verify_interaction_trace.rs`; it checks causal relationships but is not a JSON Schema validator.
 A standalone Bevy 0.20.1 adapter has transition-aware source code under
 `renderers/symthaea-soma-bevy/`, outside the root Cargo workspace; it has not been built or run.
-All 190 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
+All 203 current regression tests are authored but unexecuted, and no VideoFDB, StreamEval, TurnBench or InteractionBench evaluation result is claimed.
 
 ## Theoretical Foundations
 
