@@ -17,6 +17,11 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::extractor::{ContentExtractor, ContentType, ExtractedContent};
+use super::ssrf::{
+    GuardedDnsResolver, is_dns_policy_rejection, is_dns_policy_rejection_anyhow,
+    is_redirect_policy_rejection_anyhow, is_url_policy_rejection_anyhow, reject_redirect_response,
+    validate_request_url,
+};
 use super::types::{
     AcquisitionOutcome, AcquisitionReceipt, AcquisitionStage, EpistemicStatus, ResearchSource,
     ResearchStatus, VerifiedClaim, WebResearchConfig, WebResearchReport, WebResearchResult,
@@ -79,6 +84,9 @@ impl WebResearcher {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(config.request_timeout_ms))
             .user_agent(&config.user_agent)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .dns_resolver(GuardedDnsResolver::system())
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -524,21 +532,41 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::SearchProvider,
                         query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
+                        outcome,
                     );
                     receipt.provider = Some(provider.to_string());
                     receipt.requested_url = requested_url;
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("SEARCH_PROVIDER_FAILED".to_string());
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else if http_status == Some(429) {
+                        "SEARCH_RATE_LIMITED".to_string()
+                    } else {
+                        "SEARCH_PROVIDER_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -582,21 +610,34 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
-                    let mut receipt = make_receipt(
-                        query_rank,
-                        None,
-                        AcquisitionStage::ArxivApi,
-                        query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
-                    );
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
+                    let mut receipt =
+                        make_receipt(query_rank, None, AcquisitionStage::ArxivApi, query, outcome);
                     receipt.provider = Some("arxiv".to_string());
                     receipt.requested_url = Some(self.config.arxiv_endpoint.clone());
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("ARXIV_SEARCH_FAILED".to_string());
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else {
+                        "ARXIV_SEARCH_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -640,21 +681,39 @@ impl WebResearcher {
                 }
                 Err(error) => {
                     let http_status = http_status_from_error(&error);
+                    let redirect_rejected = is_redirect_policy_rejection_anyhow(&error);
+                    let url_rejected = is_url_policy_rejection_anyhow(&error);
+                    let dns_rejected = is_dns_policy_rejection_anyhow(&error);
+                    let outcome = if http_status == Some(429) {
+                        AcquisitionOutcome::RateLimited
+                    } else if redirect_rejected {
+                        AcquisitionOutcome::RedirectRejected
+                    } else if url_rejected {
+                        AcquisitionOutcome::UrlPolicyRejected
+                    } else if dns_rejected {
+                        AcquisitionOutcome::DnsPolicyRejected
+                    } else {
+                        AcquisitionOutcome::ProviderFailed
+                    };
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::OpenReviewApi,
                         query,
-                        if http_status == Some(429) {
-                            AcquisitionOutcome::RateLimited
-                        } else {
-                            AcquisitionOutcome::ProviderFailed
-                        },
+                        outcome,
                     );
                     receipt.provider = Some("openreview".to_string());
                     receipt.requested_url = Some(self.config.openreview_endpoint.clone());
                     receipt.http_status = http_status;
-                    receipt.reason_code = Some("OPENREVIEW_SEARCH_FAILED".to_string());
+                    receipt.reason_code = Some(if redirect_rejected {
+                        "REDIRECT_REJECTED".to_string()
+                    } else if url_rejected {
+                        "URL_POLICY_REJECTED".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
+                    } else {
+                        "OPENREVIEW_SEARCH_FAILED".to_string()
+                    });
                     receipt.reason = Some(format!("{error:#}"));
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
@@ -728,186 +787,213 @@ impl WebResearcher {
             urls.extend(seeded_urls);
         }
 
-        // DuckDuckGo HTML fallback.
+        // DuckDuckGo HTML fallback. Fixed provider URLs still pass the common URL gate.
         let ddg_url = format!("https://html.duckduckgo.com/html/?q={}", encoded_query);
-        let started = Instant::now();
-        match self.client.get(&ddg_url).send().await {
-            Err(error) => {
-                let mut receipt = make_receipt(
-                    query_rank,
-                    None,
-                    AcquisitionStage::DuckDuckGo,
-                    query,
-                    if error.is_timeout() {
-                        AcquisitionOutcome::Timeout
-                    } else {
-                        AcquisitionOutcome::ProviderFailed
-                    },
-                );
-                receipt.provider = Some("duckduckgo-html".to_string());
-                receipt.requested_url = Some(ddg_url);
-                receipt.reason_code = Some(if error.is_timeout() {
-                    "SEARCH_TIMEOUT".to_string()
-                } else {
-                    "SEARCH_REQUEST_FAILED".to_string()
-                });
-                receipt.reason = Some(error.to_string());
-                receipt.elapsed_ms = elapsed_ms(started);
-                receipts.push(receipt);
-            }
-            Ok(mut response) => {
-                let status = response.status();
-                let final_url = response.url().to_string();
-                let content_type = response
-                    .headers()
-                    .get(reqwest::header::CONTENT_TYPE)
-                    .and_then(|value| value.to_str().ok())
-                    .map(str::to_string);
-                if !status.is_success() {
+        if let Err(error) = validate_request_url(&ddg_url) {
+            let mut receipt = make_receipt(
+                query_rank,
+                None,
+                AcquisitionStage::DuckDuckGo,
+                query,
+                AcquisitionOutcome::UrlPolicyRejected,
+            );
+            receipt.provider = Some("duckduckgo-html".to_string());
+            receipt.requested_url = Some(ddg_url);
+            receipt.reason_code = Some("URL_POLICY_REJECTED".to_string());
+            receipt.reason = Some(error.to_string());
+            receipts.push(receipt);
+        } else {
+            let started = Instant::now();
+            match self.client.get(&ddg_url).send().await {
+                Err(error) => {
+                    let dns_rejected = is_dns_policy_rejection(&error);
                     let mut receipt = make_receipt(
                         query_rank,
                         None,
                         AcquisitionStage::DuckDuckGo,
                         query,
-                        if status.as_u16() == 429 {
-                            AcquisitionOutcome::RateLimited
+                        if error.is_timeout() {
+                            AcquisitionOutcome::Timeout
+                        } else if dns_rejected {
+                            AcquisitionOutcome::DnsPolicyRejected
                         } else {
-                            AcquisitionOutcome::HttpError
+                            AcquisitionOutcome::ProviderFailed
                         },
                     );
                     receipt.provider = Some("duckduckgo-html".to_string());
                     receipt.requested_url = Some(ddg_url);
-                    receipt.final_url = Some(final_url);
-                    receipt.http_status = Some(status.as_u16());
-                    receipt.content_type = content_type;
-                    receipt.reason_code = Some(if status.as_u16() == 429 {
-                        "SEARCH_RATE_LIMITED".to_string()
+                    receipt.reason_code = Some(if error.is_timeout() {
+                        "SEARCH_TIMEOUT".to_string()
+                    } else if dns_rejected {
+                        "DNS_POLICY_REJECTED".to_string()
                     } else {
-                        "SEARCH_HTTP_ERROR".to_string()
+                        "SEARCH_REQUEST_FAILED".to_string()
                     });
-                    receipt.reason = Some(format!("DuckDuckGo returned HTTP {status}"));
+                    receipt.reason = Some(error.to_string());
                     receipt.elapsed_ms = elapsed_ms(started);
                     receipts.push(receipt);
-                } else {
-                    let mut body = Vec::new();
-                    let mut truncated = false;
-                    let mut read_error = None;
-                    loop {
-                        match response.chunk().await {
-                            Ok(Some(chunk)) => {
-                                let remaining =
-                                    self.config.max_content_length.saturating_sub(body.len());
-                                let take = remaining.min(chunk.len());
-                                body.extend_from_slice(&chunk[..take]);
-                                if take < chunk.len() {
-                                    truncated = true;
-                                    break;
-                                }
-                            }
-                            Ok(None) => break,
-                            Err(error) => {
-                                read_error = Some(error.to_string());
-                                break;
-                            }
-                        }
-                    }
-
-                    if let Some(reason) = read_error {
+                }
+                Ok(mut response) => {
+                    let status = response.status();
+                    let final_url = response.url().to_string();
+                    let content_type = response
+                        .headers()
+                        .get(reqwest::header::CONTENT_TYPE)
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_string);
+                    if !status.is_success() {
                         let mut receipt = make_receipt(
                             query_rank,
                             None,
                             AcquisitionStage::DuckDuckGo,
                             query,
-                            AcquisitionOutcome::ReadFailed,
+                            if status.as_u16() == 429 {
+                                AcquisitionOutcome::RateLimited
+                            } else if status.is_redirection() {
+                                AcquisitionOutcome::RedirectRejected
+                            } else {
+                                AcquisitionOutcome::HttpError
+                            },
                         );
                         receipt.provider = Some("duckduckgo-html".to_string());
                         receipt.requested_url = Some(ddg_url);
                         receipt.final_url = Some(final_url);
                         receipt.http_status = Some(status.as_u16());
                         receipt.content_type = content_type;
-                        receipt.captured_bytes = body.len();
-                        receipt.content_sha256 = Some(sha256_hex(&body));
-                        receipt.reason_code = Some("SEARCH_BODY_READ_FAILED".to_string());
-                        receipt.reason = Some(reason);
+                        receipt.reason_code = Some(if status.as_u16() == 429 {
+                            "SEARCH_RATE_LIMITED".to_string()
+                        } else if status.is_redirection() {
+                            "REDIRECT_REJECTED".to_string()
+                        } else {
+                            "SEARCH_HTTP_ERROR".to_string()
+                        });
+                        receipt.reason = Some(if status.is_redirection() {
+                            format!("automatic redirects are disabled; refused HTTP {status}")
+                        } else {
+                            format!("DuckDuckGo returned HTTP {status}")
+                        });
                         receipt.elapsed_ms = elapsed_ms(started);
                         receipts.push(receipt);
                     } else {
-                        let html_text = String::from_utf8_lossy(&body).into_owned();
-                        match scraper::Selector::parse("a.result__url") {
-                            Err(error) => {
-                                let mut receipt = make_receipt(
-                                    query_rank,
-                                    None,
-                                    AcquisitionStage::DuckDuckGo,
-                                    query,
-                                    AcquisitionOutcome::ExtractionFailed,
-                                );
-                                receipt.provider = Some("duckduckgo-html".to_string());
-                                receipt.requested_url = Some(ddg_url);
-                                receipt.final_url = Some(final_url);
-                                receipt.http_status = Some(status.as_u16());
-                                receipt.content_type = content_type;
-                                receipt.captured_bytes = body.len();
-                                receipt.content_sha256 = Some(sha256_hex(&body));
-                                receipt.reason_code =
-                                    Some("SEARCH_RESULT_EXTRACTION_FAILED".to_string());
-                                receipt.reason = Some(error.to_string());
-                                receipt.elapsed_ms = elapsed_ms(started);
-                                receipts.push(receipt);
-                            }
-                            Ok(selector) => {
-                                let document = scraper::Html::parse_document(&html_text);
-                                let mut found = Vec::new();
-                                for element in document.select(&selector) {
-                                    if let Some(href) = element.value().attr("href") {
-                                        if !href.contains("duckduckgo.com")
-                                            && href.starts_with("http")
-                                        {
-                                            found.push(href.to_string());
-                                        }
+                        let mut body = Vec::new();
+                        let mut truncated = false;
+                        let mut read_error = None;
+                        loop {
+                            match response.chunk().await {
+                                Ok(Some(chunk)) => {
+                                    let remaining =
+                                        self.config.max_content_length.saturating_sub(body.len());
+                                    let take = remaining.min(chunk.len());
+                                    body.extend_from_slice(&chunk[..take]);
+                                    if take < chunk.len() {
+                                        truncated = true;
+                                        break;
                                     }
                                 }
-                                let mut receipt = make_receipt(
-                                    query_rank,
-                                    None,
-                                    AcquisitionStage::DuckDuckGo,
-                                    query,
-                                    if truncated {
-                                        AcquisitionOutcome::FetchedTruncated
-                                    } else if found.is_empty() {
-                                        AcquisitionOutcome::NoResults
+                                Ok(None) => break,
+                                Err(error) => {
+                                    read_error = Some(error.to_string());
+                                    break;
+                                }
+                            }
+                        }
+                        if let Some(reason) = read_error {
+                            let mut receipt = make_receipt(
+                                query_rank,
+                                None,
+                                AcquisitionStage::DuckDuckGo,
+                                query,
+                                AcquisitionOutcome::ReadFailed,
+                            );
+                            receipt.provider = Some("duckduckgo-html".to_string());
+                            receipt.requested_url = Some(ddg_url);
+                            receipt.final_url = Some(final_url);
+                            receipt.http_status = Some(status.as_u16());
+                            receipt.content_type = content_type;
+                            receipt.captured_bytes = body.len();
+                            receipt.content_sha256 = Some(sha256_hex(&body));
+                            receipt.reason_code = Some("SEARCH_BODY_READ_FAILED".to_string());
+                            receipt.reason = Some(reason);
+                            receipt.elapsed_ms = elapsed_ms(started);
+                            receipts.push(receipt);
+                        } else {
+                            let html_text = String::from_utf8_lossy(&body).into_owned();
+                            match scraper::Selector::parse("a.result__url") {
+                                Err(error) => {
+                                    let mut receipt = make_receipt(
+                                        query_rank,
+                                        None,
+                                        AcquisitionStage::DuckDuckGo,
+                                        query,
+                                        AcquisitionOutcome::ExtractionFailed,
+                                    );
+                                    receipt.provider = Some("duckduckgo-html".to_string());
+                                    receipt.requested_url = Some(ddg_url);
+                                    receipt.final_url = Some(final_url);
+                                    receipt.http_status = Some(status.as_u16());
+                                    receipt.content_type = content_type;
+                                    receipt.captured_bytes = body.len();
+                                    receipt.content_sha256 = Some(sha256_hex(&body));
+                                    receipt.reason_code =
+                                        Some("SEARCH_RESULT_EXTRACTION_FAILED".to_string());
+                                    receipt.reason = Some(error.to_string());
+                                    receipt.elapsed_ms = elapsed_ms(started);
+                                    receipts.push(receipt);
+                                }
+                                Ok(selector) => {
+                                    let document = scraper::Html::parse_document(&html_text);
+                                    let mut found = Vec::new();
+                                    for element in document.select(&selector) {
+                                        if let Some(href) = element.value().attr("href") {
+                                            if !href.contains("duckduckgo.com")
+                                                && href.starts_with("http")
+                                            {
+                                                found.push(href.to_string());
+                                            }
+                                        }
+                                    }
+                                    let mut receipt = make_receipt(
+                                        query_rank,
+                                        None,
+                                        AcquisitionStage::DuckDuckGo,
+                                        query,
+                                        if truncated {
+                                            AcquisitionOutcome::FetchedTruncated
+                                        } else if found.is_empty() {
+                                            AcquisitionOutcome::NoResults
+                                        } else {
+                                            AcquisitionOutcome::ResultsFound
+                                        },
+                                    );
+                                    receipt.provider = Some("duckduckgo-html".to_string());
+                                    receipt.requested_url = Some(ddg_url);
+                                    receipt.final_url = Some(final_url);
+                                    receipt.http_status = Some(status.as_u16());
+                                    receipt.content_type = content_type;
+                                    receipt.captured_bytes = body.len();
+                                    receipt.content_sha256 = Some(sha256_hex(&body));
+                                    receipt.reason_code = if truncated {
+                                        Some("SEARCH_RESPONSE_TRUNCATED_AT_BUDGET".to_string())
                                     } else {
-                                        AcquisitionOutcome::ResultsFound
-                                    },
-                                );
-                                receipt.provider = Some("duckduckgo-html".to_string());
-                                receipt.requested_url = Some(ddg_url);
-                                receipt.final_url = Some(final_url);
-                                receipt.http_status = Some(status.as_u16());
-                                receipt.content_type = content_type;
-                                receipt.captured_bytes = body.len();
-                                receipt.content_sha256 = Some(sha256_hex(&body));
-                                receipt.reason_code = if truncated {
-                                    Some("SEARCH_RESPONSE_TRUNCATED_AT_BUDGET".to_string())
-                                } else {
-                                    None
-                                };
-                                receipt.reason = if truncated {
-                                    Some(format!(
-                                        "search HTML capture stopped at the {} byte budget",
-                                        self.config.max_content_length
-                                    ))
-                                } else if found.is_empty() {
-                                    Some(
-                                        "search completed successfully with zero organic links"
-                                            .to_string(),
-                                    )
-                                } else {
-                                    None
-                                };
-                                receipt.elapsed_ms = elapsed_ms(started);
-                                receipts.push(receipt);
-                                urls.extend(found);
+                                        None
+                                    };
+                                    receipt.reason = if truncated {
+                                        Some(format!(
+                                            "search HTML capture stopped at the {} byte budget",
+                                            self.config.max_content_length
+                                        ))
+                                    } else if found.is_empty() {
+                                        Some(
+                                            "search completed successfully with zero organic links"
+                                                .to_string(),
+                                        )
+                                    } else {
+                                        None
+                                    };
+                                    receipt.elapsed_ms = elapsed_ms(started);
+                                    receipts.push(receipt);
+                                    urls.extend(found);
+                                }
                             }
                         }
                     }
@@ -983,6 +1069,7 @@ impl WebResearcher {
             .search_endpoint
             .as_deref()
             .unwrap_or("https://google.serper.dev/search");
+        validate_request_url(endpoint)?;
 
         let body = serde_json::json!({
             "q": query,
@@ -998,7 +1085,9 @@ impl WebResearcher {
             .json(&body)
             .send()
             .await
-            .context("Serper search request failed")?
+            .context("Serper search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("Serper search returned a non-success HTTP status")?;
 
@@ -1017,6 +1106,7 @@ impl WebResearcher {
             .as_deref()
             .unwrap_or("https://api.search.brave.com/res/v1/web/search");
         let url = format!("{endpoint}?q={}", urlencoding::encode(query));
+        validate_request_url(&url)?;
 
         let response = self
             .client
@@ -1026,7 +1116,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("Brave search request failed")?
+            .context("Brave search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("Brave search returned a non-success HTTP status")?;
 
@@ -1046,6 +1138,7 @@ impl WebResearcher {
             endpoint,
             urlencoding::encode(query)
         );
+        validate_request_url(&url)?;
 
         let response = self
             .client
@@ -1054,7 +1147,9 @@ impl WebResearcher {
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .send()
             .await
-            .context("SearXNG search request failed")?
+            .context("SearXNG search request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("SearXNG search returned a non-success HTTP status")?;
 
@@ -1085,13 +1180,16 @@ impl WebResearcher {
             "{}?search_query={}&id_list=&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
             self.config.arxiv_endpoint, encoded_query
         );
+        validate_request_url(&url)?;
 
         let response = self
             .client
             .get(url)
             .send()
             .await
-            .context("arXiv API request failed")?
+            .context("arXiv API request failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("arXiv API returned a non-success HTTP status")?;
 
@@ -1103,6 +1201,7 @@ impl WebResearcher {
         let endpoint = self.config.openreview_endpoint.trim_end_matches('/');
         let encoded_query = urlencoding::encode(query);
         let url = format!("{endpoint}?term={encoded_query}");
+        validate_request_url(&url)?;
 
         let mut request = self.client.get(url).header("Accept", "application/json")
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -1110,10 +1209,9 @@ impl WebResearcher {
             request = request.header("Cookie", format!("openreview.accessToken={token}"));
         }
 
-        let response = request
-            .send()
-            .await
-            .context("OpenReview search failed")?
+        let response = request.send().await.context("OpenReview search failed")?;
+        let response = reject_redirect_response(response)?;
+        let response = response
             .error_for_status()
             .context("OpenReview search returned a non-success HTTP status")?;
         let json: Value = response
@@ -1127,12 +1225,33 @@ impl WebResearcher {
     /// Fetch, capture and extract a page while preserving a complete attempt receipt.
     async fn fetch_and_extract_with_receipt(&self, candidate: PageCandidate) -> PageAcquisition {
         let started = Instant::now();
+        if let Err(error) = validate_request_url(&candidate.url) {
+            let mut receipt = make_receipt(
+                candidate.query_rank,
+                Some(candidate.source_rank),
+                AcquisitionStage::PageFetch,
+                &candidate.query,
+                AcquisitionOutcome::UrlPolicyRejected,
+            );
+            receipt.requested_url = Some(candidate.url.clone());
+            receipt.reason_code = Some("URL_POLICY_REJECTED".to_string());
+            receipt.reason = Some(error.to_string());
+            receipt.elapsed_ms = elapsed_ms(started);
+            return PageAcquisition {
+                candidate,
+                receipt,
+                extraction: None,
+            };
+        }
         let response = self.client.get(&candidate.url).send().await;
         let mut response = match response {
             Ok(response) => response,
             Err(error) => {
+                let dns_rejected = is_dns_policy_rejection(&error);
                 let outcome = if error.is_timeout() {
                     AcquisitionOutcome::Timeout
+                } else if dns_rejected {
+                    AcquisitionOutcome::DnsPolicyRejected
                 } else {
                     AcquisitionOutcome::ReadFailed
                 };
@@ -1146,6 +1265,8 @@ impl WebResearcher {
                 receipt.requested_url = Some(candidate.url.clone());
                 receipt.reason_code = Some(if error.is_timeout() {
                     "PAGE_FETCH_TIMEOUT".to_string()
+                } else if dns_rejected {
+                    "DNS_POLICY_REJECTED".to_string()
                 } else {
                     "PAGE_FETCH_REQUEST_FAILED".to_string()
                 });
@@ -1175,6 +1296,8 @@ impl WebResearcher {
                 &candidate.query,
                 if status.as_u16() == 429 {
                     AcquisitionOutcome::RateLimited
+                } else if status.is_redirection() {
+                    AcquisitionOutcome::RedirectRejected
                 } else {
                     AcquisitionOutcome::HttpError
                 },
@@ -1185,10 +1308,21 @@ impl WebResearcher {
             receipt.content_type = content_type;
             receipt.reason_code = Some(if status.as_u16() == 429 {
                 "PAGE_RATE_LIMITED".to_string()
+            } else if status.is_redirection() {
+                "REDIRECT_REJECTED".to_string()
             } else {
                 "PAGE_HTTP_ERROR".to_string()
             });
-            receipt.reason = Some(format!("page fetch returned HTTP {status}"));
+            receipt.reason = Some(if status.is_redirection() {
+                let location = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("<missing or invalid Location>");
+                format!("automatic redirects are disabled; refused next hop {location}")
+            } else {
+                format!("page fetch returned HTTP {status}")
+            });
             receipt.elapsed_ms = elapsed_ms(started);
             return PageAcquisition {
                 candidate,
@@ -2090,5 +2224,26 @@ mod tests {
         assert!(page.attempt_id.contains("q2-page-fetch-4"));
         assert_ne!(search.attempt_id, page.attempt_id);
         assert!(search.captured_at_unix_ms > 0);
+    }
+
+
+    #[tokio::test]
+    async fn page_fetch_rejects_private_ip_literal_before_transport() {
+        let researcher = WebResearcher::new().expect("researcher initialization");
+        let page = researcher
+            .fetch_and_extract_with_receipt(PageCandidate {
+                query_rank: 0,
+                source_rank: 0,
+                query: "SSRF negative control".to_string(),
+                url: "http://127.0.0.1/latest/meta-data/".to_string(),
+            })
+            .await;
+
+        assert_eq!(page.receipt.outcome, AcquisitionOutcome::UrlPolicyRejected);
+        assert_eq!(
+            page.receipt.reason_code.as_deref(),
+            Some("URL_POLICY_REJECTED")
+        );
+        assert!(page.extraction.is_none());
     }
 }

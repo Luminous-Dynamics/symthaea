@@ -1,10 +1,12 @@
-name: WebResearch Bounded Acquisition and Receipts
+name: WebResearch Acquisition, DNS and SSRF Security
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/web_research/ssrf.rs"
       - "src/web_research/researcher.rs"
       - "src/web_research/types.rs"
       - "src/web_research/verifier.rs"
@@ -16,7 +18,7 @@ permissions:
 
 jobs:
   qualify:
-    name: Rust 1.96 bounded acquisition regression tests
+    name: Rust 1.96 acquisition and DNS security contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +26,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.96.0"
-          components: rustfmt
+          components: rustfmt, clippy
       - name: Check touched Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/web_research/researcher.rs src/web_research/types.rs src/web_research/mod.rs src/web_research/verifier.rs
-      - name: Run focused acquisition and receipt tests
+        run: rustfmt +1.96.0 --edition 2024 --check src/web_research/ssrf.rs src/web_research/researcher.rs src/web_research/types.rs src/web_research/mod.rs src/web_research/verifier.rs
+      - name: Run DNS policy and reqwest transport integration tests
+        run: cargo test --manifest-path Cargo.toml --locked --no-default-features --features web_research_module --lib web_research::ssrf::tests
+      - name: Run acquisition-boundary and private-IP negative-control tests
         run: cargo test --manifest-path Cargo.toml --locked --no-default-features --features web_research_module --lib web_research::researcher::tests
+      - name: Clippy WebResearch security-enabled library
+        run: cargo clippy --manifest-path Cargo.toml --locked --no-default-features --features web_research_module --lib -- -D warnings

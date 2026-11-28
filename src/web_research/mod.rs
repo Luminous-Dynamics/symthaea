@@ -83,6 +83,9 @@ pub mod extractor;
 // Epistemic verification
 pub mod verifier;
 
+// Outbound destination policy and DNS-pinned resolver.
+pub mod ssrf;
+
 // Feeds web-research-acquired numeric data into the Conjecture Engine
 // (symthaea-core's symbolic-regression discovery engine). Requires the
 // conjecture engine's math types, which live in symthaea-core unconditionally.
@@ -115,6 +118,10 @@ pub use meta_learning::{
     VerificationStrategy,
 };
 pub use researcher::WebResearcher;
+pub use ssrf::{
+    DnsPolicyRejection, GuardedDnsResolver, UrlPolicyRejection, is_public_destination,
+    validate_request_url,
+};
 pub use types::*;
 pub use verifier::{
     EpistemicVerifier, SourceEvidence, VerificationContext, VerificationResult, VerifierConfig,
