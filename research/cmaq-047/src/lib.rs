@@ -580,8 +580,7 @@ mod tests {
         );
         malformed.authority_receipt_sha256 = "bad".into();
         assert_eq!(
-            ActionCatalog::new(SHA_A.into(), SHA_B.into(), SHA_C.into(), vec![malformed], 2)
-                .err(),
+            ActionCatalog::new(SHA_A.into(), SHA_B.into(), SHA_C.into(), vec![malformed], 2).err(),
             Some(ControlledError::InvalidDigest("authority_receipt_sha256"))
         );
     }
