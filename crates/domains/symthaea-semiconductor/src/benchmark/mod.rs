@@ -4,6 +4,7 @@ pub mod binary_metrics;
 pub mod calibration_requalification;
 pub mod dtco_manifest;
 pub mod gated_streaming_adapter;
+pub mod streaming_revocation_impact;
 pub mod label_consumption_guard;
 pub mod metrology_audit;
 pub mod metrology_qualification_gate;
@@ -143,10 +144,19 @@ pub use gated_streaming_adapter::{
     GATED_STREAMING_ADAPTER_SCHEMA_V1, GatedStreamingAdapterEngineV1, GatedStreamingAdapterErrorV1,
     STREAMING_ADAPTER_POLICY_SCHEMA_V1, STREAMING_DELIVERY_SCHEMA_V1,
     STREAMING_PREDICTION_RECEIPT_SCHEMA_V1, STREAMING_PREDICTION_SCHEMA_V1,
-    STREAMING_UPDATE_RECEIPT_SCHEMA_V1, StreamingAdapterPolicyV1, StreamingAdapterStateV1,
+    STREAMING_UPDATE_RECEIPT_SCHEMA_V1, StreamingAcceptedUpdateJournalEntryV1,
+    StreamingAdapterPolicyV1, StreamingAdapterStateV1,
     StreamingContextStateV1, StreamingLabelDeliveryV1, StreamingPredictionInputV1,
     StreamingPredictionReceiptV1, StreamingUpdateDispositionV1, StreamingUpdateReasonV1,
     StreamingUpdateReceiptV1, create_gated_streaming_adapter_engine_v1,
     deliver_qualified_stream_label_v1, predict_and_register_stream_sample_v1,
     verify_streaming_prediction_receipt_v1, verify_streaming_update_receipt_v1,
+};
+
+pub use streaming_revocation_impact::{
+    STREAMING_REVOCATION_IMPACT_INPUT_SCHEMA_V1, STREAMING_REVOCATION_IMPACT_REPORT_SCHEMA_V1,
+    STREAMING_UPDATE_JOURNAL_ENTRY_SCHEMA_V1, StreamingRevocationImpactInputV1,
+    StreamingRevocationImpactReportV1, StreamingRevocationImpactStatusV1,
+    StreamingUpdateImpactEntryV1, StreamingUpdateImpactStateV1,
+    assess_streaming_revocation_impact_v1,
 };
