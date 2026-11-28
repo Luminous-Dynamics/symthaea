@@ -246,7 +246,7 @@ impl CognitiveProfile {
             let bar: String = "#".repeat(bar_len);
             let pad: String = " ".repeat(max_width - bar_len);
             out.push_str(&format!(
-                "{:<14} |{}{}| {:.1}% ({} benchmarks) {}\n",
+                "{:<14} |{}{}| {:.1}% ({} task metrics; heuristic index) {}\n",
                 d.domain,
                 bar,
                 pad,
