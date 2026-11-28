@@ -58,6 +58,67 @@ pub const MIREX_GOTO_STD_THRESHOLD: f64 = 0.2;
 /// mir_eval P-score window as a fraction of median reference IOI.
 pub const MIREX_P_SCORE_WINDOW_RATIO: f64 = 0.2;
 
+/// Task represented by a MIREX scoring receipt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MirexScoringTask {
+    BeatTracking,
+    DownbeatEstimation,
+}
+
+/// Reproducible metric configuration and reference-source receipt.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirexBeatScoringReceiptV1 {
+    pub schema_version: u16,
+    pub task: MirexScoringTask,
+    pub mirex_evaluator_repository: String,
+    pub mirex_evaluator_commit: String,
+    pub reference_library: String,
+    pub reference_library_version: String,
+    pub reference_library_commit: String,
+    pub sample_rate_hz: u32,
+    pub initial_trim_seconds: u64,
+    pub event_f_measure_tolerance_ms: u64,
+    pub cemgil_sigma_ms: u64,
+    pub continuity_phase_threshold_ppm: u32,
+    pub continuity_period_threshold_ppm: u32,
+    pub goto_error_threshold: f64,
+    pub goto_mean_threshold: f64,
+    pub goto_std_threshold: f64,
+    pub p_score_window_ratio: f64,
+}
+
+/// Produce the exact pinned scoring configuration used by this module.
+pub fn mirex_beat_scoring_receipt(
+    task: MirexScoringTask,
+    sample_rate_hz: u32,
+) -> MirexBeatScoringReceiptV1 {
+    MirexBeatScoringReceiptV1 {
+        schema_version: MIREX_BEAT_SCORE_SCHEMA_VERSION,
+        task,
+        mirex_evaluator_repository: "ismir-mirex/mirex-evaluation".to_string(),
+        mirex_evaluator_commit: MIREX_EVALUATOR_SOURCE_COMMIT.to_string(),
+        reference_library: "mir_eval".to_string(),
+        reference_library_version: MIR_EVAL_REFERENCE_VERSION.to_string(),
+        reference_library_commit: MIR_EVAL_REFERENCE_COMMIT.to_string(),
+        sample_rate_hz,
+        initial_trim_seconds: if task == MirexScoringTask::BeatTracking {
+            MIREX_INITIAL_TRIM_SECONDS
+        } else {
+            0
+        },
+        event_f_measure_tolerance_ms: MIREX_BEAT_F_MEASURE_TOLERANCE_MS,
+        cemgil_sigma_ms: MIREX_CEMGIL_SIGMA_MS,
+        continuity_phase_threshold_ppm: MIREX_CONTINUITY_PHASE_THRESHOLD_PPM,
+        continuity_period_threshold_ppm: MIREX_CONTINUITY_PERIOD_THRESHOLD_PPM,
+        goto_error_threshold: MIREX_GOTO_ERROR_THRESHOLD,
+        goto_mean_threshold: MIREX_GOTO_MEAN_THRESHOLD,
+        goto_std_threshold: MIREX_GOTO_STD_THRESHOLD,
+        p_score_window_ratio: MIREX_P_SCORE_WINDOW_RATIO,
+    }
+}
+
 /// One MIREX beat-track score vector.
 ///
 /// The first eight fields are the MIREX public table metrics, in public-view
@@ -82,6 +143,7 @@ pub struct MirexBeatMetricScores {
 #[serde(deny_unknown_fields)]
 pub struct MirexBeatTrackReportV1 {
     pub schema_version: u16,
+    pub scoring_receipt: MirexBeatScoringReceiptV1,
     pub scores: MirexBeatMetricScores,
     pub reference_beats_input: u64,
     pub estimated_beats_input: u64,
@@ -89,6 +151,22 @@ pub struct MirexBeatTrackReportV1 {
     pub estimated_beats_scored: u64,
     pub sample_rate_hz: u32,
     pub initial_trim_seconds: u64,
+}
+
+/// Separate downbeat-task precision/recall/F-measure result.
+///
+/// The downbeat task uses the 70 ms event tolerance but does not inherit the
+/// beat-tracking task's five-second initial trim.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirexDownbeatEventScoresV1 {
+    pub precision: f64,
+    pub recall: f64,
+    pub f_measure: f64,
+    pub matched_events: u64,
+    pub reference_events: u64,
+    pub estimated_events: u64,
+    pub scoring_receipt: MirexBeatScoringReceiptV1,
 }
 
 /// Errors from invalid event arrays or unsupported source clocks.
@@ -139,6 +217,10 @@ pub fn score_mirex_beat_track(
 
     Ok(MirexBeatTrackReportV1 {
         schema_version: MIREX_BEAT_SCORE_SCHEMA_VERSION,
+        scoring_receipt: mirex_beat_scoring_receipt(
+            MirexScoringTask::BeatTracking,
+            sample_rate_hz,
+        ),
         scores,
         reference_beats_input: reference_frames.len() as u64,
         estimated_beats_input: estimated_frames.len() as u64,
@@ -153,24 +235,68 @@ pub fn score_mirex_beat_track(
 ///
 /// The downbeat task uses its own event list and does not apply the beat
 /// track's five-second initial trim.
-pub fn score_mirex_downbeat_f_measure(
+pub fn score_mirex_downbeat_events(
     reference_frames: &[u64],
     estimated_frames: &[u64],
     sample_rate_hz: u32,
     total_frames: u64,
-) -> Result<f64, MirexBeatMetricError> {
+) -> Result<MirexDownbeatEventScoresV1, MirexBeatMetricError> {
     validate_event_inputs(
         reference_frames,
         estimated_frames,
         sample_rate_hz,
         total_frames,
     )?;
-    Ok(event_f_measure(
+    let matched = event_match_count(
         reference_frames,
         estimated_frames,
         sample_rate_hz,
         MIREX_BEAT_F_MEASURE_TOLERANCE_MS,
-    ))
+    );
+    let precision = if estimated_frames.is_empty() {
+        0.0
+    } else {
+        matched as f64 / estimated_frames.len() as f64
+    };
+    let recall = if reference_frames.is_empty() {
+        0.0
+    } else {
+        matched as f64 / reference_frames.len() as f64
+    };
+    let f_measure = if precision + recall == 0.0 {
+        0.0
+    } else {
+        2.0 * precision * recall / (precision + recall)
+    };
+
+    Ok(MirexDownbeatEventScoresV1 {
+        precision,
+        recall,
+        f_measure,
+        matched_events: matched as u64,
+        reference_events: reference_frames.len() as u64,
+        estimated_events: estimated_frames.len() as u64,
+        scoring_receipt: mirex_beat_scoring_receipt(
+            MirexScoringTask::DownbeatEstimation,
+            sample_rate_hz,
+        ),
+    })
+}
+
+/// Convenience wrapper for callers that only need the downbeat F-measure.
+pub fn score_mirex_downbeat_f_measure(
+    reference_frames: &[u64],
+    estimated_frames: &[u64],
+    sample_rate_hz: u32,
+    total_frames: u64,
+) -> Result<f64, MirexBeatMetricError> {
+    Ok(score_mirex_downbeat_events(
+        reference_frames,
+        estimated_frames,
+        sample_rate_hz,
+        total_frames,
+    )?
+    .f_measure)
 }
 
 /// Explicit track aggregation policy.
@@ -241,6 +367,14 @@ pub fn aggregate_mirex_beat_scores(
         numerator / denominator
     };
 
+    let aggregate_weight_frames: u128 = tracks
+        .iter()
+        .map(|track| u128::from(track.weight_frames))
+        .sum();
+    if aggregate_weight_frames > u128::from(crate::transition::MAX_SAFE_JSON_INTEGER) {
+        return None;
+    }
+
     let scores = MirexBeatMetricScores {
         f_measure: weighted(|scores| scores.f_measure),
         cemgil: weighted(|scores| scores.cemgil),
@@ -256,7 +390,7 @@ pub fn aggregate_mirex_beat_scores(
     Some(MirexBeatAggregateScores {
         mode,
         track_count: tracks.len() as u64,
-        total_weight_frames: tracks.iter().map(|track| track.weight_frames).sum(),
+        total_weight_frames: aggregate_weight_frames as u64,
         scores,
     })
 }
@@ -343,14 +477,14 @@ fn score_trimmed_beat_frames(
     }
 }
 
-fn event_f_measure(
+fn event_match_count(
     reference: &[u64],
     estimated: &[u64],
     sample_rate_hz: u32,
     tolerance_ms: u64,
-) -> f64 {
+) -> usize {
     if reference.is_empty() || estimated.is_empty() {
-        return 0.0;
+        return 0;
     }
     let sample_rate = f64::from(sample_rate_hz);
     let tolerance_seconds = tolerance_ms as f64 / 1_000.0;
@@ -382,7 +516,20 @@ fn event_f_measure(
             reference_index += 1;
         }
     }
+    matching_count
+}
 
+fn event_f_measure(
+    reference: &[u64],
+    estimated: &[u64],
+    sample_rate_hz: u32,
+    tolerance_ms: u64,
+) -> f64 {
+    let matching_count =
+        event_match_count(reference, estimated, sample_rate_hz, tolerance_ms);
+    if reference.is_empty() || estimated.is_empty() {
+        return 0.0;
+    }
     let precision = matching_count as f64 / estimated.len() as f64;
     let recall = matching_count as f64 / reference.len() as f64;
     if precision + recall == 0.0 {
@@ -448,7 +595,7 @@ fn reference_beat_variations(reference: &[f64]) -> Vec<Vec<f64>> {
     let mut doubled = Vec::with_capacity(reference.len().saturating_mul(2).saturating_sub(1));
     for pair in reference.windows(2) {
         doubled.push(pair[0]);
-        doubled.push((pair[0] + pair[1]) * 0.5);
+        doubled.push(pair[0] + (pair[1] - pair[0]) * 0.5);
     }
     if let Some(last) = reference.last() {
         doubled.push(*last);
@@ -890,6 +1037,18 @@ mod tests {
         let estimated = [1_000, 2_000, 3_000];
         let score = score_mirex_downbeat_f_measure(&reference, &estimated, 1_000, 10_000).unwrap();
         assert_eq!(score, 1.0);
+
+        let report = score_mirex_downbeat_events(
+            &[1_000, 2_000, 3_000],
+            &[1_000, 2_000, 4_000],
+            1_000,
+            10_000,
+        )
+        .unwrap();
+        assert!((report.precision - 2.0 / 3.0).abs() < 1e-12);
+        assert!((report.recall - 2.0 / 3.0).abs() < 1e-12);
+        assert!((report.f_measure - 2.0 / 3.0).abs() < 1e-12);
+        assert_eq!(report.scoring_receipt.initial_trim_seconds, 0);
     }
 
     #[test]
