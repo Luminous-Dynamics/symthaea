@@ -159,10 +159,12 @@ fn run_replication(
     let mut alarm = None;
 
     for sequence in 1..=config.horizon {
-        let context = (sequence as usize - 1) % CONTEXTS;
+        let context = (sequence - 1) % CONTEXTS;
+        let sequence_u64 = u64::try_from(sequence)
+            .map_err(|_| "sequence exceeds u64".to_string())?;
         let (x, y) = pair_values(scenario, context, &mut rng);
         let update = monitor
-            .observe_pair(sequence, &format!("{}-{replication}-{sequence}", scenario.name()), context, &[x], &[y])
+            .observe_pair(sequence_u64, &format!("{}-{replication}-{sequence}", scenario.name()), context, &[x], &[y])
             .map_err(|error| format!("paired monitor update failed: {error:?}"))?;
         writeln!(
             csv,
