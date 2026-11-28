@@ -705,17 +705,63 @@ mod tests {
         .is_err());
 
         let mut wrong_trust = trust.clone();
-        wrong_trust["keys"][0]["public_key_hex"] = json!(hex(&SigningKey::from_bytes(&[9; 32]).verifying_key().to_bytes()));
-        let _ = signing_key;
+        wrong_trust["keys"][0]["public_key_hex"] =
+            json!(hex(&SigningKey::from_bytes(&[9; 32]).verifying_key().to_bytes()));
+        let wrong_trust_bytes = serde_json::to_vec(&wrong_trust).unwrap();
+        let wrong_context = ObserverVerificationContext {
+            expected_trust_store_sha256: &sha256(&wrong_trust_bytes),
+            ..context
+        };
+        let (_, _, valid_envelope, _, _) = sample();
         assert!(verify_and_consume(
-            &serde_json::from_slice(&serde_json::to_vec(&sample().2).unwrap()).unwrap(),
+            &valid_envelope,
             &wrong_trust,
-            &serde_json::to_vec(&wrong_trust).unwrap(),
+            &wrong_trust_bytes,
+            &wrong_context,
+            &root,
+            &ledger
+        )
+        .is_err());
+        let _ = signing_key;
+    }
+
+    #[test]
+    fn payload_modified_and_rehashed_without_resigning_fails_strict_signature() {
+        let (task, observation, envelope, trust_bytes, _) = sample();
+        let trust: Value = serde_json::from_slice(&trust_bytes).unwrap();
+        let observation_bytes = serde_json::to_vec(&observation).unwrap();
+        let root = root();
+        let ledger = ledger();
+        let mut changed_envelope = envelope.clone();
+        let original_payload = decode_hex(
+            changed_envelope["payload_hex"].as_str().unwrap(),
+        )
+        .unwrap();
+        let mut modified_payload = original_payload;
+        let mutation_index = modified_payload.len() / 2;
+        modified_payload[mutation_index] ^= 0x01;
+        changed_envelope["payload_hex"] = json!(hex(&modified_payload));
+        changed_envelope["payload_sha256"] = json!(sha256(&modified_payload));
+        let context = ObserverVerificationContext {
+            task: &task,
+            observation: &observation,
+            run_id: "run-001",
+            challenge_nonce: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            verification_time: "2026-11-28T10:01:00Z",
+            task_corpus_sha256: VALID_SHA,
+            expected_trust_store_sha256: &sha256(&trust_bytes),
+            observation_bytes: &observation_bytes,
+        };
+        assert!(verify_and_consume(
+            &changed_envelope,
+            &trust,
+            &trust_bytes,
             &context,
             &root,
             &ledger
         )
         .is_err());
+        assert_eq!(fs::read_dir(ledger).unwrap().count(), 0);
     }
 
     #[test]
