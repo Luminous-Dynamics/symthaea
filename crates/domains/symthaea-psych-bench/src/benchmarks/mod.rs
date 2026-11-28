@@ -14,6 +14,7 @@ pub mod coding;
 pub mod cogbench;
 pub mod consciousness;
 pub mod creativity;
+pub mod cognitive_ecology;
 pub mod executive;
 pub mod inhibition;
 pub mod institutional_reasoning;
