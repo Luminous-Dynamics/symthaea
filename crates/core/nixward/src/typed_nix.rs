@@ -333,6 +333,23 @@ mod tests {
         assert!(!without_escaped_interpolation.contains(&concat!("$", "{")));
     }
 
+    proptest::proptest! {
+        #[test]
+        fn escaped_string_literals_always_parse_when_supported(input in ".*") {
+            match render_string_literal(&input) {
+                Ok(rendered) => {
+                    let source = format!("{{ value = {rendered}; }}");
+                    proptest::prop_assert!(
+                        rnix::Root::parse(&source).errors().is_empty(),
+                        "escaped Nix string did not parse: {source:?}"
+                    );
+                }
+                Err(TypedNixError::UnsupportedControlCharacter(_)) => {}
+                Err(error) => proptest::prop_assert!(false, "unexpected rendering error: {error:?}"),
+            }
+        }
+    }
+
     #[test]
     fn unsupported_control_characters_fail_closed() {
         assert_eq!(
