@@ -69,7 +69,8 @@
           ],
           "confidence_ppm": 760000
         }
-      ]
+      ],
+      "tempo_interpolation": "linear_in_frame_time"
     },
     {
       "hypothesis_id": "grid-60-bpm-half-time",
@@ -123,7 +124,8 @@
           ],
           "confidence_ppm": 760000
         }
-      ]
+      ],
+      "tempo_interpolation": "linear_in_frame_time"
     }
   ],
   "abstention_reason": null
