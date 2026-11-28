@@ -103,6 +103,14 @@ For every arm the report includes:
 
 The audit estimate is not a conditional-on-every-wafer coverage guarantee. The partial-identification interval remains the conservative population statement absent stronger assumptions.
 
+## Mixed-controller known-answer comparison
+
+The test suite now includes a shared two-wafer paired trace with one fixed-delay τ-ACI arm and one bounded-delay CA-OCRC arm. Both arms use the same global-model artifact, interval method, acquisition policy, physical-metrology budget, K1-qualified physical label and independent audit draw.
+
+The CA-OCRC stream admits the selected wafer with a one-round proxy delay, receives the K1-qualified label on the next round and records one successful weighted feedback update. The second wafer is physically unmeasured; this correctly invalidates the CA-OCRC complete-feedback theorem assumptions. The summary must therefore show the feedback result and `ca_ocrc_theorem_assumptions_intact=false`, not transfer the bounded-delay theorem to a selected/unmeasured population.
+
+This is the first end-to-end shared-trace execution that compares both controller families rather than using two ACI arms as the paired fixture.
+
 ## Frozen fixture
 
 The first known-answer fixture is synthetic and has two rounds:
@@ -111,7 +119,7 @@ The first known-answer fixture is synthetic and has two rounds:
 - the independent audit samples wafer 2 with inclusion probability 1 and a separate reference receipt;
 - two paired arms share the same trace, acquisition policy, physical budget and audit draw.
 
-Nine tests currently cover:
+Ten tests currently cover:
 1. successful paired replay with separate physical/qualified/audit counts and ACI coverage;
 2. numeric/K1 row mismatch rejection;
 3. paired arms with different observed audit losses rejection;
@@ -120,7 +128,7 @@ Nine tests currently cover:
 6. unmeasured row cannot carry label/report/delivery evidence;
 7. UNKNOWN/BLOCKED CA-OCRC feedback can remain visible without promoting it to an eligible update;
 8. controller-only scope rejects different global-model or interval-method artifacts;
-9. end-to-end scope accepts a distinct interval method and preserves the scope in the report.
+9. end-to-end scope accepts a distinct interval method and preserves the scope in the report;\n10. mixed τ-ACI/CA-OCRC arms replay on one shared population and audit, with the CA-OCRC theorem claim suspended when one wafer is unmeasured.
 
 Exact-head rustfmt, strict Clippy, crate tests and SEMI-BENCH-001 Reference Oracle are pending for the current branch.
 
