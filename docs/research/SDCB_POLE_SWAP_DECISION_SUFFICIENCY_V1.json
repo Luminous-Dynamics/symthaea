@@ -1,0 +1,393 @@
+{
+  "schema_version": "sdcb-pole-swap-decision-sufficiency-v1",
+  "title": "Decision sufficiency under a structurally non-identifiable process/sensor pole swap",
+  "status": "analytic-frozen-task-adapter;rust-authored-not-compiled-or-ci-qualified",
+  "provenance": {
+    "parent_issue": 14242,
+    "decision_sufficiency_issue": 14038,
+    "pole_swap_issue": 14002,
+    "pole_swap_pr": 14003,
+    "pole_swap_source_commit": "32ed97333ce383ab4c604ee558bb642341872f3e",
+    "pole_swap_source_path": "docs/research/SDCB_RESPONSE_IDENTIFIABILITY_CHALLENGE_V1.json",
+    "pole_swap_source_blob_sha": "edf6da2ec4e4e5effb4638d76fcdcaffa16ff218",
+    "policy_oracle_issue": 13567,
+    "action_probability_enclosure_issue": 14000,
+    "evidence_authority_issue": 13805,
+    "base_commit": "a2ff2ea66799063b3873503bcced96e54b67b5ba"
+  },
+  "worlds": [
+    {
+      "id": "world_a_physical_slow_sensor_fast",
+      "lambda": "0.25",
+      "mu": "4.0",
+      "process_variance": "9.0"
+    },
+    {
+      "id": "world_b_physical_fast_sensor_slow",
+      "lambda": "4.0",
+      "mu": "0.25",
+      "process_variance": "144.0"
+    }
+  ],
+  "probe_families": [
+    {
+      "id": "passive_sensor_output_autocovariance",
+      "mechanism_identifiability": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS",
+      "support_partition": [
+        "{A,B}"
+      ],
+      "original_expected_values": {
+        "lags": [
+          "0",
+          "0.1",
+          "0.5",
+          "1",
+          "4"
+        ],
+        "world_a": [
+          "8.47058823529411764705882352941",
+          "8.43367823797704473817329755810",
+          "7.89719444223072776693323753225",
+          "7.02635118508446703715520352963",
+          "3.32389888727034489954029128027"
+        ],
+        "world_b": [
+          "8.47058823529411764705882352941",
+          "8.43367823797704473817329755810",
+          "7.89719444223072776693323753225",
+          "7.02635118508446703715520352963",
+          "3.32389888727034489954029128027"
+        ]
+      },
+      "synthetic_resource_cost": {
+        "elapsed_slots": 0,
+        "reference_units": 0,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      }
+    },
+    {
+      "id": "upstream_command_first_order_relaxation_cascade",
+      "mechanism_identifiability": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS",
+      "support_partition": [
+        "{A,B}"
+      ],
+      "original_expected_values": {
+        "transfer_function": "H(s)=lambda*mu/((s+lambda)*(s+mu))",
+        "angular_frequencies": [
+          "0",
+          "0.25",
+          "1",
+          "4"
+        ],
+        "magnitude": [
+          "1.0",
+          "0.705729746225969425",
+          "0.235294117647058824",
+          "0.0441081091391230891"
+        ],
+        "phase_radians": [
+          "0.0",
+          "-0.847816973393405658",
+          "-1.57079632679489662",
+          "-2.29377568019638758"
+        ]
+      },
+      "synthetic_resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 0,
+        "actuator_energy_units": 1,
+        "compute_units": 0
+      }
+    },
+    {
+      "id": "traceable_sensor_inlet_step",
+      "mechanism_identifiability": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL",
+      "support_partition": [
+        "{A}",
+        "{B}"
+      ],
+      "original_expected_values": {
+        "step_times": [
+          "0.5",
+          "1",
+          "2"
+        ],
+        "world_a": [
+          "0.864664716763387308106000505028",
+          "0.981684361111265819706281978727",
+          "0.999664537372097488161178610874"
+        ],
+        "world_b": [
+          "0.117503097415404597135107856771",
+          "0.221199216928595131754829733022",
+          "0.393469340287366576396200465009"
+        ]
+      },
+      "synthetic_resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 1,
+        "actuator_energy_units": 1,
+        "compute_units": 0
+      }
+    },
+    {
+      "id": "traceable_sensor_inlet_frequency_sweep",
+      "mechanism_identifiability": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL",
+      "support_partition": [
+        "{A}",
+        "{B}"
+      ],
+      "original_expected_values": {
+        "angular_frequencies": [
+          "0.25",
+          "1",
+          "4"
+        ],
+        "world_a_magnitude": [
+          "0.9980525784828885519",
+          "0.97014250014533189408",
+          "0.7071067811865475244"
+        ],
+        "world_a_phase_radians": [
+          "-0.062418809995957348474",
+          "-0.24497866312686415417",
+          "-0.78539816339744830962"
+        ],
+        "world_b_magnitude": [
+          "0.7071067811865475244",
+          "0.24253562503633297352",
+          "0.062378286155180534494"
+        ],
+        "world_b_phase_radians": [
+          "-0.78539816339744830962",
+          "-1.3258176636680324651",
+          "-1.5083775167989392708"
+        ]
+      },
+      "synthetic_resource_cost": {
+        "elapsed_slots": 2,
+        "reference_units": 1,
+        "actuator_energy_units": 2,
+        "compute_units": 0
+      }
+    },
+    {
+      "id": "independent_reference_of_latent_process",
+      "mechanism_identifiability": "IDENTIFIABLE_WITHIN_FROZEN_TWO_WORLD_MODEL",
+      "support_partition": [
+        "{A}",
+        "{B}"
+      ],
+      "original_expected_values": {
+        "reference_response": "known_instantaneous_or_independently_characterized",
+        "lags": [
+          "0.5",
+          "1",
+          "4"
+        ],
+        "world_a": [
+          "7.94247212326135862578402928906",
+          "7.00920704764264381420653240280",
+          "3.31091497054298089435971393145"
+        ],
+        "world_b": [
+          "19.488280786072227632735927276",
+          "2.63745199997772196229539506335",
+          "0.0000162050651595733124899836257847"
+        ]
+      },
+      "synthetic_resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 2,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      }
+    },
+    {
+      "id": "high_entropy_world_independent_nuisance_control",
+      "mechanism_identifiability": "NON_IDENTIFIABLE_EQUIVALENCE_CLASS",
+      "support_partition": [
+        "{A,B}",
+        "{A,B}"
+      ],
+      "conditional_outcome_law": {
+        "world_a": {
+          "outcome_0": "1/2",
+          "outcome_1": "1/2"
+        },
+        "world_b": {
+          "outcome_0": "1/2",
+          "outcome_1": "1/2"
+        }
+      },
+      "outcome_entropy_bits": "1",
+      "mutual_information_world_bits": "0",
+      "synthetic_resource_cost": {
+        "elapsed_slots": 1,
+        "reference_units": 0,
+        "actuator_energy_units": 0,
+        "compute_units": 0
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TASK_INV_DECISION_INVARIANT",
+      "estimand": "prior-free robust terminal loss over the compatible-world support",
+      "terminal_actions": [
+        {
+          "id": "maintain_safe_configuration",
+          "loss_by_world": {
+            "A": 0,
+            "B": 0
+          }
+        },
+        {
+          "id": "replace_sensor",
+          "loss_by_world": {
+            "A": 1,
+            "B": 1
+          }
+        }
+      ],
+      "baseline": {
+        "compatible_support": [
+          "A",
+          "B"
+        ],
+        "unique_minimax_action": "maintain_safe_configuration",
+        "worst_case_terminal_loss": 0,
+        "decision_status": "DECISION_SUFFICIENT"
+      },
+      "outcomes": {
+        "all_probe_families": "worst_case_terminal_loss remains 0",
+        "disambiguating_sensor_or_reference": "mechanism becomes identifiable but terminal decision loss does not decrease"
+      },
+      "known_answer": {
+        "acquisition_required": false,
+        "unnecessary_probe_decision_value": 0,
+        "decision_regret_without_acquisition": 0
+      }
+    },
+    {
+      "id": "TASK_SENS_DECISION_SENSITIVE",
+      "estimand": "prior-free robust terminal loss over the compatible-world support",
+      "terminal_actions": [
+        {
+          "id": "select_fast_sensor_path",
+          "loss_by_world": {
+            "A": 0,
+            "B": 1
+          }
+        },
+        {
+          "id": "select_slow_sensor_path",
+          "loss_by_world": {
+            "A": 1,
+            "B": 0
+          }
+        }
+      ],
+      "baseline": {
+        "compatible_support": [
+          "A",
+          "B"
+        ],
+        "minimax_terminal_loss": 1,
+        "deterministic_tie_break_action": "select_fast_sensor_path",
+        "decision_status": "DECISION_SENSITIVE_UNRESOLVED"
+      },
+      "after_probe": {
+        "passive_sensor_output_autocovariance": {
+          "support": [
+            "A",
+            "B"
+          ],
+          "worst_case_terminal_loss": 1,
+          "decision_value": 0
+        },
+        "upstream_command_first_order_relaxation_cascade": {
+          "support": [
+            "A",
+            "B"
+          ],
+          "worst_case_terminal_loss": 1,
+          "decision_value": 0
+        },
+        "traceable_sensor_inlet_step": {
+          "outcome_supports": [
+            [
+              "A"
+            ],
+            [
+              "B"
+            ]
+          ],
+          "action_after_A": "select_fast_sensor_path",
+          "action_after_B": "select_slow_sensor_path",
+          "worst_case_terminal_loss": 0,
+          "decision_value": 1
+        },
+        "traceable_sensor_inlet_frequency_sweep": {
+          "outcome_supports": [
+            [
+              "A"
+            ],
+            [
+              "B"
+            ]
+          ],
+          "worst_case_terminal_loss": 0,
+          "decision_value": 1
+        },
+        "independent_reference_of_latent_process": {
+          "outcome_supports": [
+            [
+              "A"
+            ],
+            [
+              "B"
+            ]
+          ],
+          "worst_case_terminal_loss": 0,
+          "decision_value": 1
+        },
+        "high_entropy_world_independent_nuisance_control": {
+          "outcome_supports": [
+            [
+              "A",
+              "B"
+            ],
+            [
+              "A",
+              "B"
+            ]
+          ],
+          "worst_case_terminal_loss": 1,
+          "decision_value": 0
+        }
+      }
+    }
+  ],
+  "decision_semantics": {
+    "robust_terminal_loss": "min_action max_world loss(action,world) over declared compatible support",
+    "post_probe_loss": "max_over_possible_outcomes robust_terminal_loss over each child support",
+    "decision_value": "baseline robust terminal loss minus worst-case post-probe robust terminal loss",
+    "randomized_terminal_actions": false,
+    "bayesian_estimand": "not included; any equal-prior expected-loss variant must be reported separately",
+    "resource_treatment": "resource vector separate from terminal loss; no scalarization or implicit utility conversion"
+  },
+  "validation": {
+    "rust_source": "scripts/research/sdcb_pole_swap_decision_sufficiency.rs",
+    "rust_harness": "scripts/research/run_sdcb_pole_swap_decision_sufficiency_tests.sh",
+    "authored_rust_tests": 9,
+    "rust_compiled": false,
+    "rust_tests_executed": false,
+    "policy_oracle_integration": "fixture prepared for #13567; generic policy solver is not duplicated and no #13567 run is claimed",
+    "source_world_fixture_fetchback": "passed; exact source commit/path/blob SHA recorded above",
+    "physical_validation": false,
+    "decision_authorization": false
+  },
+  "claim_boundary": "Exact two-world analytic decision-sufficiency adapter only. It does not establish physical sensor performance, traceability, a general adaptive policy, or SOTA superiority."
+}
